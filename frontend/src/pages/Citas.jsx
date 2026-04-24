@@ -108,6 +108,37 @@ export default function Citas() {
 
   const setF = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
 
+  const guardar = async (e) => {
+    e.preventDefault();
+    if (!form.mascota_id || !form.fecha || !form.hora || !form.veterinario || !form.motivo) {
+      setErrorPanel('Mascota, fecha, hora, veterinario y motivo son requeridos.');
+      return;
+    }
+    setGuardando(true);
+    setErrorPanel('');
+    try {
+      const payload = {
+        mascota_id: form.mascota_id,
+        fecha: form.fecha,
+        hora: form.hora,
+        veterinario: form.veterinario,
+        motivo: form.motivo,
+        notas: form.notas || null,
+      };
+      if (citaEditando) {
+        await api.put(`/citas/${citaEditando.id}`, { ...payload, estado: citaEditando.estado });
+      } else {
+        await api.post('/citas', payload);
+      }
+      cerrarPanel();
+      cargar();
+    } catch (err) {
+      setErrorPanel(err.response?.data?.error || 'Error al guardar. Intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar esta cita? No se puede deshacer.')) return;
     await api.delete(`/citas/${id}`);
@@ -337,7 +368,126 @@ export default function Citas() {
           </button>
         </div>
 
-        <p className="p-6 text-gray-400 text-sm">Formulario aquí (Task 6)...</p>
+        <form onSubmit={guardar} className="flex-1 overflow-y-auto p-6 space-y-4">
+          {errorPanel && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              {errorPanel}
+            </div>
+          )}
+
+          {/* Mascota */}
+          <div>
+            <label className="label">Mascota *</label>
+            {citaEditando ? (
+              <div className="input bg-gray-50 text-gray-700">{form.mascota_label}</div>
+            ) : (
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-300" />
+                <input
+                  className="input pl-9"
+                  placeholder="Buscar mascota..."
+                  value={busqMascota}
+                  onChange={(e) => {
+                    setBusqMascota(e.target.value);
+                    setForm((f) => ({ ...f, mascota_id: '', mascota_label: '' }));
+                  }}
+                />
+                {busqMascota && !form.mascota_id && mascotasFiltradas.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto mt-1">
+                    {mascotasFiltradas.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setForm((f) => ({
+                            ...f,
+                            mascota_id: m.id,
+                            mascota_label: `${ESPECIES[m.especie] || '🐾'} ${m.nombre}`,
+                          }));
+                          setBusqMascota(`${ESPECIES[m.especie] || '🐾'} ${m.nombre}`);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left"
+                      >
+                        <span className="text-lg">{ESPECIES[m.especie] || '🐾'}</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{m.nombre}</p>
+                          <p className="text-xs text-gray-400">{m.dueno_nombre}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fecha y Hora */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Fecha *</label>
+              <input type="date" className="input" value={form.fecha} onChange={setF('fecha')} required />
+            </div>
+            <div>
+              <label className="label">Hora *</label>
+              <input type="time" className="input" value={form.hora} onChange={setF('hora')} required />
+            </div>
+          </div>
+
+          {/* Veterinario */}
+          <div>
+            <label className="label">Veterinario *</label>
+            <input
+              className="input"
+              list="vets-list"
+              placeholder="Ej: Dr. García"
+              value={form.veterinario}
+              onChange={setF('veterinario')}
+              required
+            />
+            <datalist id="vets-list">
+              {veterinariosUnicos.map((v) => <option key={v} value={v} />)}
+            </datalist>
+          </div>
+
+          {/* Motivo */}
+          <div>
+            <label className="label">Motivo *</label>
+            <input
+              className="input"
+              placeholder="Ej: Vacuna anual, Control rutinario..."
+              value={form.motivo}
+              onChange={setF('motivo')}
+              required
+            />
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="label">Notas <span className="text-gray-400 font-normal">(opcional)</span></label>
+            <textarea
+              className="input resize-none"
+              rows={3}
+              placeholder="Observaciones adicionales..."
+              value={form.notas}
+              onChange={setF('notas')}
+            />
+          </div>
+        </form>
+
+        {/* Footer panel */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+          <button type="button" onClick={cerrarPanel} className="btn-secondary flex-1 justify-center">
+            Cancelar
+          </button>
+          <button
+            onClick={guardar}
+            disabled={guardando}
+            className="btn-primary flex-1 justify-center disabled:opacity-60"
+          >
+            {guardando && <Loader2 className="w-4 h-4 animate-spin" />}
+            {citaEditando ? 'Guardar cambios' : 'Agendar'}
+          </button>
+        </div>
       </div>
     </div>
   );
