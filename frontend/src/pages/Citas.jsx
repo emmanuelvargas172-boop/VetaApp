@@ -66,6 +66,34 @@ export default function Citas() {
     cargar();
   };
 
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const cerrar = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownEstadoId(null);
+      }
+    };
+    document.addEventListener('mousedown', cerrar);
+    return () => document.removeEventListener('mousedown', cerrar);
+  }, []);
+
+  const cambiarEstado = async (citaId, nuevoEstado) => {
+    const estadoAnterior = citas.find((c) => c.id === citaId)?.estado;
+    setCitas((prev) =>
+      prev.map((c) => (c.id === citaId ? { ...c, estado: nuevoEstado } : c))
+    );
+    setDropdownEstadoId(null);
+    try {
+      await api.patch(`/citas/${citaId}/estado`, { estado: nuevoEstado });
+    } catch {
+      setCitas((prev) =>
+        prev.map((c) => (c.id === citaId ? { ...c, estado: estadoAnterior } : c))
+      );
+      alert('No se pudo cambiar el estado. Intenta de nuevo.');
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Cabecera */}
@@ -182,12 +210,31 @@ export default function Citas() {
                 {/* Veterinario */}
                 <p className="text-sm text-gray-500 truncate hidden md:block">{cita.veterinario}</p>
 
-                {/* Estado — badge estático por ahora (Task 4 lo hace clickeable) */}
-                <div>
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${ESTADO_CONFIG[cita.estado]?.badge}`}>
+                {/* Estado con dropdown */}
+                <div className="relative" ref={dropdownEstadoId === cita.id ? dropdownRef : null}>
+                  <span
+                    onClick={() => setDropdownEstadoId(dropdownEstadoId === cita.id ? null : cita.id)}
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full select-none ${ESTADO_CONFIG[cita.estado]?.badge} ${TRANSICIONES[cita.estado]?.length > 0 ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+                  >
                     <span className={`w-1.5 h-1.5 rounded-full ${ESTADO_CONFIG[cita.estado]?.dot}`} />
                     {ESTADO_CONFIG[cita.estado]?.label}
+                    {TRANSICIONES[cita.estado]?.length > 0 && <ChevronDown className="w-3 h-3" />}
                   </span>
+
+                  {dropdownEstadoId === cita.id && TRANSICIONES[cita.estado]?.length > 0 && (
+                    <div className="absolute left-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[140px]">
+                      {TRANSICIONES[cita.estado].map((estado) => (
+                        <button
+                          key={estado}
+                          onClick={() => cambiarEstado(cita.id, estado)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <span className={`w-2 h-2 rounded-full ${ESTADO_CONFIG[estado]?.dot}`} />
+                          {ESTADO_CONFIG[estado]?.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Acciones */}
