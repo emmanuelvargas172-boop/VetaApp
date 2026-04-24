@@ -55,10 +55,58 @@ export default function Citas() {
 
   useEffect(() => { cargar(); }, [filtroFecha, filtroEstado]);
 
+  const FORM_INICIAL = {
+    mascota_id: '', mascota_label: '', fecha: hoy,
+    hora: '', veterinario: '', motivo: '', notas: '',
+  };
+  const [form, setForm]               = useState(FORM_INICIAL);
+  const [mascotas, setMascotas]       = useState([]);
+  const [busqMascota, setBusqMascota] = useState('');
+  const [errorPanel, setErrorPanel]   = useState('');
+  const [guardando, setGuardando]     = useState(false);
+
+  const veterinariosUnicos = useMemo(
+    () => [...new Set(citas.map((c) => c.veterinario).filter(Boolean))],
+    [citas]
+  );
+
+  const mascotasFiltradas = useMemo(() => {
+    if (!busqMascota.trim()) return mascotas.slice(0, 8);
+    const q = busqMascota.toLowerCase();
+    return mascotas.filter(
+      (m) => m.nombre.toLowerCase().includes(q) || m.dueno_nombre.toLowerCase().includes(q)
+    ).slice(0, 8);
+  }, [mascotas, busqMascota]);
+
   const abrirPanel = (cita = null) => {
     setCitaEditando(cita);
+    setErrorPanel('');
+    if (cita) {
+      setForm({
+        mascota_id: cita.mascota_id,
+        mascota_label: `${ESPECIES[cita.especie] || '🐾'} ${cita.mascota_nombre}`,
+        fecha: cita.fecha,
+        hora: cita.hora,
+        veterinario: cita.veterinario,
+        motivo: cita.motivo,
+        notas: cita.notas || '',
+      });
+    } else {
+      setForm(FORM_INICIAL);
+      setBusqMascota('');
+    }
+    if (mascotas.length === 0) {
+      api.get('/mascotas').then((r) => setMascotas(r.data)).catch(() => {});
+    }
     setPanelAbierto(true);
   };
+
+  const cerrarPanel = () => {
+    setPanelAbierto(false);
+    setCitaEditando(null);
+  };
+
+  const setF = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
 
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar esta cita? No se puede deshacer.')) return;
@@ -259,6 +307,38 @@ export default function Citas() {
           </div>
         </div>
       )}
+
+      {/* Overlay */}
+      {panelAbierto && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30"
+          onClick={cerrarPanel}
+        />
+      )}
+
+      {/* Panel lateral */}
+      <div
+        className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${
+          panelAbierto ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {/* Header panel */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-blue-500" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">
+              {citaEditando ? 'Editar Cita' : 'Nueva Cita'}
+            </h2>
+          </div>
+          <button onClick={cerrarPanel} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        <p className="p-6 text-gray-400 text-sm">Formulario aquí (Task 6)...</p>
+      </div>
     </div>
   );
 }
