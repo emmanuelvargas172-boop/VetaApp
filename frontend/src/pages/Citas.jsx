@@ -60,6 +60,12 @@ export default function Citas() {
     setPanelAbierto(true);
   };
 
+  const eliminar = async (id) => {
+    if (!window.confirm('¿Eliminar esta cita? No se puede deshacer.')) return;
+    await api.delete(`/citas/${id}`);
+    cargar();
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Cabecera */}
@@ -114,7 +120,98 @@ export default function Citas() {
         </div>
       </div>
 
-      <p className="text-gray-400 text-sm">Tabla de citas aquí...</p>
+      {/* Tabla */}
+      {cargando ? (
+        <div className="card p-16 flex flex-col items-center">
+          <div className="w-8 h-8 border-4 border-verde-claro border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-gray-400 text-sm">Cargando citas...</p>
+        </div>
+      ) : citas.length === 0 ? (
+        <div className="card p-16 flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 text-3xl">
+            📅
+          </div>
+          <p className="font-semibold text-gray-700">
+            {filtroFecha === 'hoy'
+              ? 'Sin citas para hoy'
+              : filtroFecha === 'semana'
+              ? 'Sin citas esta semana'
+              : 'No hay citas registradas'}
+          </p>
+          <p className="text-gray-400 text-sm mt-1">Agenda la primera cita con el botón de arriba</p>
+          <button onClick={() => abrirPanel()} className="btn-primary mt-5 text-sm">
+            <Plus className="w-4 h-4" /> Nueva Cita
+          </button>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          {/* Cabecera tabla */}
+          <div className="hidden md:grid grid-cols-[80px_1.5fr_1.5fr_1fr_120px_80px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            <span>Hora</span>
+            <span>Mascota</span>
+            <span>Motivo</span>
+            <span>Veterinario</span>
+            <span>Estado</span>
+            <span></span>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {citas.map((cita) => (
+              <div
+                key={cita.id}
+                className="grid grid-cols-1 md:grid-cols-[80px_1.5fr_1.5fr_1fr_120px_80px] gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors items-center group"
+              >
+                {/* Hora */}
+                <div className="flex items-center gap-1.5 text-gray-500">
+                  <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="text-sm font-mono font-medium">{cita.hora}</span>
+                </div>
+
+                {/* Mascota */}
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{ESPECIES[cita.especie] || '🐾'}</span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm truncate">{cita.mascota_nombre}</p>
+                    <p className="text-xs text-gray-400 truncate">{cita.dueno_nombre}</p>
+                  </div>
+                </div>
+
+                {/* Motivo */}
+                <p className="text-sm text-gray-600 truncate">{cita.motivo}</p>
+
+                {/* Veterinario */}
+                <p className="text-sm text-gray-500 truncate hidden md:block">{cita.veterinario}</p>
+
+                {/* Estado — badge estático por ahora (Task 4 lo hace clickeable) */}
+                <div>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${ESTADO_CONFIG[cita.estado]?.badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${ESTADO_CONFIG[cita.estado]?.dot}`} />
+                    {ESTADO_CONFIG[cita.estado]?.label}
+                  </span>
+                </div>
+
+                {/* Acciones */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => abrirPanel(cita)}
+                    className="p-1.5 rounded-lg hover:bg-verde-fondo text-gray-300 hover:text-verde-claro transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => eliminar(cita.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
