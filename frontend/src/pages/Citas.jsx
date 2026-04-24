@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Plus, Calendar, Clock, PawPrint, User, Edit2,
-  Trash2, ChevronDown, X, Loader2, AlertCircle,
-  Search, CheckCircle2
+  Plus, Calendar, Clock, Edit2,
+  Trash2, ChevronDown, X, Loader2, AlertCircle, Search,
 } from 'lucide-react';
 import api from '../api/axios';
 
