@@ -1,0 +1,87 @@
+<h2>¿Cómo se crea una nueva cita?</h2>
+<p class="subtitle">Elige cómo el usuario accede al formulario para agendar</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0faf4;padding:16px;position:relative">
+      <!-- Lista de fondo -->
+      <div style="opacity:0.35;font-size:10px">
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:8px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-weight:bold">Agenda de Citas</span>
+            <div style="background:#40916C;color:white;padding:2px 8px;border-radius:4px;font-size:9px">+ Nueva Cita</div>
+          </div>
+          <div style="height:40px;background:#f9fafb;border-radius:4px"></div>
+        </div>
+      </div>
+      <!-- Modal encima -->
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+        <div style="background:white;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.2);padding:12px;width:85%;font-size:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px solid #f3f4f6;padding-bottom:6px">
+            <span style="font-weight:bold;color:#1B4332">🐾 Nueva Cita</span>
+            <span style="color:#9ca3af">✕</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div>
+              <div style="color:#6b7280;margin-bottom:2px">Mascota</div>
+              <div style="background:#f3f4f6;border-radius:4px;padding:4px">Rex 🐶 ▾</div>
+            </div>
+            <div>
+              <div style="color:#6b7280;margin-bottom:2px">Veterinario</div>
+              <div style="background:#f3f4f6;border-radius:4px;padding:4px">Dr. García ▾</div>
+            </div>
+            <div>
+              <div style="color:#6b7280;margin-bottom:2px">Fecha</div>
+              <div style="background:#f3f4f6;border-radius:4px;padding:4px">2026-04-24</div>
+            </div>
+            <div>
+              <div style="color:#6b7280;margin-bottom:2px">Hora</div>
+              <div style="background:#f3f4f6;border-radius:4px;padding:4px">09:00</div>
+            </div>
+            <div style="grid-column:span 2">
+              <div style="color:#6b7280;margin-bottom:2px">Motivo</div>
+              <div style="background:#f3f4f6;border-radius:4px;padding:4px">Vacuna anual</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
+            <div style="border:1px solid #e5e7eb;border-radius:4px;padding:3px 8px;color:#6b7280">Cancelar</div>
+            <div style="background:#40916C;color:white;border-radius:4px;padding:3px 8px">Agendar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Modal centrado</h3>
+      <p>Igual que en Mascotas. Ventana encima de la lista. Consistente con el resto del sistema.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f0faf4;padding:10px;font-size:10px">
+      <div style="display:grid;grid-template-columns:1fr 180px;gap:8px;height:130px">
+        <!-- Lista -->
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:8px">
+          <div style="font-weight:bold;margin-bottom:6px;color:#1B4332">Agenda de Citas</div>
+          <div style="height:14px;background:#f3f4f6;border-radius:3px;margin-bottom:3px"></div>
+          <div style="height:14px;background:#f3f4f6;border-radius:3px;margin-bottom:3px"></div>
+          <div style="height:14px;background:#f3f4f6;border-radius:3px"></div>
+        </div>
+        <!-- Panel lateral -->
+        <div style="background:white;border:1px solid #40916C;border-radius:6px;padding:8px;border-left:3px solid #40916C">
+          <div style="font-weight:bold;color:#1B4332;margin-bottom:6px">Nueva Cita</div>
+          <div style="height:10px;background:#f3f4f6;border-radius:3px;margin-bottom:4px"></div>
+          <div style="height:10px;background:#f3f4f6;border-radius:3px;margin-bottom:4px"></div>
+          <div style="height:10px;background:#f3f4f6;border-radius:3px;margin-bottom:4px"></div>
+          <div style="height:10px;background:#f3f4f6;border-radius:3px;margin-bottom:8px"></div>
+          <div style="background:#40916C;color:white;border-radius:4px;padding:3px;text-align:center">Agendar</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Panel lateral deslizable</h3>
+      <p>El formulario aparece a la derecha sin cubrir la lista. Se puede ver la agenda mientras se agenda.</p>
+    </div>
+  </div>
+
+</div>
