@@ -172,7 +172,7 @@ function PerfilMascota({ mascota, onVolver, onEditar, onEliminar }) {
           </Link>
 
           <Link
-            to="/historias"
+            to={`/historias/${mascota.id}`}
             className="card p-4 flex items-center gap-4 hover:shadow-md transition-shadow group cursor-pointer"
           >
             <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
@@ -201,7 +201,7 @@ function PerfilMascota({ mascota, onVolver, onEditar, onEliminar }) {
       <div className="card p-5">
         <div className="flex items-center justify-between mb-1">
           <h2 className="font-semibold text-gray-900">Historial Clínico</h2>
-          <Link to="/historias" className="text-xs text-verde-claro hover:text-verde-medio font-medium">Ver módulo →</Link>
+          <Link to={`/historias/${mascota.id}`} className="text-xs text-verde-claro hover:text-verde-medio font-medium">Ver historial →</Link>
         </div>
         <div className="py-8 text-center text-gray-300">
           <FileText className="w-10 h-10 mx-auto mb-2" />
