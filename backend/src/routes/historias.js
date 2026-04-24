@@ -18,7 +18,7 @@ router.post('/', (req, res) => {
   const result = db.prepare(
     `INSERT INTO historias_clinicas (mascota_id, fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(mascota_id, fecha, motivo, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso || null, notas || null);
+  ).run(mascota_id, fecha, motivo, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso ?? null, notas || null);
   res.status(201).json(db.prepare(`SELECT * FROM historias_clinicas WHERE id = ?`).get(result.lastInsertRowid));
 });
 
@@ -26,7 +26,7 @@ router.put('/:id', (req, res) => {
   const { fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas } = req.body;
   const result = db.prepare(
     `UPDATE historias_clinicas SET fecha=?, motivo=?, diagnostico=?, tratamiento=?, medicamentos=?, veterinario=?, peso=?, notas=? WHERE id=?`
-  ).run(fecha || null, motivo || null, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso || null, notas || null, req.params.id);
+  ).run(fecha || null, motivo || null, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso ?? null, notas || null, req.params.id);
   if (result.changes === 0) return res.status(404).json({ error: 'Historia no encontrada' });
   res.json(db.prepare(`SELECT * FROM historias_clinicas WHERE id = ?`).get(req.params.id));
 });

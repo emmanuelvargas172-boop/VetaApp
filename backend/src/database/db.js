@@ -70,6 +70,10 @@ db.exec(`
 `);
 
 // Agregar campo peso a historias_clinicas si no existe
-try { db.exec(`ALTER TABLE historias_clinicas ADD COLUMN peso REAL`); } catch (_) {}
+try {
+  db.exec(`ALTER TABLE historias_clinicas ADD COLUMN peso REAL`);
+} catch (err) {
+  if (!err.message.includes('duplicate column name')) throw err;
+}
 
 module.exports = db;
