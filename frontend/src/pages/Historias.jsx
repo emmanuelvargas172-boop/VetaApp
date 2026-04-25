@@ -45,7 +45,7 @@ function BuscarMascota() {
   const filtradas = useMemo(() => {
     if (!busqueda.trim()) return mascotas;
     const q = busqueda.toLowerCase();
-    return mascotas.filter(m => m.nombre.toLowerCase().includes(q));
+    return mascotas.filter(m => m.nombre?.toLowerCase().includes(q));
   }, [mascotas, busqueda]);
 
   return (
@@ -223,8 +223,12 @@ function HistorialMascota() {
 
   const eliminarConsulta = async id => {
     if (!window.confirm('¿Eliminar esta consulta? No se puede deshacer.')) return;
-    await api.delete(`/historias/${id}`);
-    await cargarConsultas();
+    try {
+      await api.delete(`/historias/${id}`);
+      await cargarConsultas();
+    } catch {
+      alert('No se pudo eliminar la consulta. Intenta de nuevo.');
+    }
   };
 
   const guardarVacuna = async e => {
@@ -252,8 +256,12 @@ function HistorialMascota() {
 
   const eliminarVacuna = async id => {
     if (!window.confirm('¿Eliminar esta vacuna? No se puede deshacer.')) return;
-    await api.delete(`/historias/vacunas/${id}`);
-    await cargarVacunas();
+    try {
+      await api.delete(`/historias/vacunas/${id}`);
+      await cargarVacunas();
+    } catch {
+      alert('No se pudo eliminar la vacuna. Intenta de nuevo.');
+    }
   };
 
   if (cargando) return (
@@ -462,7 +470,7 @@ function HistorialMascota() {
         </div>
 
         {panelTipo === 'consulta' && (
-          <form onSubmit={guardarConsulta} className="flex-1 overflow-y-auto p-6 space-y-4">
+          <form id="form-consulta" onSubmit={guardarConsulta} className="flex-1 overflow-y-auto p-6 space-y-4">
             {errorPanel && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{errorPanel}</div>
             )}
@@ -507,7 +515,7 @@ function HistorialMascota() {
         )}
 
         {panelTipo === 'vacuna' && (
-          <form onSubmit={guardarVacuna} className="flex-1 overflow-y-auto p-6 space-y-4">
+          <form id="form-vacuna" onSubmit={guardarVacuna} className="flex-1 overflow-y-auto p-6 space-y-4">
             {errorPanel && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{errorPanel}</div>
             )}
@@ -536,7 +544,8 @@ function HistorialMascota() {
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
           <button type="button" onClick={cerrarPanel} className="btn-secondary flex-1 justify-center">Cancelar</button>
           <button
-            onClick={panelTipo === 'consulta' ? guardarConsulta : guardarVacuna}
+            type="submit"
+            form={panelTipo === 'consulta' ? 'form-consulta' : 'form-vacuna'}
             disabled={guardando}
             className="btn-primary flex-1 justify-center disabled:opacity-60"
           >
