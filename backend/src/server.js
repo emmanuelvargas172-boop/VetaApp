@@ -15,6 +15,7 @@ app.use('/api/duenos', require('./routes/duenos'));
 app.use('/api/historias', require('./routes/historias'));
 app.use('/api/citas', require('./routes/citas'));
 app.use('/api/recordatorios', require('./routes/recordatorios'));
+app.use('/api/inventario', require('./routes/inventario'));
 
 app.listen(PORT, () => {
   console.log(`✅ VetaApp Backend corriendo en http://localhost:${PORT}`);
