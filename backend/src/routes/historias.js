@@ -11,24 +11,40 @@ router.get('/mascota/:mascotaId', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { mascota_id, fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas } = req.body;
-  if (!mascota_id || !fecha || !motivo) {
-    return res.status(400).json({ error: 'Mascota, fecha y motivo son requeridos' });
+  try {
+    const { mascota_id, fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas, medicamentos_ids } = req.body;
+    if (!mascota_id || !fecha || !motivo) {
+      return res.status(400).json({ error: 'Mascota, fecha y motivo son requeridos' });
+    }
+    const result = db.prepare(
+      `INSERT INTO historias_clinicas (mascota_id, fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas, medicamentos_ids)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(mascota_id, fecha, motivo, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso ?? null, notas || null, medicamentos_ids || null);
+    const ids = JSON.parse(medicamentos_ids || '[]');
+    const warnings = [];
+    for (const id of ids) {
+      db.prepare(`UPDATE inventario SET cantidad = cantidad - 1 WHERE id = ?`).run(id);
+      const producto = db.prepare(`SELECT nombre, cantidad FROM inventario WHERE id = ?`).get(id);
+      if (producto && producto.cantidad <= 0) warnings.push(`${producto.nombre} quedó sin stock`);
+    }
+    const historia = db.prepare(`SELECT * FROM historias_clinicas WHERE id = ?`).get(result.lastInsertRowid);
+    res.status(201).json({ ...historia, warnings });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al guardar la historia clínica' });
   }
-  const result = db.prepare(
-    `INSERT INTO historias_clinicas (mascota_id, fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(mascota_id, fecha, motivo, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso ?? null, notas || null);
-  res.status(201).json(db.prepare(`SELECT * FROM historias_clinicas WHERE id = ?`).get(result.lastInsertRowid));
 });
 
 router.put('/:id', (req, res) => {
-  const { fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas } = req.body;
-  const result = db.prepare(
-    `UPDATE historias_clinicas SET fecha=?, motivo=?, diagnostico=?, tratamiento=?, medicamentos=?, veterinario=?, peso=?, notas=? WHERE id=?`
-  ).run(fecha || null, motivo || null, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso ?? null, notas || null, req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Historia no encontrada' });
-  res.json(db.prepare(`SELECT * FROM historias_clinicas WHERE id = ?`).get(req.params.id));
+  try {
+    const { fecha, motivo, diagnostico, tratamiento, medicamentos, veterinario, peso, notas, medicamentos_ids } = req.body;
+    const result = db.prepare(
+      `UPDATE historias_clinicas SET fecha=?, motivo=?, diagnostico=?, tratamiento=?, medicamentos=?, veterinario=?, peso=?, notas=?, medicamentos_ids=? WHERE id=?`
+    ).run(fecha || null, motivo || null, diagnostico || null, tratamiento || null, medicamentos || null, veterinario || null, peso ?? null, notas || null, medicamentos_ids || null, req.params.id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Historia no encontrada' });
+    res.json(db.prepare(`SELECT * FROM historias_clinicas WHERE id = ?`).get(req.params.id));
+  } catch (err) {
+    res.status(500).json({ error: 'Error al actualizar la historia clínica' });
+  }
 });
 
 router.delete('/:id', (req, res) => {
