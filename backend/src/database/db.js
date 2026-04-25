@@ -67,11 +67,30 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS inventario (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    categoria TEXT NOT NULL,
+    cantidad INTEGER NOT NULL DEFAULT 0,
+    cantidad_minima INTEGER NOT NULL DEFAULT 0,
+    precio_compra REAL,
+    precio_venta REAL,
+    unidad TEXT NOT NULL DEFAULT 'unidad',
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 // Agregar campo peso a historias_clinicas si no existe
 try {
   db.exec(`ALTER TABLE historias_clinicas ADD COLUMN peso REAL`);
+} catch (err) {
+  if (!err.message.includes('duplicate column name')) throw err;
+}
+
+// Migración: campo medicamentos_ids en historias_clinicas
+try {
+  db.exec(`ALTER TABLE historias_clinicas ADD COLUMN medicamentos_ids TEXT`);
 } catch (err) {
   if (!err.message.includes('duplicate column name')) throw err;
 }
