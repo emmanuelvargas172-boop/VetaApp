@@ -5,6 +5,7 @@ import Mascotas from './pages/Mascotas';
 import Historias from './pages/Historias';
 import Citas from './pages/Citas';
 import Recordatorios from './pages/Recordatorios';
+import Operaciones from './pages/Operaciones';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/historias/*" element={<Historias />} />
             <Route path="/citas/*" element={<Citas />} />
             <Route path="/recordatorios" element={<Recordatorios />} />
+            <Route path="/operaciones" element={<Operaciones />} />
           </Routes>
         </main>
       </div>

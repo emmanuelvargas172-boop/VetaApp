@@ -1,0 +1,135 @@
+<h2>¿Cómo se organiza el historial de una mascota?</h2>
+<p class="subtitle">Consultas y vacunas en la misma vista</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8faf9;padding:14px;font-size:10px">
+      <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+        <!-- Header mascota -->
+        <div style="padding:10px 14px;background:#1B4332;color:white;display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">🐶</span>
+          <div>
+            <div style="font-weight:700;font-size:11px">Rex</div>
+            <div style="font-size:9px;opacity:0.7">Golden Retriever · 3 años</div>
+          </div>
+        </div>
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:1px solid #e5e7eb">
+          <div style="padding:6px 12px;border-bottom:2px solid #40916C;color:#40916C;font-size:9px;font-weight:600">📋 Consultas (4)</div>
+          <div style="padding:6px 12px;color:#9ca3af;font-size:9px">💉 Vacunas (3)</div>
+        </div>
+        <!-- Lista consultas -->
+        <div style="padding:8px">
+          <div style="border:1px solid #e5e7eb;border-radius:6px;padding:8px;margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-weight:600;font-size:9px">Control rutinario</span>
+              <span style="font-size:9px;color:#9ca3af">12 abr 2026</span>
+            </div>
+            <div style="font-size:8px;color:#6b7280">Dx: Saludable · Dr. García</div>
+          </div>
+          <div style="border:1px solid #e5e7eb;border-radius:6px;padding:8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-weight:600;font-size:9px">Tos persistente</span>
+              <span style="font-size:9px;color:#9ca3af">2 mar 2026</span>
+            </div>
+            <div style="font-size:8px;color:#6b7280">Dx: Traqueobronquitis · Dra. López</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Pestañas</h3>
+      <p>Consultas y vacunas en pestañas separadas. Limpio y fácil de navegar entre los dos tipos de registro.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8faf9;padding:14px;font-size:10px">
+      <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+        <!-- Header mascota -->
+        <div style="padding:10px 14px;background:#1B4332;color:white;display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">🐶</span>
+          <div>
+            <div style="font-weight:700;font-size:11px">Rex</div>
+            <div style="font-size:9px;opacity:0.7">Golden Retriever · 3 años</div>
+          </div>
+        </div>
+        <!-- Sección consultas -->
+        <div style="padding:8px 12px 4px">
+          <div style="font-size:9px;font-weight:700;color:#374151;margin-bottom:6px">📋 Consultas</div>
+          <div style="border:1px solid #e5e7eb;border-radius:6px;padding:7px;margin-bottom:5px">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:600">Control rutinario</span><span style="font-size:8px;color:#9ca3af">12 abr</span></div>
+            <div style="font-size:8px;color:#6b7280">Dr. García</div>
+          </div>
+        </div>
+        <!-- Sección vacunas -->
+        <div style="padding:4px 12px 8px">
+          <div style="font-size:9px;font-weight:700;color:#374151;margin-bottom:6px">💉 Vacunas</div>
+          <div style="border:1px solid #e5e7eb;border-radius:6px;padding:7px">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:600">Rabia</span><span style="font-size:8px;color:#9ca3af">15 ene</span></div>
+            <div style="font-size:8px;color:#6b7280">Próxima: 15 ene 2027</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Dos secciones</h3>
+      <p>Consultas arriba y vacunas abajo en una sola página con scroll. Todo visible sin cambiar de pestaña.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8faf9;padding:14px;font-size:10px">
+      <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+        <!-- Header mascota -->
+        <div style="padding:10px 14px;background:#1B4332;color:white;display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">🐶</span>
+          <div>
+            <div style="font-weight:700;font-size:11px">Rex</div>
+            <div style="font-size:9px;opacity:0.7">Golden Retriever · 3 años</div>
+          </div>
+        </div>
+        <!-- Timeline -->
+        <div style="padding:8px 12px">
+          <div style="font-size:9px;font-weight:700;color:#374151;margin-bottom:8px">Historial cronológico</div>
+          <!-- Item consulta -->
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:20px;height:20px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:10px">📋</div>
+              <div style="width:1px;height:14px;background:#e5e7eb"></div>
+            </div>
+            <div style="flex:1;padding-bottom:8px">
+              <div style="font-size:9px;font-weight:600">Control rutinario</div>
+              <div style="font-size:8px;color:#9ca3af">12 abr 2026 · Dr. García</div>
+            </div>
+          </div>
+          <!-- Item vacuna -->
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div style="width:20px;height:20px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:10px">💉</div>
+              <div style="width:1px;height:14px;background:#e5e7eb"></div>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:9px;font-weight:600">Vacuna Rabia</div>
+              <div style="font-size:8px;color:#9ca3af">15 ene 2026 · Dra. López</div>
+            </div>
+          </div>
+          <!-- Item consulta -->
+          <div style="display:flex;gap:8px">
+            <div style="width:20px;height:20px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:10px">📋</div>
+            <div style="flex:1">
+              <div style="font-size:9px;font-weight:600">Tos persistente</div>
+              <div style="font-size:8px;color:#9ca3af">2 mar 2026 · Dra. López</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Timeline mezclado</h3>
+      <p>Consultas y vacunas en una sola línea de tiempo cronológica. Ver toda la historia de un vistazo.</p>
+    </div>
+  </div>
+
+</div>

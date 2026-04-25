@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PawPrint, FileText, Calendar, Bell } from 'lucide-react';
+import { LayoutDashboard, PawPrint, FileText, Calendar, Bell, Package } from 'lucide-react';
 
 const navItems = [
   { path: '/',              icon: LayoutDashboard, label: 'Dashboard' },
@@ -7,10 +8,19 @@ const navItems = [
   { path: '/historias',     icon: FileText,          label: 'Historias' },
   { path: '/citas',         icon: Calendar,          label: 'Citas' },
   { path: '/recordatorios', icon: Bell,              label: 'Recordatorios' },
+  { path: '/operaciones',   icon: Package,           label: 'Operaciones', hasBadge: true },
 ];
 
 export default function Sidebar() {
   const { pathname } = useLocation();
+  const [alertaCount, setAlertaCount] = useState(0);
+
+  useEffect(() => {
+    fetch('http://localhost:3001/api/inventario/alertas')
+      .then(r => r.json())
+      .then(data => setAlertaCount(data.count ?? 0))
+      .catch(() => {});
+  }, [pathname]);
 
   const isActive = (path) =>
     path === '/' ? pathname === '/' : pathname.startsWith(path);
@@ -30,7 +40,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map(({ path, icon: Icon, label }) => (
+        {navItems.map(({ path, icon: Icon, label, hasBadge = false }) => (
           <Link
             key={path}
             to={path}
@@ -40,10 +50,17 @@ export default function Sidebar() {
                 : 'text-green-300 hover:bg-verde-medio/50 hover:text-white'
             }`}
           >
-            <Icon
-              className={`w-5 h-5 flex-shrink-0 ${isActive(path) ? 'text-white' : 'text-green-400 group-hover:text-white'}`}
-              strokeWidth={isActive(path) ? 2.5 : 2}
-            />
+            <span className="relative flex-shrink-0">
+              <Icon
+                className={`w-5 h-5 ${isActive(path) ? 'text-white' : 'text-green-400 group-hover:text-white'}`}
+                strokeWidth={isActive(path) ? 2.5 : 2}
+              />
+              {hasBadge && alertaCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                  {alertaCount}
+                </span>
+              )}
+            </span>
             <span className="font-medium text-sm">{label}</span>
             {isActive(path) && (
               <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/60" />
