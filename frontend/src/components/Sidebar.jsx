@@ -16,10 +16,15 @@ export default function Sidebar() {
   const [alertaCount, setAlertaCount] = useState(0);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/inventario/alertas')
-      .then(r => r.json())
+    const controller = new AbortController();
+    fetch('http://localhost:3001/api/inventario/alertas', { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
       .then(data => setAlertaCount(data.count ?? 0))
-      .catch(() => {});
+      .catch(err => { if (err.name !== 'AbortError') console.error(err); });
+    return () => controller.abort();
   }, [pathname]);
 
   const isActive = (path) =>
