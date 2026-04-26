@@ -132,6 +132,12 @@ function HistorialMascota() {
   const [formC, setFormC] = useState(FORM_C0);
   const [formV, setFormV] = useState(FORM_V0);
 
+  const [medSeleccionados, setMedSeleccionados] = useState([]);
+  const [medBusqueda, setMedBusqueda]           = useState('');
+  const [medSugerencias, setMedSugerencias]     = useState([]);
+  const [medTimeoutId, setMedTimeoutId]         = useState(null);
+  const [stockWarnings, setStockWarnings]       = useState([]);
+
   const veterinariosUnicos = useMemo(() => {
     const vets = [...consultas.map(c => c.veterinario), ...vacunas.map(v => v.veterinario)].filter(Boolean);
     return [...new Set(vets)];
@@ -178,6 +184,10 @@ function HistorialMascota() {
       medicamentos: consulta.medicamentos || '', veterinario: consulta.veterinario || '',
       peso: consulta.peso ?? '', notas: consulta.notas || '',
     } : FORM_C0);
+    setMedSeleccionados([]);
+    setMedBusqueda('');
+    setMedSugerencias([]);
+    setStockWarnings([]);
     setPanelTipo('consulta');
     setPanelAbierto(true);
   };
@@ -189,9 +199,38 @@ function HistorialMascota() {
     setPanelAbierto(true);
   };
 
-  const cerrarPanel = () => { setPanelAbierto(false); setConsultaEditando(null); };
+  const cerrarPanel = () => {
+    setPanelAbierto(false);
+    setConsultaEditando(null);
+    setMedSeleccionados([]);
+    setMedBusqueda('');
+    setMedSugerencias([]);
+  };
   const setFC = f => e => setFormC(p => ({ ...p, [f]: e.target.value }));
   const setFV = f => e => setFormV(p => ({ ...p, [f]: e.target.value }));
+
+  const handleMedBusqueda = val => {
+    setMedBusqueda(val);
+    if (medTimeoutId) clearTimeout(medTimeoutId);
+    if (!val.trim()) { setMedSugerencias([]); return; }
+    const tid = setTimeout(async () => {
+      try {
+        const r = await fetch(`http://localhost:3001/api/inventario/buscar?q=${encodeURIComponent(val)}`);
+        if (r.ok) setMedSugerencias(await r.json());
+      } catch {}
+    }, 300);
+    setMedTimeoutId(tid);
+  };
+
+  const seleccionarMed = med => {
+    if (!medSeleccionados.some(m => m.id === med.id)) {
+      setMedSeleccionados(s => [...s, { id: med.id, nombre: med.nombre }]);
+    }
+    setMedBusqueda('');
+    setMedSugerencias([]);
+  };
+
+  const quitarMed = id => setMedSeleccionados(s => s.filter(m => m.id !== id));
 
   const guardarConsulta = async e => {
     e.preventDefault();
@@ -204,13 +243,20 @@ function HistorialMascota() {
       const payload = {
         mascota_id: mascotaId, fecha: formC.fecha, motivo: formC.motivo,
         diagnostico: formC.diagnostico || null, tratamiento: formC.tratamiento || null,
-        medicamentos: formC.medicamentos || null, veterinario: formC.veterinario,
-        peso: formC.peso ? parseFloat(formC.peso) : null, notas: formC.notas || null,
+        medicamentos: [
+          ...medSeleccionados.map(m => m.nombre),
+          formC.medicamentos,
+        ].filter(Boolean).join(', ') || null,
+        veterinario: formC.veterinario,
+        peso: formC.peso ? parseFloat(formC.peso) : null,
+        notas: formC.notas || null,
+        medicamentos_ids: consultaEditando ? null : JSON.stringify(medSeleccionados.map(m => m.id)),
       };
       if (consultaEditando) {
         await api.put(`/historias/${consultaEditando.id}`, payload);
       } else {
-        await api.post('/historias', payload);
+        const res = await api.post('/historias', payload);
+        if (res.data.warnings?.length) setStockWarnings(res.data.warnings);
       }
       cerrarPanel();
       await cargarConsultas();
@@ -307,6 +353,23 @@ function HistorialMascota() {
           {tabActiva === 'consultas' ? 'Nueva Consulta' : 'Nueva Vacuna'}
         </button>
       </div>
+
+      {stockWarnings.length > 0 && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-amber-700 text-sm font-semibold">Alerta de stock</p>
+            <ul className="mt-1 space-y-0.5">
+              {stockWarnings.map((w, i) => (
+                <li key={i} className="text-amber-600 text-sm">• {w}</li>
+              ))}
+            </ul>
+          </div>
+          <button onClick={() => setStockWarnings([])} className="text-amber-400 hover:text-amber-600 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Pestañas */}
       <div className="flex border-b border-gray-200 mb-6">
@@ -491,8 +554,47 @@ function HistorialMascota() {
               <textarea className="input resize-none" rows={2} placeholder="Indicaciones médicas..." value={formC.tratamiento} onChange={setFC('tratamiento')} />
             </div>
             <div>
-              <label className="label">Medicamentos <span className="text-gray-400 font-normal">(opcional)</span></label>
-              <textarea className="input resize-none" rows={2} placeholder="Medicamentos recetados..." value={formC.medicamentos} onChange={setFC('medicamentos')} />
+              <label className="label">Medicamentos del inventario <span className="text-gray-400 font-normal">(opcional)</span></label>
+              {medSeleccionados.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {medSeleccionados.map(m => (
+                    <span key={m.id} className="inline-flex items-center gap-1 bg-verde-fondo text-verde-oscuro text-xs px-2 py-1 rounded-full font-medium">
+                      {m.nombre}
+                      <button type="button" onClick={() => quitarMed(m.id)} className="hover:text-red-500 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="relative">
+                <input
+                  className="input"
+                  placeholder="Buscar medicamento del inventario..."
+                  value={medBusqueda}
+                  onChange={e => handleMedBusqueda(e.target.value)}
+                  autoComplete="off"
+                />
+                {medSugerencias.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                    {medSugerencias.map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => seleccionarMed(s)}
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-verde-fondo text-left text-sm transition-colors"
+                      >
+                        <span className="text-gray-900 font-medium">{s.nombre}</span>
+                        <span className="text-gray-400 text-xs ml-2">{s.cantidad} {s.unidad}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="label">Medicamentos adicionales <span className="text-gray-400 font-normal">(texto libre)</span></label>
+              <textarea className="input resize-none" rows={2} placeholder="Otros medicamentos o notas..." value={formC.medicamentos} onChange={setFC('medicamentos')} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
