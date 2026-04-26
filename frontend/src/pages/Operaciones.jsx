@@ -10,7 +10,7 @@ const FORM_INICIAL = {
 };
 
 function estadoBadge(cantidad, cantidad_minima) {
-  if (cantidad === 0)                              return { cls: 'bg-red-100 text-red-700',    label: 'Agotado' };
+  if (cantidad <= 0)                               return { cls: 'bg-red-100 text-red-700',    label: 'Agotado' };
   if (cantidad > 0 && cantidad <= cantidad_minima) return { cls: 'bg-amber-100 text-amber-700', label: 'Por agotarse' };
   return                                                  { cls: 'bg-green-100 text-green-700',  label: 'OK' };
 }
@@ -31,6 +31,7 @@ export default function Operaciones() {
   const [errorPanel,       setErrorPanel]       = useState('');
   const [formProducto,     setFormProducto]     = useState(FORM_INICIAL);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { cargarProductos(); }, []);
 
   async function cargarProductos() {
@@ -76,6 +77,7 @@ export default function Operaciones() {
 
   async function guardarProducto(e) {
     e.preventDefault();
+    if (guardando) return;
     setGuardando(true);
     setErrorPanel('');
     const body = {
@@ -87,11 +89,20 @@ export default function Operaciones() {
       precio_compra:   formProducto.precio_compra !== '' ? parseFloat(formProducto.precio_compra) : null,
       precio_venta:    formProducto.precio_venta  !== '' ? parseFloat(formProducto.precio_venta)  : null,
     };
+    if (isNaN(body.cantidad) || isNaN(body.cantidad_minima)) {
+      setErrorPanel('Cantidad y cantidad mínima deben ser números enteros válidos');
+      setGuardando(false);
+      return;
+    }
     try {
       const url    = productoEditando ? `http://localhost:3001/api/inventario/${productoEditando.id}` : 'http://localhost:3001/api/inventario';
       const method = productoEditando ? 'PUT' : 'POST';
       const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'Error al guardar'); }
+      if (!r.ok) {
+        let msg = 'Error al guardar';
+        try { const d = await r.json(); if (d.error) msg = d.error; } catch {}
+        throw new Error(msg);
+      }
       cerrarPanel();
       cargarProductos();
     } catch (err) {
