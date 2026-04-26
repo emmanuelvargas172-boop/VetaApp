@@ -577,7 +577,7 @@ function HistorialMascota() {
                 />
                 {medSugerencias.length > 0 && (
                   <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    {medSugerencias.map(s => (
+                    {medSugerencias.slice(0, 8).map(s => (
                       <button
                         key={s.id}
                         type="button"
