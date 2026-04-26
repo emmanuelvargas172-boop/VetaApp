@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useRoutes } from 'react-router-dom';
 import {
   ArrowLeft, Plus, Edit2, Trash2, Search, X, Loader2,
@@ -135,8 +135,10 @@ function HistorialMascota() {
   const [medSeleccionados, setMedSeleccionados] = useState([]);
   const [medBusqueda, setMedBusqueda]           = useState('');
   const [medSugerencias, setMedSugerencias]     = useState([]);
-  const [medTimeoutId, setMedTimeoutId]         = useState(null);
+  const medTimeoutId = useRef(null);
   const [stockWarnings, setStockWarnings]       = useState([]);
+
+  useEffect(() => () => { if (medTimeoutId.current) clearTimeout(medTimeoutId.current); }, []);
 
   const veterinariosUnicos = useMemo(() => {
     const vets = [...consultas.map(c => c.veterinario), ...vacunas.map(v => v.veterinario)].filter(Boolean);
@@ -211,15 +213,16 @@ function HistorialMascota() {
 
   const handleMedBusqueda = val => {
     setMedBusqueda(val);
-    if (medTimeoutId) clearTimeout(medTimeoutId);
+    if (medTimeoutId.current) clearTimeout(medTimeoutId.current);
     if (!val.trim()) { setMedSugerencias([]); return; }
-    const tid = setTimeout(async () => {
+    medTimeoutId.current = setTimeout(async () => {
       try {
-        const r = await fetch(`http://localhost:3001/api/inventario/buscar?q=${encodeURIComponent(val)}`);
-        if (r.ok) setMedSugerencias(await r.json());
-      } catch {}
+        const { data } = await api.get(`/inventario/buscar?q=${encodeURIComponent(val)}`);
+        setMedSugerencias(data);
+      } catch (err) {
+        if (import.meta.env.DEV) console.error(err);
+      }
     }, 300);
-    setMedTimeoutId(tid);
   };
 
   const seleccionarMed = med => {
@@ -573,6 +576,7 @@ function HistorialMascota() {
                   placeholder="Buscar medicamento del inventario..."
                   value={medBusqueda}
                   onChange={e => handleMedBusqueda(e.target.value)}
+                  onBlur={() => setTimeout(() => setMedSugerencias([]), 150)}
                   autoComplete="off"
                 />
                 {medSugerencias.length > 0 && (
