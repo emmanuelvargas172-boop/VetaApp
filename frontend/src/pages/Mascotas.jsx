@@ -1,450 +1,442 @@
-import { useState, useEffect, useMemo } from 'react';
-import {
-  Plus, Search, PawPrint, Phone, MapPin, ArrowLeft,
-  Edit2, Trash2, Calendar, FileText, MessageCircle,
-  Weight, Clock, User, ChevronRight, X
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ModalMascota from '../components/ModalMascota';
+import {
+  Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle, Sparkline,
+} from '../components/ui';
+import {
+  SpeciesAvatar, SPECIES_ICONS,
+  IconPaw, IconPlus, IconFilter, IconSearch, IconEdit, IconTrash, IconWhatsApp,
+  IconChevronRight, IconArrowLeft, IconCalendar, IconFile, IconSyringe, IconBell,
+  IconClock, IconWeight, IconPhone, IconMapPin, IconActivity, IconAlert,
+} from '../components/icons';
 
-const ESPECIES = {
-  perro:  { emoji: '🐶', color: 'bg-blue-100 text-blue-700',   label: 'Perro' },
-  gato:   { emoji: '🐱', color: 'bg-purple-100 text-purple-700', label: 'Gato' },
-  ave:    { emoji: '🐦', color: 'bg-yellow-100 text-yellow-700', label: 'Ave' },
-  conejo: { emoji: '🐰', color: 'bg-pink-100 text-pink-700',   label: 'Conejo' },
-  reptil: { emoji: '🦎', color: 'bg-verde-fondo text-verde-claro', label: 'Reptil' },
-  otro:   { emoji: '🐾', color: 'bg-gray-100 text-gray-600',   label: 'Otro' },
-};
+const FILTROS = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'perro', label: 'Perros' },
+  { id: 'gato', label: 'Gatos' },
+  { id: 'ave', label: 'Aves' },
+  { id: 'conejo', label: 'Conejos' },
+  { id: 'reptil', label: 'Reptiles' },
+];
 
 function formatEdad(anios, meses) {
   const a = Number(anios) || 0;
   const m = Number(meses) || 0;
   if (a === 0 && m === 0) return '—';
-  if (a === 0) return `${m} mes${m !== 1 ? 'es' : ''}`;
-  if (m === 0) return `${a} año${a !== 1 ? 's' : ''}`;
+  if (a === 0) return `${m}m`;
+  if (m === 0) return `${a}a`;
   return `${a}a ${m}m`;
 }
 
-function Avatar({ mascota, size = 'md' }) {
-  const esp = ESPECIES[mascota.especie] || ESPECIES.otro;
-  const sizes = { sm: 'w-9 h-9 text-lg', md: 'w-12 h-12 text-2xl', lg: 'w-20 h-20 text-4xl' };
-  if (mascota.foto) {
-    return <img src={mascota.foto} alt={mascota.nombre} className={`${sizes[size]} rounded-full object-cover flex-shrink-0`} />;
-  }
+function FilterChip({ active, onClick, children, count }) {
   return (
-    <div className={`${sizes[size]} ${esp.color} rounded-full flex items-center justify-center flex-shrink-0`}>
-      {esp.emoji}
+    <button onClick={onClick} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '5px 11px', borderRadius: 'var(--r-full)',
+      border: `1px solid ${active ? 'var(--verde-600)' : 'var(--border-strong)'}`,
+      background: active ? 'var(--verde-600)' : 'var(--surface)',
+      color: active ? '#fff' : 'var(--text-muted)',
+      fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+    }}
+    onMouseEnter={(e) => { if (!active) { e.currentTarget.style.borderColor = 'var(--verde-500)'; e.currentTarget.style.color = 'var(--text)'; } }}
+    onMouseLeave={(e) => { if (!active) { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-muted)'; } }}
+    >
+      {children}
+      {count !== undefined && (
+        <span className="tabular" style={{ fontSize: 10.5, padding: '1px 5px', borderRadius: 'var(--r-full)', background: active ? 'rgba(255,255,255,0.18)' : 'var(--stone-100)', color: active ? '#fff' : 'var(--text-faint)' }}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function MascotaRow({ m, onClick }) {
+  const cfg = SPECIES_ICONS[m.especie] || SPECIES_ICONS.otro;
+  const [hover, setHover] = useState(false);
+  const edad = formatEdad(m.edad_anios, m.edad_meses);
+  const waLink = `https://wa.me/57${(m.dueno_telefono || '').replace(/\D/g, '')}`;
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '2fr 1.4fr 0.9fr 1.8fr 1fr auto',
+        gap: 16, padding: '11px 16px',
+        background: hover ? 'var(--stone-50)' : 'transparent',
+        borderBottom: '1px solid var(--divider)',
+        alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s',
+      }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <SpeciesAvatar especie={m.especie} size={38}/>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: hover ? 'var(--verde-700)' : 'var(--text)', letterSpacing: '-0.01em', transition: 'color 0.15s' }}>{m.nombre}</p>
+          <p className="mono" style={{ margin: '1px 0 0', fontSize: 10.5, color: 'var(--text-faint)' }}>
+            MASC-{String(m.id).padStart(4, '0')}
+          </p>
+        </div>
+      </div>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.color }}/>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{cfg.label}</span>
+        </div>
+        <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>{m.raza || '—'}</p>
+      </div>
+      <div>
+        <p className="tabular" style={{ margin: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--text)' }}>{edad}</p>
+        <p className="tabular" style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>{m.peso ? `${m.peso} kg` : '—'}</p>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.dueno_nombre || '—'}</p>
+        <p className="mono" style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-faint)' }}>{m.dueno_telefono || ''}</p>
+      </div>
+      <div>
+        <Badge tone="neutral" size="sm">Registrado</Badge>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hover ? 1 : 0, transition: 'opacity 0.15s' }} onClick={e => e.stopPropagation()}>
+        <button title="Editar" style={iconBtnStyle}><IconEdit size={14} color="var(--text-muted)"/></button>
+        {m.dueno_telefono && (
+          <a href={waLink} target="_blank" rel="noopener noreferrer" title="WhatsApp" style={{ ...iconBtnStyle, color: '#25D366', textDecoration: 'none' }}>
+            <IconWhatsApp size={12}/>
+          </a>
+        )}
+        <button title="Eliminar" style={iconBtnStyle}><IconTrash size={14} color="var(--danger)"/></button>
+        <span style={{ marginLeft: 4 }}><IconChevronRight size={14} color="var(--text-disabled)"/></span>
+      </div>
     </div>
   );
 }
 
-// ─── Vista: Perfil de mascota ────────────────────────────────────────────────
-function PerfilMascota({ mascota, onVolver, onEditar, onEliminar }) {
-  const esp = ESPECIES[mascota.especie] || ESPECIES.otro;
-  const waLink = `https://wa.me/57${mascota.dueno_telefono?.replace(/\D/g, '')}`;
+function MascotaPerfil({ mascota, onBack }) {
+  const cfg = SPECIES_ICONS[mascota.especie] || SPECIES_ICONS.otro;
+  const Icon = cfg.Icon;
+  const [tab, setTab] = useState('resumen');
+  const edad = formatEdad(mascota.edad_anios, mascota.edad_meses);
+  const waLink = `https://wa.me/57${(mascota.dueno_telefono || '').replace(/\D/g, '')}`;
+
+  function Tab({ id, children, count }) {
+    const active = tab === id;
+    return (
+      <button onClick={() => setTab(id)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '8px 2px', marginRight: 24,
+        background: 'transparent', border: 'none',
+        fontSize: 13, fontWeight: 600,
+        color: active ? 'var(--text)' : 'var(--text-faint)',
+        cursor: 'pointer',
+        borderBottom: `2px solid ${active ? 'var(--verde-600)' : 'transparent'}`,
+        marginBottom: -1, transition: 'all 0.15s',
+      }}>
+        {children}
+        {count !== undefined && (
+          <span style={{ fontSize: 10.5, fontWeight: 600, padding: '1px 5px', borderRadius: 'var(--r-full)', background: active ? 'var(--verde-100)' : 'var(--stone-100)', color: active ? 'var(--verde-700)' : 'var(--text-faint)' }}>{count}</span>
+        )}
+      </button>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* Barra superior */}
-      <button
-        onClick={onVolver}
-        className="flex items-center gap-2 text-gray-400 hover:text-gray-700 text-sm font-medium mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Volver a la lista
-      </button>
-
-      {/* Header perfil */}
-      <div className="card p-6 mb-5">
-        <div className="flex items-start gap-5">
-          <Avatar mascota={mascota} size="lg" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{mascota.nombre}</h1>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${esp.color}`}>
-                    {esp.emoji} {esp.label}
-                  </span>
-                  {mascota.raza && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-                      {mascota.raza}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={onEditar}
-                  className="btn-secondary text-sm py-1.5 px-3"
-                >
-                  <Edit2 className="w-3.5 h-3.5" /> Editar
-                </button>
-                <button
-                  onClick={onEliminar}
-                  className="flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                </button>
-              </div>
+    <>
+      <Topbar
+        breadcrumb={['Mascotas', mascota.nombre]}
+        title={mascota.nombre}
+        subtitle={`${cfg.label} · ${mascota.raza || ''} · ID MASC-${String(mascota.id).padStart(4, '0')}`}
+        actions={
+          <>
+            <Button variant="secondary" size="md" icon={<IconArrowLeft size={13}/>} onClick={onBack}>Volver</Button>
+            <Button variant="secondary" size="md" icon={<IconEdit size={13}/>}>Editar</Button>
+            <Button variant="primary" size="md" icon={<IconCalendar size={13}/>}>Agendar cita</Button>
+          </>
+        }
+      />
+      <Page>
+        {/* Hero */}
+        <div style={{
+          position: 'relative', padding: '20px 24px',
+          background: `linear-gradient(135deg, ${cfg.soft}, transparent 80%)`,
+          border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', marginBottom: 14, overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', right: -20, top: -10, opacity: 0.08 }}>
+            <Icon size={200} color={cfg.color}/>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, position: 'relative' }}>
+            <div style={{ width: 72, height: 72, borderRadius: 18, background: cfg.soft, border: `2px solid ${cfg.color}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-sm)' }}>
+              <Icon size={50} color={cfg.color}/>
             </div>
-
-            {/* Stats rápidas */}
-            <div className="grid grid-cols-3 gap-3 mt-4">
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <Clock className="w-4 h-4 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Edad</p>
-                <p className="font-semibold text-gray-900 text-sm">{formatEdad(mascota.edad_anios, mascota.edad_meses)}</p>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text)' }}>{mascota.nombre}</h2>
+                <Badge tone="verde" dot>Activa</Badge>
               </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <Weight className="w-4 h-4 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Peso</p>
-                <p className="font-semibold text-gray-900 text-sm">{mascota.peso ? `${mascota.peso} kg` : '—'}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <Calendar className="w-4 h-4 text-gray-400 mx-auto mb-1" />
-                <p className="text-xs text-gray-400">Registro</p>
-                <p className="font-semibold text-gray-900 text-sm">
-                  {new Date(mascota.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
-                </p>
-              </div>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>{cfg.label} · {mascota.raza || '—'}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 18 }}>
+              {[
+                { label: 'Edad',  value: edad,                   Icon: IconClock },
+                { label: 'Peso',  value: mascota.peso ? `${mascota.peso} kg` : '—', Icon: IconWeight },
+              ].map((v, i) => (
+                <div key={i} style={{ textAlign: 'right' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                    <v.Icon size={11} color="var(--text-faint)"/>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-faint)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{v.label}</span>
+                  </div>
+                  <p className="tabular" style={{ margin: '4px 0 0', fontSize: 17, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '-0.015em' }}>{v.value}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-        {/* Datos del dueño */}
-        <div className="card p-5">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <User className="w-4 h-4 text-verde-claro" /> Datos del Dueño
-          </h2>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <User className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-gray-400">Nombre</p>
-                <p className="font-medium text-gray-900">{mascota.dueno_nombre}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Phone className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-gray-400">Teléfono</p>
-                <p className="font-medium text-gray-900">{mascota.dueno_telefono}</p>
-              </div>
-            </div>
-            {mascota.dueno_direccion && (
-              <div className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-400">Dirección</p>
-                  <p className="font-medium text-gray-900">{mascota.dueno_direccion}</p>
+        {/* Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', marginBottom: 16, padding: '0 4px' }}>
+          <Tab id="resumen">Resumen</Tab>
+          <Tab id="vacunas">Vacunas</Tab>
+          <Tab id="citas">Próximas citas</Tab>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14 }}>
+          <div>
+            {tab === 'resumen' && (
+              <Card padding={0}>
+                <SectionHeader title="Control de peso" subtitle="Histórico (mock)"/>
+                <div style={{ padding: 18 }}>
+                  <p className="tabular" style={{ margin: 0, fontSize: 30, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.025em', lineHeight: 1 }}>
+                    {mascota.peso || '—'} <span style={{ fontSize: 14, color: 'var(--text-faint)', fontWeight: 500 }}>kg</span>
+                  </p>
+                  <div style={{ marginTop: 12 }}>
+                    <Sparkline data={[3.8, 3.9, 4.0, 4.1, 4.0, mascota.peso || 4]} width={600} height={70} color="var(--verde-500)"/>
+                  </div>
                 </div>
-              </div>
+              </Card>
+            )}
+            {tab !== 'resumen' && (
+              <EmptyState icon={<IconCalendar size={24}/>} title="Sin registros" subtitle={`No hay datos en esta sección para ${mascota.nombre}`}
+                action={<Button variant="primary" size="md" icon={<IconPlus size={14}/>}>Agregar</Button>}/>
             )}
           </div>
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe59] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors w-full"
-          >
-            <MessageCircle className="w-4 h-4" />
-            Enviar WhatsApp
-          </a>
-        </div>
 
-        {/* Acciones */}
-        <div className="space-y-3">
-          <Link
-            to="/citas"
-            className="card p-4 flex items-center gap-4 hover:shadow-md transition-shadow group cursor-pointer"
-          >
-            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-500" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-900 text-sm">Agendar Cita</p>
-              <p className="text-xs text-gray-400">Programar consulta</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-verde-claro" />
-          </Link>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Card padding={0}>
+              <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--verde-400), var(--verde-700))', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                  {(mascota.dueno_nombre || '?').split(' ').map(w => w[0]).slice(0, 2).join('')}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)', fontWeight: 500 }}>Dueño responsable</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{mascota.dueno_nombre || '—'}</p>
+                </div>
+              </div>
+              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {mascota.dueno_telefono && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--stone-50)', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                      <IconPhone size={13}/>
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Teléfono</p>
+                      <p className="mono" style={{ margin: '1px 0 0', fontSize: 12.5, fontWeight: 500, color: 'var(--text)' }}>{mascota.dueno_telefono}</p>
+                    </div>
+                  </div>
+                )}
+                {mascota.dueno_direccion && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--stone-50)', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
+                      <IconMapPin size={13}/>
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Dirección</p>
+                      <p style={{ margin: '1px 0 0', fontSize: 12.5, color: 'var(--text)' }}>{mascota.dueno_direccion}</p>
+                    </div>
+                  </div>
+                )}
+                {mascota.dueno_telefono && (
+                  <a href={waLink} target="_blank" rel="noopener noreferrer" style={{
+                    marginTop: 4, height: 36, width: '100%',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    background: '#25D366', color: '#fff', border: '1px solid #1ebe59',
+                    borderRadius: 'var(--r-md)', fontSize: 12.5, fontWeight: 600,
+                    cursor: 'pointer', transition: 'background 0.15s', textDecoration: 'none',
+                  }}>
+                    <IconWhatsApp size={14}/>
+                    Enviar mensaje
+                  </a>
+                )}
+              </div>
+            </Card>
 
-          <Link
-            to={`/historias/${mascota.id}`}
-            className="card p-4 flex items-center gap-4 hover:shadow-md transition-shadow group cursor-pointer"
-          >
-            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-              <FileText className="w-5 h-5 text-purple-500" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-900 text-sm">Nueva Historia Clínica</p>
-              <p className="text-xs text-gray-400">Registrar consulta médica</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-verde-claro" />
-          </Link>
+            <Card padding={0}>
+              <SectionHeader title="Acciones"/>
+              <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[
+                  { Icon: IconCalendar, label: 'Agendar cita',       color: 'var(--info)' },
+                  { Icon: IconFile,     label: 'Nueva historia',      color: 'var(--sp-gato)' },
+                  { Icon: IconSyringe,  label: 'Registrar vacuna',    color: 'var(--verde-600)' },
+                  { Icon: IconBell,     label: 'Crear recordatorio',  color: 'var(--warn)' },
+                ].map((a, i) => (
+                  <button key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', background: 'transparent', border: 'none',
+                    borderRadius: 'var(--r-md)', cursor: 'pointer', textAlign: 'left', width: '100%',
+                    transition: 'background 0.15s', fontSize: 12.5, fontWeight: 500, color: 'var(--text)',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--stone-50)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                    <a.Icon size={15} color={a.color}/>
+                    <span style={{ flex: 1 }}>{a.label}</span>
+                    <IconChevronRight size={13} color="var(--text-disabled)"/>
+                  </button>
+                ))}
+              </div>
+            </Card>
 
-          <div className="card p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">ID del registro</p>
-            <p className="font-mono text-sm text-gray-500">MASC-{String(mascota.id).padStart(4, '0')}</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Registrada el {new Date(mascota.created_at).toLocaleDateString('es-CO', {
-                year: 'numeric', month: 'long', day: 'numeric'
-              })}
-            </p>
+            <Card style={{ background: 'var(--stone-50)' }}>
+              <p className="mono" style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.04em' }}>ID DEL REGISTRO</p>
+              <p className="mono" style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>MASC-{String(mascota.id).padStart(4, '0')}</p>
+            </Card>
           </div>
         </div>
-      </div>
-
-      {/* Historia y vacunas - próximamente */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-gray-900">Historial Clínico</h2>
-          <Link to={`/historias/${mascota.id}`} className="text-xs text-verde-claro hover:text-verde-medio font-medium">Ver historial →</Link>
-        </div>
-        <div className="py-8 text-center text-gray-300">
-          <FileText className="w-10 h-10 mx-auto mb-2" />
-          <p className="text-sm text-gray-400">No hay registros clínicos todavía</p>
-          <p className="text-xs text-gray-300 mt-1">El historial aparecerá aquí una vez que registres consultas</p>
-        </div>
-      </div>
-    </div>
+      </Page>
+    </>
   );
 }
 
-// ─── Vista: Lista de mascotas ────────────────────────────────────────────────
 export default function Mascotas() {
   const [mascotas, setMascotas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [filtro, setFiltro] = useState('todas');
   const [busqueda, setBusqueda] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [mascotaEditar, setMascotaEditar] = useState(null);
-  const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
+  const [perfilActivo, setPerfilActivo] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editando, setEditando] = useState(null);
 
   const cargar = () => {
-    setCargando(true);
     api.get('/mascotas')
-      .then((r) => setMascotas(r.data))
-      .finally(() => setCargando(false));
+      .then(res => { setMascotas(res.data || []); setCargando(false); })
+      .catch(() => setCargando(false));
   };
 
   useEffect(() => { cargar(); }, []);
 
-  const filtradas = useMemo(() => {
-    if (!busqueda.trim()) return mascotas;
-    const q = busqueda.toLowerCase();
-    return mascotas.filter(
-      (m) =>
-        m.nombre.toLowerCase().includes(q) ||
-        m.dueno_nombre.toLowerCase().includes(q) ||
-        m.raza?.toLowerCase().includes(q) ||
-        m.especie.toLowerCase().includes(q)
-    );
-  }, [mascotas, busqueda]);
-
-  const abrirEditar = (m, e) => {
-    e?.stopPropagation();
-    setMascotaEditar(m);
-    setShowModal(true);
-  };
-
-  const eliminar = async (m, e) => {
-    e?.stopPropagation();
-    if (!window.confirm(`¿Eliminar a ${m.nombre}? Esta acción no se puede deshacer.`)) return;
-    await api.delete(`/mascotas/${m.id}`);
-    if (mascotaSeleccionada?.id === m.id) setMascotaSeleccionada(null);
-    cargar();
-  };
-
-  const handleSuccess = () => {
-    cargar();
-    setMascotaEditar(null);
-    if (mascotaSeleccionada) {
-      // Actualizar mascota seleccionada con datos frescos
-      api.get(`/mascotas/${mascotaSeleccionada.id}`)
-        .then((r) => setMascotaSeleccionada(r.data))
-        .catch(() => setMascotaSeleccionada(null));
-    }
-  };
-
-  // Vista perfil
-  if (mascotaSeleccionada) {
-    return (
-      <>
-        <PerfilMascota
-          mascota={mascotaSeleccionada}
-          onVolver={() => setMascotaSeleccionada(null)}
-          onEditar={() => abrirEditar(mascotaSeleccionada)}
-          onEliminar={async () => {
-            if (!window.confirm(`¿Eliminar a ${mascotaSeleccionada.nombre}?`)) return;
-            await api.delete(`/mascotas/${mascotaSeleccionada.id}`);
-            setMascotaSeleccionada(null);
-            cargar();
-          }}
-        />
-        <ModalMascota
-          isOpen={showModal}
-          onClose={() => { setShowModal(false); setMascotaEditar(null); }}
-          onSuccess={handleSuccess}
-          mascotaEditar={mascotaEditar}
-        />
-      </>
-    );
+  if (perfilActivo) {
+    return <MascotaPerfil mascota={perfilActivo} onBack={() => setPerfilActivo(null)}/>;
   }
 
-  // Vista lista
+  const filtradas = mascotas.filter(m => {
+    if (filtro !== 'todas' && m.especie !== filtro) return false;
+    if (busqueda) {
+      const q = busqueda.toLowerCase();
+      return (m.nombre || '').toLowerCase().includes(q) ||
+             (m.dueno_nombre || '').toLowerCase().includes(q) ||
+             (m.raza || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const counts = FILTROS.reduce((acc, f) => {
+    acc[f.id] = f.id === 'todas' ? mascotas.length : mascotas.filter(m => m.especie === f.id).length;
+    return acc;
+  }, {});
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Mascotas y Dueños</h1>
-          <p className="text-gray-400 text-sm mt-1">{mascotas.length} mascota{mascotas.length !== 1 ? 's' : ''} registrada{mascotas.length !== 1 ? 's' : ''}</p>
-        </div>
-        <button
-          onClick={() => { setMascotaEditar(null); setShowModal(true); }}
-          className="btn-primary flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Registrar Mascota
-        </button>
-      </div>
-
-      {/* Buscador */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3.5 top-3 w-4 h-4 text-gray-300" />
-        <input
-          className="input pl-10 py-3 text-sm"
-          placeholder="Buscar por nombre de mascota, dueño, raza o especie..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        {busqueda && (
-          <button onClick={() => setBusqueda('')} className="absolute right-3 top-3">
-            <X className="w-4 h-4 text-gray-300 hover:text-gray-500" />
-          </button>
-        )}
-      </div>
-
-      {/* Tabla / lista */}
-      {cargando ? (
-        <div className="card p-16 flex flex-col items-center text-center">
-          <div className="w-8 h-8 border-4 border-verde-claro border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-gray-400 text-sm">Cargando mascotas...</p>
-        </div>
-      ) : filtradas.length === 0 ? (
-        <div className="card p-16 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-verde-fondo rounded-2xl flex items-center justify-center mb-4 text-3xl">
-            🐾
+    <>
+      <Topbar
+        title="Mascotas"
+        subtitle={`${mascotas.length} pacientes registrados`}
+        actions={
+          <>
+            <Button variant="secondary" size="md" icon={<IconFilter size={13}/>}>Filtros</Button>
+            <Button variant="primary" size="md" icon={<IconPlus size={14}/>} onClick={() => { setEditando(null); setModalOpen(true); }}>Registrar mascota</Button>
+          </>
+        }
+      />
+      <Page>
+        {/* Search + filter chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+          <UIInput
+            placeholder="Buscar por nombre, dueño, raza..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            icon={<IconSearch size={14}/>}
+            style={{ width: 340 }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {FILTROS.map(f => (
+              <FilterChip key={f.id} active={filtro === f.id} onClick={() => setFiltro(f.id)} count={counts[f.id]}>
+                {f.label}
+              </FilterChip>
+            ))}
           </div>
-          <p className="font-semibold text-gray-700">
-            {busqueda ? 'Sin resultados para tu búsqueda' : 'Aún no hay mascotas registradas'}
-          </p>
-          <p className="text-gray-400 text-sm mt-1">
-            {busqueda
-              ? `No encontramos mascotas que coincidan con "${busqueda}"`
-              : 'Registra la primera mascota para comenzar'}
-          </p>
-          {!busqueda && (
-            <button
-              onClick={() => { setMascotaEditar(null); setShowModal(true); }}
-              className="btn-primary mt-5 text-sm"
-            >
-              <Plus className="w-4 h-4" /> Registrar primera mascota
-            </button>
-          )}
         </div>
-      ) : (
-        <div className="card overflow-hidden">
-          {/* Cabecera tabla */}
-          <div className="hidden md:grid grid-cols-[2fr_1.2fr_1fr_1.5fr_1fr_auto] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            <span>Mascota</span>
-            <span>Especie / Raza</span>
-            <span>Edad / Peso</span>
-            <span>Dueño</span>
-            <span>Teléfono</span>
-            <span></span>
-          </div>
 
-          {/* Filas */}
-          <div className="divide-y divide-gray-50">
-            {filtradas.map((m) => {
-              const esp = ESPECIES[m.especie] || ESPECIES.otro;
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => setMascotaSeleccionada(m)}
-                  className="grid grid-cols-1 md:grid-cols-[2fr_1.2fr_1fr_1.5fr_1fr_auto] gap-4 px-5 py-4 hover:bg-gray-50/60 cursor-pointer transition-colors items-center group"
-                >
-                  {/* Mascota */}
-                  <div className="flex items-center gap-3">
-                    <Avatar mascota={m} size="sm" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 truncate group-hover:text-verde-claro transition-colors">
-                        {m.nombre}
-                      </p>
-                      <p className="text-xs text-gray-400 md:hidden">{esp.emoji} {esp.label} · {m.raza || 'Sin raza'}</p>
-                    </div>
-                  </div>
-
-                  {/* Especie/Raza */}
-                  <div className="hidden md:block">
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${esp.color}`}>
-                      {esp.emoji} {esp.label}
-                    </span>
-                    <p className="text-xs text-gray-400 mt-1 truncate">{m.raza || '—'}</p>
-                  </div>
-
-                  {/* Edad/Peso */}
-                  <div className="hidden md:block">
-                    <p className="text-sm text-gray-700">{formatEdad(m.edad_anios, m.edad_meses)}</p>
-                    <p className="text-xs text-gray-400">{m.peso ? `${m.peso} kg` : '—'}</p>
-                  </div>
-
-                  {/* Dueño */}
-                  <div className="hidden md:flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <User className="w-3 h-3 text-gray-400" />
-                    </div>
-                    <p className="text-sm text-gray-700 truncate">{m.dueno_nombre}</p>
-                  </div>
-
-                  {/* Teléfono */}
-                  <div className="hidden md:flex items-center gap-1.5 text-sm text-gray-500">
-                    <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{m.dueno_telefono}</span>
-                  </div>
-
-                  {/* Acciones */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => abrirEditar(m, e)}
-                      className="p-1.5 rounded-lg hover:bg-verde-fondo text-gray-300 hover:text-verde-claro transition-colors"
-                      title="Editar"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => eliminar(m, e)}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+        {/* Species mini-stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
+          {['perro','gato','ave','conejo','reptil'].map(esp => {
+            const cfg = SPECIES_ICONS[esp];
+            const count = mascotas.filter(m => m.especie === esp).length;
+            const isActive = filtro === esp;
+            return (
+              <button key={esp} onClick={() => setFiltro(filtro === esp ? 'todas' : esp)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                  background: isActive ? cfg.soft : 'var(--surface)',
+                  border: `1px solid ${isActive ? cfg.color : 'var(--border)'}`,
+                  borderRadius: 'var(--r-lg)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.18s',
+                }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--stone-50)'; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--surface)'; }}
+              >
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: cfg.soft, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <cfg.Icon size={20} color={cfg.color}/>
                 </div>
-              );
-            })}
-          </div>
+                <div>
+                  <p className="tabular" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{count}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-faint)', fontWeight: 500 }}>{cfg.label}s</p>
+                </div>
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {/* Table */}
+        <Card padding={0}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '2fr 1.4fr 0.9fr 1.8fr 1fr auto',
+            gap: 16, padding: '10px 16px',
+            background: 'var(--stone-50)', borderBottom: '1px solid var(--border)',
+            fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)',
+            letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}>
+            <span>Mascota</span><span>Especie / Raza</span><span>Edad / Peso</span>
+            <span>Dueño</span><span>Estado</span><span style={{ minWidth: 110 }}></span>
+          </div>
+
+          {cargando ? (
+            <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+              <div className="vp-spinner"/>
+            </div>
+          ) : filtradas.length === 0 ? (
+            <EmptyState
+              icon={<IconPaw size={26}/>}
+              title="Sin resultados"
+              subtitle={busqueda ? `No encontramos mascotas que coincidan con "${busqueda}"` : 'No hay mascotas en esta categoría'}
+              action={filtro !== 'todas' || busqueda ? <Button variant="secondary" size="sm" onClick={() => { setFiltro('todas'); setBusqueda(''); }}>Limpiar filtros</Button> : null}
+            />
+          ) : filtradas.map(m => (
+            <MascotaRow key={m.id} m={m} onClick={() => setPerfilActivo(m)}/>
+          ))}
+        </Card>
+      </Page>
 
       <ModalMascota
-        isOpen={showModal}
-        onClose={() => { setShowModal(false); setMascotaEditar(null); }}
-        onSuccess={handleSuccess}
-        mascotaEditar={mascotaEditar}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={cargar}
+        mascotaEditar={editando}
       />
-    </div>
+    </>
   );
 }

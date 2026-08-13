@@ -1,39 +1,37 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useRoutes } from 'react-router-dom';
-import {
-  ArrowLeft, Plus, Edit2, Trash2, Search, X, Loader2,
-  AlertCircle, FileText, Syringe, ChevronRight,
-} from 'lucide-react';
 import api from '../api/axios';
+import {
+  Card, Button, Badge, Topbar, Page, SectionHeader, Sparkline, EmptyState, iconBtnStyle,
+} from '../components/ui';
+import {
+  IconFile, IconPlus, IconSearch, IconArrowLeft, IconX, IconEdit, IconTrash,
+  IconSyringe, IconActivity, IconAlert, IconCheckCircle, IconChevronRight, IconCalendar,
+  SpeciesAvatar, SPECIES_ICONS,
+} from '../components/icons';
 
-const ESPECIES = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', reptil: '🦎', otro: '🐾' };
+const TIPO_REGISTRO = {
+  Vacunación:  { Icon: IconSyringe,      color: 'var(--info)',      soft: 'var(--info-soft)',          ring: 'var(--info-ring)' },
+  Consulta:    { Icon: IconActivity,     color: 'var(--verde-600)', soft: 'var(--verde-50)',           ring: 'var(--verde-200)' },
+  Cirugía:     { Icon: IconAlert,        color: 'var(--sp-gato)',   soft: 'rgba(124,58,237,0.08)',     ring: 'rgba(124,58,237,0.25)' },
+  Emergencia:  { Icon: IconAlert,        color: 'var(--danger)',    soft: 'var(--danger-soft)',        ring: 'var(--danger-ring)' },
+  Control:     { Icon: IconCheckCircle,  color: 'var(--warn)',      soft: 'var(--warn-soft)',          ring: 'var(--warn-ring)' },
+};
 
-function calcDias(fecha) {
-  const hoy = new Date().toISOString().split('T')[0];
-  return Math.ceil(
-    (new Date(fecha + 'T12:00:00') - new Date(hoy + 'T12:00:00')) / (1000 * 60 * 60 * 24)
-  );
-}
+const labelInput = { display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 };
+const styleInput = {
+  width: '100%', height: 36, padding: '0 10px',
+  border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+  fontSize: 13, color: 'var(--text)', background: 'var(--bg)',
+  outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+};
 
-function badgeProxDosis(proxima_dosis) {
-  if (!proxima_dosis) return null;
-  const dias = calcDias(proxima_dosis);
-  const fecha = new Date(proxima_dosis + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
-  if (dias < 0)  return { cls: 'bg-gray-100 text-gray-500',    label: 'Vencida' };
-  if (dias === 0) return { cls: 'bg-red-100 text-red-700',      label: 'Hoy' };
-  if (dias <= 7)  return { cls: 'bg-red-100 text-red-700',      label: `${dias}d` };
-  if (dias <= 15) return { cls: 'bg-amber-100 text-amber-700',  label: `${dias}d` };
-  if (dias <= 30) return { cls: 'bg-green-100 text-green-700',  label: `${dias}d` };
-  return              { cls: 'bg-gray-100 text-gray-500',    label: fecha };
-}
-
-// ─── Vista: Buscar mascota ───────────────────────────────────────────────────
 function BuscarMascota() {
   const navigate = useNavigate();
-  const [mascotas, setMascotas]   = useState([]);
-  const [busqueda, setBusqueda]   = useState('');
-  const [cargando, setCargando]   = useState(true);
-  const [error, setError]         = useState(false);
+  const [mascotas, setMascotas] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     api.get('/mascotas')
@@ -45,68 +43,126 @@ function BuscarMascota() {
   const filtradas = useMemo(() => {
     if (!busqueda.trim()) return mascotas;
     const q = busqueda.toLowerCase();
-    return mascotas.filter(m => m.nombre?.toLowerCase().includes(q));
+    return mascotas.filter(m => m.nombre?.toLowerCase().includes(q) || m.dueno_nombre?.toLowerCase().includes(q));
   }, [mascotas, busqueda]);
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Historias Clínicas</h1>
-        <p className="text-gray-400 text-sm mt-1">Selecciona una mascota para ver su historial</p>
-      </div>
-
-      {error && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-          <p className="text-amber-700 text-sm">No se pudo cargar la lista de mascotas.</p>
-        </div>
-      )}
-
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-300" />
-        <input
-          className="input pl-9"
-          placeholder="Buscar mascota por nombre..."
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-        />
-      </div>
-
-      {cargando ? (
-        <div className="card p-16 flex flex-col items-center">
-          <div className="w-8 h-8 border-4 border-verde-claro border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-gray-400 text-sm">Cargando mascotas...</p>
-        </div>
-      ) : filtradas.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-gray-500">{mascotas.length === 0 ? 'No hay mascotas registradas' : 'No se encontraron mascotas'}</p>
-        </div>
-      ) : (
-        <div className="card divide-y divide-gray-50">
-          {filtradas.map(m => (
-            <button
-              key={m.id}
-              onClick={() => navigate(`/historias/${m.id}`)}
-              className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-verde-fondo transition-colors text-left"
-            >
-              <span className="text-2xl">{ESPECIES[m.especie] || '🐾'}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm">{m.nombre}</p>
-                <p className="text-xs text-gray-400">{m.dueno_nombre}</p>
+    <>
+      <Topbar
+        title="Historias clínicas"
+        subtitle={`${mascotas.length} pacientes registrados`}
+        actions={
+          <Button variant="primary" size="md" icon={<IconPlus size={14}/>}>Nuevo registro</Button>
+        }
+      />
+      <Page>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+          {[
+            { label: 'Total pacientes', value: mascotas.length, Icon: IconFile,     color: 'var(--text-muted)', bg: 'var(--stone-50)' },
+            { label: 'Este mes',        value: '—',             Icon: IconCalendar, color: 'var(--info)',       bg: 'var(--info-soft)' },
+            { label: 'Vacunaciones',    value: '—',             Icon: IconSyringe,  color: 'var(--verde-600)',  bg: 'var(--verde-50)' },
+            { label: 'Cirugías',        value: '—',             Icon: IconAlert,    color: 'var(--sp-gato)',    bg: 'rgba(124,58,237,0.08)' },
+          ].map((s, i) => (
+            <Card key={i} padding={14}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: s.bg, color: s.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <s.Icon size={17}/>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{s.label}</p>
+                  <p className="tabular" style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.025em', lineHeight: 1 }}>{s.value}</p>
+                </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-            </button>
+            </Card>
           ))}
         </div>
-      )}
-    </div>
+
+        {/* Search */}
+        <div style={{ marginBottom: 14, position: 'relative', maxWidth: 420 }}>
+          <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', display: 'flex' }}>
+            <IconSearch size={14}/>
+          </div>
+          <input
+            style={{ ...styleInput, paddingLeft: 32 }}
+            placeholder="Buscar paciente por nombre o dueño..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+          />
+        </div>
+
+        {cargando ? (
+          <Card style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <span className="vp-spinner"/>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)' }}>Cargando mascotas...</p>
+          </Card>
+        ) : error ? (
+          <div style={{ padding: '12px 16px', background: 'var(--warn-soft)', border: '1px solid var(--warn-ring)', borderRadius: 'var(--r-lg)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <IconAlert size={16} color="var(--warn)"/>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--warn)' }}>No se pudo cargar la lista de mascotas.</p>
+          </div>
+        ) : filtradas.length === 0 ? (
+          <EmptyState icon={<IconFile size={22}/>} title="No se encontraron mascotas" subtitle={mascotas.length === 0 ? 'No hay mascotas registradas' : 'Intenta con otro nombre'}/>
+        ) : (
+          <Card padding={0}>
+            <SectionHeader title="Pacientes con historial" subtitle={`${filtradas.length} mostrados`}/>
+            <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+              {filtradas.map(m => {
+                const cfg = SPECIES_ICONS[m.especie] || SPECIES_ICONS.otro;
+                return (
+                  <div key={m.id}
+                    onClick={() => navigate(`/app/historias/${m.id}`)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: 12, borderRadius: 'var(--r-lg)',
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      cursor: 'pointer', transition: 'all 0.18s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = cfg.color;
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.transform = 'none';
+                    }}>
+                    <SpeciesAvatar especie={m.especie} size={44}/>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{m.nombre}</p>
+                        <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>· {m.raza}</span>
+                      </div>
+                      <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>{m.dueno_nombre}</p>
+                    </div>
+                    <IconChevronRight size={14} color="var(--text-disabled)"/>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+      </Page>
+    </>
   );
 }
 
-// ─── Vista: Historial de una mascota ────────────────────────────────────────
+function badgeProxDosis(proxima_dosis) {
+  if (!proxima_dosis) return null;
+  const hoy = new Date().toISOString().split('T')[0];
+  const dias = Math.ceil((new Date(proxima_dosis + 'T12:00:00') - new Date(hoy + 'T12:00:00')) / 86400000);
+  if (dias < 0)   return { tone: 'neutral', label: 'Vencida' };
+  if (dias === 0) return { tone: 'danger',  label: 'Hoy' };
+  if (dias <= 7)  return { tone: 'danger',  label: `${dias}d` };
+  if (dias <= 15) return { tone: 'warn',    label: `${dias}d` };
+  if (dias <= 30) return { tone: 'success', label: `${dias}d` };
+  return { tone: 'neutral', label: new Date(proxima_dosis + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) };
+}
+
 function HistorialMascota() {
   const { mascotaId } = useParams();
-  const navigate      = useNavigate();
+  const navigate = useNavigate();
 
   const [mascota, setMascota]     = useState(null);
   const [consultas, setConsultas] = useState([]);
@@ -114,29 +170,25 @@ function HistorialMascota() {
   const [tabActiva, setTabActiva] = useState('consultas');
   const [cargando, setCargando]   = useState(true);
   const [error, setError]         = useState(false);
+  const [selReg, setSelReg]       = useState(null);
 
   const [panelAbierto, setPanelAbierto]         = useState(false);
   const [panelTipo, setPanelTipo]               = useState('consulta');
   const [consultaEditando, setConsultaEditando] = useState(null);
   const [guardando, setGuardando]               = useState(false);
   const [errorPanel, setErrorPanel]             = useState('');
+  const [stockWarnings, setStockWarnings]       = useState([]);
 
   const HOY = new Date().toISOString().split('T')[0];
-
-  const FORM_C0 = {
-    fecha: HOY, motivo: '', diagnostico: '', tratamiento: '',
-    medicamentos: '', veterinario: '', peso: '', notas: '',
-  };
+  const FORM_C0 = { fecha: HOY, motivo: '', diagnostico: '', tratamiento: '', medicamentos: '', veterinario: '', peso: '', notas: '' };
   const FORM_V0 = { nombre: '', fecha_aplicacion: HOY, proxima_dosis: '', veterinario: '' };
 
   const [formC, setFormC] = useState(FORM_C0);
   const [formV, setFormV] = useState(FORM_V0);
-
   const [medSeleccionados, setMedSeleccionados] = useState([]);
   const [medBusqueda, setMedBusqueda]           = useState('');
   const [medSugerencias, setMedSugerencias]     = useState([]);
   const medTimeoutId = useRef(null);
-  const [stockWarnings, setStockWarnings]       = useState([]);
 
   useEffect(() => () => { if (medTimeoutId.current) clearTimeout(medTimeoutId.current); }, []);
 
@@ -168,6 +220,7 @@ function HistorialMascota() {
         setMascota(mRes.data);
         setConsultas(cRes.data);
         setVacunas(vRes.data);
+        if (cRes.data.length > 0) setSelReg(cRes.data[0]);
       } catch {
         setError(true);
       } finally {
@@ -208,6 +261,7 @@ function HistorialMascota() {
     setMedBusqueda('');
     setMedSugerencias([]);
   };
+
   const setFC = f => e => setFormC(p => ({ ...p, [f]: e.target.value }));
   const setFV = f => e => setFormV(p => ({ ...p, [f]: e.target.value }));
 
@@ -219,9 +273,7 @@ function HistorialMascota() {
       try {
         const { data } = await api.get(`/inventario/buscar?q=${encodeURIComponent(val)}`);
         setMedSugerencias(data);
-      } catch (err) {
-        if (import.meta.env.DEV) console.error(err);
-      }
+      } catch {}
     }, 300);
   };
 
@@ -233,23 +285,15 @@ function HistorialMascota() {
     setMedSugerencias([]);
   };
 
-  const quitarMed = id => setMedSeleccionados(s => s.filter(m => m.id !== id));
-
   const guardarConsulta = async e => {
     e.preventDefault();
-    if (!formC.fecha || !formC.motivo || !formC.veterinario) {
-      setErrorPanel('Fecha, motivo y veterinario son requeridos.');
-      return;
-    }
+    if (!formC.fecha || !formC.motivo || !formC.veterinario) { setErrorPanel('Fecha, motivo y veterinario son requeridos.'); return; }
     setGuardando(true); setErrorPanel('');
     try {
       const payload = {
         mascota_id: mascotaId, fecha: formC.fecha, motivo: formC.motivo,
         diagnostico: formC.diagnostico || null, tratamiento: formC.tratamiento || null,
-        medicamentos: [
-          ...medSeleccionados.map(m => m.nombre),
-          formC.medicamentos,
-        ].filter(Boolean).join(', ') || null,
+        medicamentos: [...medSeleccionados.map(m => m.nombre), formC.medicamentos].filter(Boolean).join(', ') || null,
         veterinario: formC.veterinario,
         peso: formC.peso ? parseFloat(formC.peso) : null,
         notas: formC.notas || null,
@@ -272,20 +316,13 @@ function HistorialMascota() {
 
   const eliminarConsulta = async id => {
     if (!window.confirm('¿Eliminar esta consulta? No se puede deshacer.')) return;
-    try {
-      await api.delete(`/historias/${id}`);
-      await cargarConsultas();
-    } catch {
-      alert('No se pudo eliminar la consulta. Intenta de nuevo.');
-    }
+    try { await api.delete(`/historias/${id}`); await cargarConsultas(); }
+    catch { alert('No se pudo eliminar. Intenta de nuevo.'); }
   };
 
   const guardarVacuna = async e => {
     e.preventDefault();
-    if (!formV.nombre || !formV.fecha_aplicacion) {
-      setErrorPanel('Nombre de vacuna y fecha de aplicación son requeridos.');
-      return;
-    }
+    if (!formV.nombre || !formV.fecha_aplicacion) { setErrorPanel('Nombre y fecha de aplicación son requeridos.'); return; }
     setGuardando(true); setErrorPanel('');
     try {
       await api.post('/historias/vacunas', {
@@ -304,292 +341,400 @@ function HistorialMascota() {
   };
 
   const eliminarVacuna = async id => {
-    if (!window.confirm('¿Eliminar esta vacuna? No se puede deshacer.')) return;
-    try {
-      await api.delete(`/historias/vacunas/${id}`);
-      await cargarVacunas();
-    } catch {
-      alert('No se pudo eliminar la vacuna. Intenta de nuevo.');
-    }
+    if (!window.confirm('¿Eliminar esta vacuna?')) return;
+    try { await api.delete(`/historias/vacunas/${id}`); await cargarVacunas(); }
+    catch { alert('No se pudo eliminar. Intenta de nuevo.'); }
   };
 
   if (cargando) return (
-    <div className="p-6 flex flex-col items-center justify-center min-h-64">
-      <div className="w-8 h-8 border-4 border-verde-claro border-t-transparent rounded-full animate-spin mb-3" />
-      <p className="text-gray-400 text-sm">Cargando historial...</p>
+    <div style={{ height: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <span className="vp-spinner"/>
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)' }}>Cargando historial...</p>
     </div>
   );
 
   if (error || !mascota) return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 mb-4">
-        <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-        <p className="text-amber-700 text-sm">No se pudo cargar el historial de esta mascota.</p>
+    <Page>
+      <div style={{ padding: '12px 16px', background: 'var(--warn-soft)', border: '1px solid var(--warn-ring)', borderRadius: 'var(--r-lg)', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <IconAlert size={16} color="var(--warn)"/>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--warn)' }}>No se pudo cargar el historial de esta mascota.</p>
       </div>
-      <button onClick={() => navigate('/historias')} className="btn-secondary flex items-center gap-2">
-        <ArrowLeft className="w-4 h-4" /> Volver
-      </button>
-    </div>
+      <Button variant="secondary" icon={<IconArrowLeft size={13}/>} onClick={() => navigate('/app/historias')}>Volver</Button>
+    </Page>
   );
 
+  const cfg = SPECIES_ICONS[mascota.especie] || SPECIES_ICONS.otro;
+  const pesoData = consultas.filter(c => c.peso != null).slice(-6).map(c => c.peso);
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* Banner mascota */}
-      <div className="bg-verde-oscuro text-white rounded-xl p-5 mb-6 flex items-center gap-4">
-        <button
-          onClick={() => navigate('/historias')}
-          className="p-2 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
-          title="Volver"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <span className="text-3xl flex-shrink-0">{ESPECIES[mascota.especie] || '🐾'}</span>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold">{mascota.nombre}</h1>
-          <p className="text-white/70 text-sm">{mascota.especie}{mascota.raza ? ` · ${mascota.raza}` : ''} · {mascota.dueno_nombre}</p>
-        </div>
-        <button
-          onClick={() => tabActiva === 'consultas' ? abrirPanelConsulta() : abrirPanelVacuna()}
-          className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          {tabActiva === 'consultas' ? 'Nueva Consulta' : 'Nueva Vacuna'}
-        </button>
-      </div>
-
-      {stockWarnings.length > 0 && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-amber-700 text-sm font-semibold">Alerta de stock</p>
-            <ul className="mt-1 space-y-0.5">
-              {stockWarnings.map((w, i) => (
-                <li key={i} className="text-amber-600 text-sm">• {w}</li>
-              ))}
-            </ul>
-          </div>
-          <button onClick={() => setStockWarnings([])} className="text-amber-400 hover:text-amber-600 flex-shrink-0">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Pestañas */}
-      <div className="flex border-b border-gray-200 mb-6">
-        {[
-          { key: 'consultas', label: 'Consultas', count: consultas.length, Icon: FileText },
-          { key: 'vacunas',   label: 'Vacunas',   count: vacunas.length,   Icon: Syringe  },
-        ].map(({ key, label, count, Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTabActiva(key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors mr-4 ${
-              tabActiva === key
-                ? 'border-verde-claro text-verde-claro'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            {label} ({count})
-          </button>
-        ))}
-      </div>
-
-      {/* Tab: Consultas */}
-      {tabActiva === 'consultas' && (
-        consultas.length === 0 ? (
-          <div className="card p-16 flex flex-col items-center text-center">
-            <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mb-4">
-              <FileText className="w-8 h-8 text-purple-400" />
+    <>
+      <Topbar
+        breadcrumb={['Historias', mascota.nombre]}
+        title={`Historia · ${mascota.nombre}`}
+        subtitle={`${consultas.length} consultas · ${vacunas.length} vacunas`}
+        actions={
+          <>
+            <Button variant="secondary" size="md" icon={<IconArrowLeft size={13}/>} onClick={() => navigate('/app/historias')}>Volver</Button>
+            <Button variant="primary" size="md" icon={<IconPlus size={14}/>}
+              onClick={() => tabActiva === 'consultas' ? abrirPanelConsulta() : abrirPanelVacuna()}>
+              {tabActiva === 'consultas' ? 'Nueva consulta' : 'Nueva vacuna'}
+            </Button>
+          </>
+        }
+      />
+      <Page>
+        {stockWarnings.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', background: 'var(--warn-soft)', border: '1px solid var(--warn-ring)', borderRadius: 'var(--r-lg)', marginBottom: 12 }}>
+            <IconAlert size={15} color="var(--warn)" style={{ flexShrink: 0, marginTop: 1 }}/>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--warn)' }}>Alerta de stock</p>
+              {stockWarnings.map((w, i) => <p key={i} style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--warn)' }}>• {w}</p>)}
             </div>
-            <p className="font-semibold text-gray-700">Sin consultas registradas</p>
-            <p className="text-gray-400 text-sm mt-1">Registra la primera consulta médica</p>
-            <button onClick={() => abrirPanelConsulta()} className="btn-primary mt-5 text-sm">
-              <Plus className="w-4 h-4" /> Nueva Consulta
-            </button>
+            <button style={iconBtnStyle} onClick={() => setStockWarnings([])}><IconX size={13}/></button>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {consultas.map(c => (
-              <div key={c.id} className="card p-5 group">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-semibold text-gray-900">{c.motivo}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                      {c.veterinario && ` · ${c.veterinario}`}
-                      {c.peso != null && ` · ${c.peso} kg`}
-                    </p>
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <button onClick={() => abrirPanelConsulta(c)} className="p-1.5 rounded-lg hover:bg-verde-fondo text-gray-300 hover:text-verde-claro transition-colors" title="Editar">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => eliminarConsulta(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 14, alignItems: 'start' }}>
+          {/* Columna izquierda */}
+          <div>
+            {/* Hero compact */}
+            <Card padding={0} style={{ marginBottom: 12 }}>
+              <div style={{
+                padding: 14,
+                background: `linear-gradient(135deg, ${cfg.soft}, transparent)`,
+                borderBottom: '1px solid var(--divider)',
+                display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+                <SpeciesAvatar especie={mascota.especie} size={48}/>
+                <div>
+                  <p style={{ margin: 0, fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em', color: 'var(--text)' }}>{mascota.nombre}</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>{cfg.label} · {mascota.raza}</p>
                 </div>
-                {(c.diagnostico || c.tratamiento || c.medicamentos) && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                    {c.diagnostico && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Diagnóstico</p>
-                        <p className="text-gray-700 text-sm">{c.diagnostico}</p>
-                      </div>
-                    )}
-                    {c.tratamiento && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Tratamiento</p>
-                        <p className="text-gray-700 text-sm">{c.tratamiento}</p>
-                      </div>
-                    )}
-                    {c.medicamentos && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Medicamentos</p>
-                        <p className="text-gray-700 text-sm">{c.medicamentos}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {c.notas && (
-                  <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50">{c.notas}</p>
-                )}
               </div>
-            ))}
-          </div>
-        )
-      )}
+              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  { label: 'Dueño', value: mascota.dueno_nombre },
+                  { label: 'Edad', value: [mascota.edad_anios ? `${mascota.edad_anios}a` : '', mascota.edad_meses ? `${mascota.edad_meses}m` : ''].filter(Boolean).join(' ') || '—' },
+                  { label: 'Peso actual', value: mascota.peso ? `${mascota.peso} kg` : '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
+                    <span style={{ color: 'var(--text-faint)' }}>{label}</span>
+                    <span className="tabular" style={{ fontWeight: 600, color: 'var(--text)' }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-      {/* Tab: Vacunas */}
-      {tabActiva === 'vacunas' && (
-        vacunas.length === 0 ? (
-          <div className="card p-16 flex flex-col items-center text-center">
-            <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mb-4">
-              <Syringe className="w-8 h-8 text-green-400" />
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--stone-100)', borderRadius: 'var(--r-md)', marginBottom: 10 }}>
+              {[
+                { key: 'consultas', label: 'Consultas', count: consultas.length },
+                { key: 'vacunas',   label: 'Vacunas',   count: vacunas.length },
+              ].map(t => (
+                <button key={t.key} onClick={() => setTabActiva(t.key)} style={{
+                  flex: 1, padding: '5px 10px', border: 'none', cursor: 'pointer',
+                  borderRadius: 6, fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                  background: tabActiva === t.key ? 'var(--surface)' : 'transparent',
+                  color: tabActiva === t.key ? 'var(--text)' : 'var(--text-muted)',
+                  boxShadow: tabActiva === t.key ? 'var(--shadow-xs)' : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                }}>
+                  {t.label}
+                  <span style={{
+                    minWidth: 16, height: 16, borderRadius: 99, fontSize: 10, fontWeight: 700,
+                    background: tabActiva === t.key ? 'var(--verde-100)' : 'var(--stone-150)',
+                    color: tabActiva === t.key ? 'var(--verde-700)' : 'var(--text-muted)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+                  }}>{t.count}</span>
+                </button>
+              ))}
             </div>
-            <p className="font-semibold text-gray-700">Sin vacunas registradas</p>
-            <p className="text-gray-400 text-sm mt-1">Registra la primera vacuna</p>
-            <button onClick={() => abrirPanelVacuna()} className="btn-primary mt-5 text-sm">
-              <Plus className="w-4 h-4" /> Nueva Vacuna
-            </button>
+
+            {/* Timeline */}
+            {tabActiva === 'consultas' && (
+              <Card padding={0}>
+                <SectionHeader title="Registros" subtitle={`${consultas.length} en total`}/>
+                {consultas.length === 0 ? (
+                  <EmptyState
+                    icon={<IconFile size={18}/>}
+                    title="Sin consultas"
+                    subtitle="Registra la primera"
+                    action={<Button variant="primary" size="sm" icon={<IconPlus size={12}/>} onClick={() => abrirPanelConsulta()}>Nueva</Button>}
+                  />
+                ) : (
+                  <div style={{ padding: 8, position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: 26, top: 14, bottom: 14, width: 1, background: 'var(--divider)' }}/>
+                    {consultas.map(c => {
+                      const tipo = c.tipo || 'Consulta';
+                      const t = TIPO_REGISTRO[tipo] || TIPO_REGISTRO.Consulta;
+                      const sel = selReg?.id === c.id;
+                      return (
+                        <button key={c.id} onClick={() => setSelReg(c)}
+                          style={{
+                            display: 'grid', gridTemplateColumns: '32px 1fr', gap: 8,
+                            padding: '8px 10px',
+                            background: sel ? 'var(--stone-50)' : 'transparent',
+                            border: sel ? '1px solid var(--border-strong)' : '1px solid transparent',
+                            borderRadius: 'var(--r-md)',
+                            width: '100%', textAlign: 'left', cursor: 'pointer',
+                            marginBottom: 4, transition: 'all 0.15s', position: 'relative',
+                          }}
+                          onMouseEnter={(e) => { if (!sel) e.currentTarget.style.background = 'var(--stone-50)'; }}
+                          onMouseLeave={(e) => { if (!sel) e.currentTarget.style.background = 'transparent'; }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: t.soft, border: `2px solid ${sel ? t.color : 'var(--bg)'}`,
+                            color: t.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            position: 'relative', zIndex: 1,
+                          }}><t.Icon size={13}/></div>
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{tipo}</p>
+                            <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.motivo}</p>
+                            <p className="mono" style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--text-disabled)' }}>
+                              {new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {tabActiva === 'vacunas' && (
+              <Card padding={0}>
+                <SectionHeader title="Vacunas" subtitle={`${vacunas.length} aplicadas`}/>
+                {vacunas.length === 0 ? (
+                  <EmptyState
+                    icon={<IconSyringe size={18}/>}
+                    title="Sin vacunas"
+                    subtitle="Registra la primera"
+                    action={<Button variant="primary" size="sm" icon={<IconPlus size={12}/>} onClick={abrirPanelVacuna}>Nueva</Button>}
+                  />
+                ) : (
+                  <div style={{ padding: 8 }}>
+                    {vacunas.map(v => {
+                      const badge = badgeProxDosis(v.proxima_dosis);
+                      return (
+                        <div key={v.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 'var(--r-md)', marginBottom: 4,
+                          border: '1px solid var(--border)',
+                        }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--verde-50)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <IconSyringe size={14} color="var(--verde-600)"/>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{v.nombre}</p>
+                            <p className="mono" style={{ margin: '1px 0 0', fontSize: 10.5, color: 'var(--text-faint)' }}>
+                              {new Date(v.fecha_aplicacion + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                          {badge && <Badge tone={badge.tone} size="sm">{badge.label}</Badge>}
+                          <button style={iconBtnStyle} onClick={() => eliminarVacuna(v.id)} title="Eliminar">
+                            <IconTrash size={12} color="var(--danger)"/>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
-        ) : (
-          <div className="space-y-3">
-            {vacunas.map(v => {
-              const badge = badgeProxDosis(v.proxima_dosis);
-              return (
-                <div key={v.id} className="card p-5 flex items-center gap-4 group">
-                  <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Syringe className="w-5 h-5 text-green-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{v.nombre}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Aplicada: {new Date(v.fecha_aplicacion + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      {v.veterinario && ` · ${v.veterinario}`}
-                    </p>
-                  </div>
-                  {badge && (
-                    <div className="flex-shrink-0 text-right">
-                      <p className="text-xs text-gray-400 mb-1">Próxima dosis</p>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+
+          {/* Columna derecha: detalle registro */}
+          <div>
+            {tabActiva === 'consultas' && selReg ? (
+              <>
+                {(() => {
+                  const tipo = selReg.tipo || 'Consulta';
+                  const tcfg = TIPO_REGISTRO[tipo] || TIPO_REGISTRO.Consulta;
+                  return (
+                    <Card padding={0}>
+                      <div style={{ padding: '16px 20px', background: tcfg.soft, borderBottom: `1px solid ${tcfg.ring}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--surface)', border: `1.5px solid ${tcfg.color}`, color: tcfg.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <tcfg.Icon size={18}/>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: tcfg.color, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{tipo}</span>
+                            <h3 style={{ margin: '2px 0 0', fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.015em' }}>{selReg.motivo}</h3>
+                            <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                              {new Date(selReg.fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                              {selReg.veterinario && ` · ${selReg.veterinario}`}
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button style={iconBtnStyle} title="Editar" onClick={() => abrirPanelConsulta(selReg)}><IconEdit size={13} color="var(--text-muted)"/></button>
+                            <button style={iconBtnStyle} title="Eliminar" onClick={() => eliminarConsulta(selReg.id)}><IconTrash size={13} color="var(--danger)"/></button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Vitales */}
+                      {(selReg.peso || selReg.temperatura) && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '14px 20px', borderBottom: '1px solid var(--divider)', background: 'var(--stone-50)' }}>
+                          {selReg.peso && (
+                            <div>
+                              <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Peso</p>
+                              <p className="tabular" style={{ margin: '4px 0 0', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{selReg.peso} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-faint)' }}>kg</span></p>
+                            </div>
+                          )}
+                          {selReg.temperatura && (
+                            <div>
+                              <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Temperatura</p>
+                              <p className="tabular" style={{ margin: '4px 0 0', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{selReg.temperatura}<span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-faint)' }}>°C</span></p>
+                            </div>
+                          )}
+                          {selReg.veterinario && (
+                            <div>
+                              <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Veterinario</p>
+                              <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{selReg.veterinario}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Secciones */}
+                      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+                        {[
+                          { label: 'Diagnóstico', content: selReg.diagnostico },
+                          { label: 'Tratamiento', content: selReg.tratamiento },
+                          { label: 'Medicamentos', content: selReg.medicamentos },
+                          { label: 'Notas', content: selReg.notas },
+                        ].filter(s => s.content).map(s => (
+                          <div key={s.label}>
+                            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{s.label}</p>
+                            <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--text)', lineHeight: 1.55 }}>{s.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  );
+                })()}
+
+                {/* Evolución de peso */}
+                {pesoData.length >= 2 && (
+                  <Card padding={0} style={{ marginTop: 12 }}>
+                    <SectionHeader title="Evolución de peso" subtitle="Últimas consultas con peso registrado"/>
+                    <div style={{ padding: '14px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <p className="tabular" style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1 }}>
+                          {pesoData[pesoData.length - 1]} <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-faint)' }}>kg</span>
+                        </p>
+                      </div>
+                      <Sparkline data={pesoData} width={600} height={56} color="var(--verde-500)"/>
                     </div>
-                  )}
-                  <button
-                    onClick={() => eliminarVacuna(v.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              );
-            })}
+                  </Card>
+                )}
+              </>
+            ) : tabActiva === 'consultas' ? (
+              <EmptyState
+                icon={<IconFile size={22}/>}
+                title="Sin consultas"
+                subtitle="Registra la primera consulta médica"
+                action={<Button variant="primary" size="md" icon={<IconPlus size={13}/>} onClick={() => abrirPanelConsulta()}>Nueva consulta</Button>}
+              />
+            ) : (
+              <EmptyState
+                icon={<IconSyringe size={22}/>}
+                title="Sin vacunas"
+                subtitle="Registra la primera vacuna aplicada"
+                action={<Button variant="primary" size="md" icon={<IconPlus size={13}/>} onClick={abrirPanelVacuna}>Nueva vacuna</Button>}
+              />
+            )}
           </div>
-        )
-      )}
+        </div>
+      </Page>
 
       {/* Overlay */}
       {panelAbierto && (
-        <div className="fixed inset-0 bg-black/30 z-30" onClick={cerrarPanel} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 30 }} onClick={cerrarPanel}/>
       )}
 
       {/* Panel lateral */}
-      <div className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${panelAbierto ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 ${panelTipo === 'consulta' ? 'bg-purple-50' : 'bg-green-50'} rounded-lg flex items-center justify-center`}>
-              {panelTipo === 'consulta'
-                ? <FileText className="w-4 h-4 text-purple-500" />
-                : <Syringe className="w-4 h-4 text-green-500" />}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, height: '100%', width: 420,
+        background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', zIndex: 40,
+        display: 'flex', flexDirection: 'column',
+        transform: panelAbierto ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.3s ease',
+        borderLeft: '1px solid var(--border)',
+      }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32,
+              background: panelTipo === 'consulta' ? 'var(--info-soft)' : 'var(--verde-50)',
+              borderRadius: 8,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              color: panelTipo === 'consulta' ? 'var(--info)' : 'var(--verde-600)',
+            }}>
+              {panelTipo === 'consulta' ? <IconActivity size={15}/> : <IconSyringe size={15}/>}
             </div>
-            <h2 className="text-lg font-bold text-gray-900">
-              {panelTipo === 'consulta'
-                ? (consultaEditando ? 'Editar Consulta' : 'Nueva Consulta')
-                : 'Nueva Vacuna'}
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+              {panelTipo === 'consulta' ? (consultaEditando ? 'Editar Consulta' : 'Nueva Consulta') : 'Nueva Vacuna'}
             </h2>
           </div>
-          <button onClick={cerrarPanel} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
+          <button style={iconBtnStyle} onClick={cerrarPanel}><IconX size={15}/></button>
         </div>
 
         {panelTipo === 'consulta' && (
-          <form id="form-consulta" onSubmit={guardarConsulta} className="flex-1 overflow-y-auto p-6 space-y-4">
+          <form id="form-consulta" onSubmit={guardarConsulta} style={{ flex: 1, overflow: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} className="scroll-thin">
             {errorPanel && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{errorPanel}</div>
+              <div style={{ padding: '10px 14px', background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 'var(--r-md)', fontSize: 12.5, color: 'var(--danger)', fontWeight: 500 }}>{errorPanel}</div>
             )}
+            {[
+              { label: 'Fecha *', type: 'date', key: 'fecha', required: true },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={labelInput}>{f.label}</label>
+                <input type={f.type} style={styleInput} value={formC[f.key]} onChange={setFC(f.key)} required={f.required}/>
+              </div>
+            ))}
             <div>
-              <label className="label">Fecha *</label>
-              <input type="date" className="input" value={formC.fecha} onChange={setFC('fecha')} required />
+              <label style={labelInput}>Motivo *</label>
+              <input style={styleInput} placeholder="Ej: Control rutinario, Vacunación..." value={formC.motivo} onChange={setFC('motivo')} required/>
             </div>
+            {[
+              { label: 'Diagnóstico (opcional)', key: 'diagnostico' },
+              { label: 'Tratamiento (opcional)', key: 'tratamiento' },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={labelInput}>{f.label}</label>
+                <textarea style={{ ...styleInput, height: 'auto', padding: '8px 10px', resize: 'none' }} rows={2} value={formC[f.key]} onChange={setFC(f.key)}/>
+              </div>
+            ))}
             <div>
-              <label className="label">Motivo *</label>
-              <input className="input" placeholder="Ej: Control rutinario, Vacunación..." value={formC.motivo} onChange={setFC('motivo')} required />
-            </div>
-            <div>
-              <label className="label">Diagnóstico <span className="text-gray-400 font-normal">(opcional)</span></label>
-              <textarea className="input resize-none" rows={2} placeholder="Resultado de la consulta..." value={formC.diagnostico} onChange={setFC('diagnostico')} />
-            </div>
-            <div>
-              <label className="label">Tratamiento <span className="text-gray-400 font-normal">(opcional)</span></label>
-              <textarea className="input resize-none" rows={2} placeholder="Indicaciones médicas..." value={formC.tratamiento} onChange={setFC('tratamiento')} />
-            </div>
-            <div>
-              <label className="label">Medicamentos del inventario <span className="text-gray-400 font-normal">(opcional)</span></label>
+              <label style={labelInput}>Medicamentos del inventario</label>
               {medSeleccionados.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                   {medSeleccionados.map(m => (
-                    <span key={m.id} className="inline-flex items-center gap-1 bg-verde-fondo text-verde-oscuro text-xs px-2 py-1 rounded-full font-medium">
+                    <span key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--verde-50)', color: 'var(--verde-700)', fontSize: 11.5, fontWeight: 600, padding: '2px 8px', borderRadius: 99 }}>
                       {m.nombre}
-                      <button type="button" onClick={() => quitarMed(m.id)} className="hover:text-red-500 transition-colors">
-                        <X className="w-3 h-3" />
+                      <button type="button" onClick={() => setMedSeleccionados(s => s.filter(x => x.id !== m.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex' }}>
+                        <IconX size={10}/>
                       </button>
                     </span>
                   ))}
                 </div>
               )}
-              <div className="relative">
-                <input
-                  className="input"
-                  placeholder="Buscar medicamento del inventario..."
-                  value={medBusqueda}
+              <div style={{ position: 'relative' }}>
+                <input style={styleInput} placeholder="Buscar medicamento del inventario..." value={medBusqueda}
                   onChange={e => handleMedBusqueda(e.target.value)}
                   onBlur={() => setTimeout(() => setMedSugerencias([]), 150)}
-                  autoComplete="off"
-                />
+                  autoComplete="off"/>
                 {medSugerencias.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-md)', zIndex: 10, maxHeight: 160, overflow: 'auto', marginTop: 4 }}>
                     {medSugerencias.slice(0, 8).map(s => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => seleccionarMed(s)}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-verde-fondo text-left text-sm transition-colors"
-                      >
-                        <span className="text-gray-900 font-medium">{s.nombre}</span>
-                        <span className="text-gray-400 text-xs ml-2">{s.cantidad} {s.unidad}</span>
+                      <button key={s.id} type="button" onClick={() => seleccionarMed(s)}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--stone-50)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{s.nombre}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{s.cantidad} {s.unidad}</span>
                       </button>
                     ))}
                   </div>
@@ -597,76 +742,67 @@ function HistorialMascota() {
               </div>
             </div>
             <div>
-              <label className="label">Medicamentos adicionales <span className="text-gray-400 font-normal">(texto libre)</span></label>
-              <textarea className="input resize-none" rows={2} placeholder="Otros medicamentos o notas..." value={formC.medicamentos} onChange={setFC('medicamentos')} />
+              <label style={labelInput}>Medicamentos adicionales (texto libre)</label>
+              <textarea style={{ ...styleInput, height: 'auto', padding: '8px 10px', resize: 'none' }} rows={2} value={formC.medicamentos} onChange={setFC('medicamentos')}/>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <label className="label">Veterinario *</label>
-                <input className="input" list="vets-list" placeholder="Ej: Dr. García" value={formC.veterinario} onChange={setFC('veterinario')} required />
-                <datalist id="vets-list">
-                  {veterinariosUnicos.map(v => <option key={v} value={v} />)}
-                </datalist>
+                <label style={labelInput}>Veterinario *</label>
+                <input style={styleInput} list="vets-list" placeholder="Ej: Dr. García" value={formC.veterinario} onChange={setFC('veterinario')} required/>
+                <datalist id="vets-list">{veterinariosUnicos.map(v => <option key={v} value={v}/>)}</datalist>
               </div>
               <div>
-                <label className="label">Peso (kg) <span className="text-gray-400 font-normal">(opc.)</span></label>
-                <input type="number" step="0.1" min="0" className="input" placeholder="12.5" value={formC.peso} onChange={setFC('peso')} />
+                <label style={labelInput}>Peso (kg)</label>
+                <input type="number" step="0.1" min="0" style={styleInput} placeholder="12.5" value={formC.peso} onChange={setFC('peso')}/>
               </div>
             </div>
             <div>
-              <label className="label">Notas <span className="text-gray-400 font-normal">(opcional)</span></label>
-              <textarea className="input resize-none" rows={2} placeholder="Observaciones adicionales..." value={formC.notas} onChange={setFC('notas')} />
+              <label style={labelInput}>Notas (opcional)</label>
+              <textarea style={{ ...styleInput, height: 'auto', padding: '8px 10px', resize: 'none' }} rows={2} value={formC.notas} onChange={setFC('notas')}/>
             </div>
           </form>
         )}
 
         {panelTipo === 'vacuna' && (
-          <form id="form-vacuna" onSubmit={guardarVacuna} className="flex-1 overflow-y-auto p-6 space-y-4">
+          <form id="form-vacuna" onSubmit={guardarVacuna} style={{ flex: 1, overflow: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} className="scroll-thin">
             {errorPanel && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{errorPanel}</div>
+              <div style={{ padding: '10px 14px', background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 'var(--r-md)', fontSize: 12.5, color: 'var(--danger)', fontWeight: 500 }}>{errorPanel}</div>
             )}
-            <div>
-              <label className="label">Nombre de la vacuna *</label>
-              <input className="input" placeholder="Ej: Rabia, Triple viral..." value={formV.nombre} onChange={setFV('nombre')} required />
-            </div>
-            <div>
-              <label className="label">Fecha de aplicación *</label>
-              <input type="date" className="input" value={formV.fecha_aplicacion} onChange={setFV('fecha_aplicacion')} required />
-            </div>
-            <div>
-              <label className="label">Próxima dosis <span className="text-gray-400 font-normal">(opcional)</span></label>
-              <input type="date" className="input" value={formV.proxima_dosis} onChange={setFV('proxima_dosis')} />
-            </div>
-            <div>
-              <label className="label">Veterinario <span className="text-gray-400 font-normal">(opcional)</span></label>
-              <input className="input" list="vets-list-v" placeholder="Ej: Dra. López" value={formV.veterinario} onChange={setFV('veterinario')} />
-              <datalist id="vets-list-v">
-                {veterinariosUnicos.map(v => <option key={v} value={v} />)}
-              </datalist>
-            </div>
+            {[
+              { label: 'Nombre de la vacuna *', key: 'nombre', type: 'text', placeholder: 'Ej: Rabia, Triple viral...', required: true },
+              { label: 'Fecha de aplicación *', key: 'fecha_aplicacion', type: 'date', required: true },
+              { label: 'Próxima dosis (opcional)', key: 'proxima_dosis', type: 'date', required: false },
+              { label: 'Veterinario (opcional)', key: 'veterinario', type: 'text', placeholder: 'Ej: Dra. López', required: false },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={labelInput}>{f.label}</label>
+                <input type={f.type || 'text'} style={styleInput} placeholder={f.placeholder} value={formV[f.key]} onChange={setFV(f.key)} required={f.required}
+                  list={f.key === 'veterinario' ? 'vets-list-v' : undefined}/>
+                {f.key === 'veterinario' && <datalist id="vets-list-v">{veterinariosUnicos.map(v => <option key={v} value={v}/>)}</datalist>}
+              </div>
+            ))}
           </form>
         )}
 
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-          <button type="button" onClick={cerrarPanel} className="btn-secondary flex-1 justify-center">Cancelar</button>
-          <button
-            type="submit"
-            form={panelTipo === 'consulta' ? 'form-consulta' : 'form-vacuna'}
-            disabled={guardando}
-            className="btn-primary flex-1 justify-center disabled:opacity-60"
-          >
-            {guardando && <Loader2 className="w-4 h-4 animate-spin" />}
-            {panelTipo === 'consulta'
-              ? (consultaEditando ? 'Guardar cambios' : 'Registrar')
-              : 'Registrar vacuna'}
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0 }}>
+          <Button variant="secondary" style={{ flex: 1 }} onClick={cerrarPanel}>Cancelar</Button>
+          <button type="submit" form={panelTipo === 'consulta' ? 'form-consulta' : 'form-vacuna'} disabled={guardando}
+            style={{
+              flex: 1, height: 36, borderRadius: 'var(--r-md)', border: 'none',
+              background: 'var(--verde-600)', color: '#fff',
+              fontSize: 13, fontWeight: 600, cursor: guardando ? 'not-allowed' : 'pointer',
+              opacity: guardando ? 0.7 : 1,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+            {guardando && <span className="vp-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }}/>}
+            {panelTipo === 'consulta' ? (consultaEditando ? 'Guardar cambios' : 'Registrar') : 'Registrar vacuna'}
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
-// ─── Componente raíz ─────────────────────────────────────────────────────────
 export default function Historias() {
   const elemento = useRoutes([
     { path: '/',           element: <BuscarMascota /> },

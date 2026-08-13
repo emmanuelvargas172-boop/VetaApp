@@ -95,4 +95,18 @@ try {
   if (!err.message.includes('duplicate column name')) throw err;
 }
 
+// Tabla tratamientos (calendario)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tratamientos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mascota_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL CHECK(tipo IN ('vacunacion', 'desparasitacion', 'bano', 'consulta')),
+    fecha TEXT NOT NULL,
+    hora TEXT,
+    notas TEXT,
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (mascota_id) REFERENCES mascotas(id) ON DELETE CASCADE
+  );
+`);
+
 module.exports = db;

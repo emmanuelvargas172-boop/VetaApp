@@ -1,19 +1,20 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  Plus, Calendar, Clock, Edit2,
-  Trash2, ChevronDown, X, Loader2, AlertCircle, Search,
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
+import {
+  Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle,
+} from '../components/ui';
+import {
+  SpeciesAvatar, SPECIES_ICONS,
+  IconCalendar, IconCalDays, IconPlus, IconSearch, IconClock, IconCheck,
+  IconCheckCircle, IconWhatsApp, IconEdit, IconMore, IconX, IconChevronDown,
+  IconAlert, IconPaw, IconSyringe,
+} from '../components/icons';
 
-const ESTADO_CONFIG = {
-  pendiente:  { label: 'Pendiente',  badge: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-400' },
-  confirmada: { label: 'Confirmada', badge: 'bg-blue-100 text-blue-700',    dot: 'bg-blue-400' },
-  atendida:   { label: 'Atendida',   badge: 'bg-green-100 text-green-700',  dot: 'bg-green-400' },
-  cancelada:  { label: 'Cancelada',  badge: 'bg-red-100 text-red-700',      dot: 'bg-red-400' },
-};
-
-const ESPECIES = {
-  perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', reptil: '🦎', otro: '🐾',
+const ESTADO_CITA = {
+  pendiente:  { tone: 'warn',    label: 'Pendiente'  },
+  confirmada: { tone: 'info',    label: 'Confirmada' },
+  atendida:   { tone: 'success', label: 'Atendida'   },
+  cancelada:  { tone: 'danger',  label: 'Cancelada'  },
 };
 
 const TRANSICIONES = {
@@ -24,470 +25,307 @@ const TRANSICIONES = {
 };
 
 export default function Citas() {
-  const [citas, setCitas]                   = useState([]);
-  const [cargando, setCargando]             = useState(true);
-  const [error, setError]                   = useState(false);
-  const [filtroFecha, setFiltroFecha]       = useState('todas');
-  const [filtroEstado, setFiltroEstado]     = useState('');
-  const [panelAbierto, setPanelAbierto]     = useState(false);
-  const [citaEditando, setCitaEditando]     = useState(null);
+  const [citas, setCitas]             = useState([]);
+  const [cargando, setCargando]       = useState(true);
+  const [error, setError]             = useState(false);
+  const [filtroFecha, setFiltroFecha] = useState('hoy');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [panelAbierto, setPanelAbierto] = useState(false);
+  const [citaEditando, setCitaEditando] = useState(null);
   const [dropdownEstadoId, setDropdownEstadoId] = useState(null);
+  const [busqueda, setBusqueda] = useState('');
 
   const hoy = new Date().toISOString().split('T')[0];
 
   const cargar = async () => {
-    setCargando(true);
-    setError(false);
+    setCargando(true); setError(false);
     try {
       const params = {};
       if (filtroFecha === 'hoy') params.fecha = hoy;
       if (filtroFecha === 'semana') params.semana = hoy;
-      if (filtroEstado) params.estado = filtroEstado;
+      if (filtroEstado !== 'todos') params.estado = filtroEstado;
       const { data } = await api.get('/citas', { params });
       setCitas(data);
-    } catch {
-      setError(true);
-    } finally {
-      setCargando(false);
-    }
+    } catch { setError(true); }
+    finally { setCargando(false); }
   };
 
   useEffect(() => { cargar(); }, [filtroFecha, filtroEstado]);
 
-  const FORM_INICIAL = {
-    mascota_id: '', mascota_label: '', fecha: hoy,
-    hora: '', veterinario: '', motivo: '', notas: '',
-  };
-  const [form, setForm]               = useState(FORM_INICIAL);
-  const [mascotas, setMascotas]       = useState([]);
-  const [busqMascota, setBusqMascota] = useState('');
-  const [errorPanel, setErrorPanel]   = useState('');
-  const [guardando, setGuardando]     = useState(false);
+  const citasFiltradas = citas.filter(c => {
+    if (!busqueda) return true;
+    const q = busqueda.toLowerCase();
+    return (c.mascota_nombre || '').toLowerCase().includes(q) ||
+           (c.motivo || '').toLowerCase().includes(q) ||
+           (c.veterinario || '').toLowerCase().includes(q);
+  });
 
-  const veterinariosUnicos = useMemo(
-    () => [...new Set(citas.map((c) => c.veterinario).filter(Boolean))],
-    [citas]
-  );
-
-  const mascotasFiltradas = useMemo(() => {
-    if (!busqMascota.trim()) return mascotas.slice(0, 8);
-    const q = busqMascota.toLowerCase();
-    return mascotas.filter(
-      (m) => m.nombre.toLowerCase().includes(q) || m.dueno_nombre.toLowerCase().includes(q)
-    ).slice(0, 8);
-  }, [mascotas, busqMascota]);
-
-  const abrirPanel = (cita = null) => {
-    setCitaEditando(cita);
-    setErrorPanel('');
-    if (cita) {
-      setForm({
-        mascota_id: cita.mascota_id,
-        mascota_label: `${ESPECIES[cita.especie] || '🐾'} ${cita.mascota_nombre}`,
-        fecha: cita.fecha,
-        hora: cita.hora,
-        veterinario: cita.veterinario,
-        motivo: cita.motivo,
-        notas: cita.notas || '',
-      });
-    } else {
-      setForm(FORM_INICIAL);
-      setBusqMascota('');
-    }
-    if (mascotas.length === 0) {
-      api.get('/mascotas').then((r) => setMascotas(r.data)).catch(() => {});
-    }
-    setPanelAbierto(true);
+  const stats = {
+    total: citasFiltradas.length,
+    pendientes: citasFiltradas.filter(c => c.estado === 'pendiente').length,
+    confirmadas: citasFiltradas.filter(c => c.estado === 'confirmada').length,
+    atendidas: citasFiltradas.filter(c => c.estado === 'atendida').length,
   };
 
-  const cerrarPanel = () => {
-    setPanelAbierto(false);
-    setCitaEditando(null);
-  };
-
-  const setF = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
-
-  const guardar = async (e) => {
-    e.preventDefault();
-    if (!form.mascota_id || !form.fecha || !form.hora || !form.veterinario || !form.motivo) {
-      setErrorPanel('Mascota, fecha, hora, veterinario y motivo son requeridos.');
-      return;
-    }
-    setGuardando(true);
-    setErrorPanel('');
-    try {
-      const payload = {
-        mascota_id: form.mascota_id,
-        fecha: form.fecha,
-        hora: form.hora,
-        veterinario: form.veterinario,
-        motivo: form.motivo,
-        notas: form.notas || null,
-      };
-      if (citaEditando) {
-        await api.put(`/citas/${citaEditando.id}`, { ...payload, estado: citaEditando.estado });
-      } else {
-        await api.post('/citas', payload);
-      }
-      cerrarPanel();
-      cargar();
-    } catch (err) {
-      setErrorPanel(err.response?.data?.error || 'Error al guardar. Intenta de nuevo.');
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const eliminar = async (id) => {
-    if (!window.confirm('¿Eliminar esta cita? No se puede deshacer.')) return;
-    await api.delete(`/citas/${id}`);
-    cargar();
-  };
-
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const cerrar = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownEstadoId(null);
-      }
-    };
-    document.addEventListener('mousedown', cerrar);
-    return () => document.removeEventListener('mousedown', cerrar);
-  }, []);
-
-  const cambiarEstado = async (citaId, nuevoEstado) => {
-    const estadoAnterior = citas.find((c) => c.id === citaId)?.estado;
-    setCitas((prev) =>
-      prev.map((c) => (c.id === citaId ? { ...c, estado: nuevoEstado } : c))
-    );
+  const cambiarEstado = async (id, nuevoEstado) => {
     setDropdownEstadoId(null);
     try {
-      await api.patch(`/citas/${citaId}/estado`, { estado: nuevoEstado });
-    } catch {
-      setCitas((prev) =>
-        prev.map((c) => (c.id === citaId ? { ...c, estado: estadoAnterior } : c))
-      );
-      alert('No se pudo cambiar el estado. Intenta de nuevo.');
-    }
+      await api.patch(`/citas/${id}/estado`, { estado: nuevoEstado });
+      setCitas(prev => prev.map(c => c.id === id ? { ...c, estado: nuevoEstado } : c));
+    } catch { alert('No se pudo actualizar el estado'); }
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Cabecera */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Agenda de Citas</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            {cargando ? 'Cargando...' : `${citas.length} cita${citas.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <button onClick={() => abrirPanel()} className="btn-primary flex-shrink-0">
-          <Plus className="w-4 h-4" /> Nueva Cita
-        </button>
-      </div>
+    <>
+      <Topbar
+        title="Citas"
+        subtitle={`${citasFiltradas.length} citas · ${stats.atendidas} completadas · ${stats.pendientes + stats.confirmadas} restantes`}
+        actions={
+          <>
+            <Button variant="secondary" size="md" icon={<IconCalDays size={13}/>}>Ver calendario</Button>
+            <Button variant="primary" size="md" icon={<IconPlus size={14}/>} onClick={() => { setCitaEditando(null); setPanelAbierto(true); }}>
+              Nueva cita
+            </Button>
+          </>
+        }
+      />
 
-      {/* Error banner */}
-      {error && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-          <p className="text-amber-700 text-sm">No se pudo conectar al servidor.</p>
-        </div>
-      )}
-
-      {/* Filtros */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
-        {['todas', 'hoy', 'semana'].map((f) => (
-          <button
-            key={f}
-            onClick={() => setFiltroFecha(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filtroFecha === f
-                ? 'bg-verde-oscuro text-white'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-verde-claro hover:text-verde-claro'
-            }`}
-          >
-            {{ todas: 'Todas', hoy: 'Hoy', semana: 'Esta semana' }[f]}
-          </button>
-        ))}
-
-        <div className="relative ml-auto">
-          <select
-            value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
-            className="input py-1.5 pr-8 text-sm appearance-none cursor-pointer"
-          >
-            <option value="">Todos los estados</option>
-            {Object.entries(ESTADO_CONFIG).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <Page>
+          {/* Tabs fecha */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: 4,
+            background: 'var(--stone-100)', borderRadius: 'var(--r-md)',
+            width: 'fit-content', marginBottom: 14,
+          }}>
+            {[{ id: 'hoy', label: 'Hoy' }, { id: 'semana', label: 'Esta semana' }, { id: 'mes', label: 'Este mes' }, { id: 'todas', label: 'Todas' }].map(t => (
+              <button key={t.id} onClick={() => setFiltroFecha(t.id)} style={{
+                padding: '5px 12px', borderRadius: 6, border: 'none',
+                background: filtroFecha === t.id ? 'var(--surface)' : 'transparent',
+                color: filtroFecha === t.id ? 'var(--text)' : 'var(--text-muted)',
+                fontSize: 12.5, fontWeight: 600,
+                boxShadow: filtroFecha === t.id ? 'var(--shadow-xs)' : 'none',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}>{t.label}</button>
             ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-2 w-4 h-4 text-gray-400 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* Tabla */}
-      {cargando ? (
-        <div className="card p-16 flex flex-col items-center">
-          <div className="w-8 h-8 border-4 border-verde-claro border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-gray-400 text-sm">Cargando citas...</p>
-        </div>
-      ) : citas.length === 0 ? (
-        <div className="card p-16 flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4 text-3xl">
-            📅
-          </div>
-          <p className="font-semibold text-gray-700">
-            {filtroFecha === 'hoy'
-              ? 'Sin citas para hoy'
-              : filtroFecha === 'semana'
-              ? 'Sin citas esta semana'
-              : 'No hay citas registradas'}
-          </p>
-          <p className="text-gray-400 text-sm mt-1">Agenda la primera cita con el botón de arriba</p>
-          <button onClick={() => abrirPanel()} className="btn-primary mt-5 text-sm">
-            <Plus className="w-4 h-4" /> Nueva Cita
-          </button>
-        </div>
-      ) : (
-        <div className="card overflow-hidden">
-          {/* Cabecera tabla */}
-          <div className="hidden md:grid grid-cols-[80px_1.5fr_1.5fr_1fr_120px_80px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            <span>Hora</span>
-            <span>Mascota</span>
-            <span>Motivo</span>
-            <span>Veterinario</span>
-            <span>Estado</span>
-            <span></span>
           </div>
 
-          <div className="divide-y divide-gray-50">
-            {citas.map((cita) => (
-              <div
-                key={cita.id}
-                className="grid grid-cols-1 md:grid-cols-[80px_1.5fr_1.5fr_1fr_120px_80px] gap-4 px-5 py-4 hover:bg-gray-50/60 transition-colors items-center group"
-              >
-                {/* Hora */}
-                <div className="flex items-center gap-1.5 text-gray-500">
-                  <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="text-sm font-mono font-medium">{cita.hora}</span>
-                </div>
-
-                {/* Mascota */}
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{ESPECIES[cita.especie] || '🐾'}</span>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm truncate">{cita.mascota_nombre}</p>
-                    <p className="text-xs text-gray-400 truncate">{cita.dueno_nombre}</p>
+          {/* Status cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+            {[
+              { label: 'Pendientes',  value: stats.pendientes,  tone: 'warn',    Icon: IconClock,        filter: 'pendiente' },
+              { label: 'Confirmadas', value: stats.confirmadas, tone: 'info',    Icon: IconCheck,        filter: 'confirmada' },
+              { label: 'Atendidas',   value: stats.atendidas,   tone: 'success', Icon: IconCheckCircle, filter: 'atendida' },
+              { label: 'Total',       value: stats.total,       tone: 'neutral', Icon: IconCalendar,     filter: 'todos' },
+            ].map((s) => {
+              const colorMap = { warn: 'var(--warn)', info: 'var(--info)', success: 'var(--verde-600)', neutral: 'var(--text-muted)' };
+              const bgMap    = { warn: 'var(--warn-soft)', info: 'var(--info-soft)', success: 'var(--verde-50)', neutral: 'var(--stone-50)' };
+              const active = filtroEstado === s.filter;
+              return (
+                <button key={s.label} onClick={() => setFiltroEstado(s.filter)} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                  background: active ? bgMap[s.tone] : 'var(--surface)',
+                  border: `1px solid ${active ? colorMap[s.tone] : 'var(--border)'}`,
+                  borderRadius: 'var(--r-lg)', cursor: 'pointer', textAlign: 'left',
+                  transition: 'all 0.18s', boxShadow: active ? 'none' : 'var(--shadow-xs)',
+                }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: bgMap[s.tone], color: colorMap[s.tone], display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <s.Icon size={16}/>
                   </div>
-                </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{s.label}</p>
+                    <p className="tabular" style={{ margin: '2px 0 0', fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{s.value}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
-                {/* Motivo */}
-                <p className="text-sm text-gray-600 truncate">{cita.motivo}</p>
-
-                {/* Veterinario */}
-                <p className="text-sm text-gray-500 truncate hidden md:block">{cita.veterinario}</p>
-
-                {/* Estado con dropdown */}
-                <div className="relative" ref={dropdownEstadoId === cita.id ? dropdownRef : null}>
-                  <span
-                    onClick={() => setDropdownEstadoId(dropdownEstadoId === cita.id ? null : cita.id)}
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full select-none ${ESTADO_CONFIG[cita.estado]?.badge} ${TRANSICIONES[cita.estado]?.length > 0 ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${ESTADO_CONFIG[cita.estado]?.dot}`} />
-                    {ESTADO_CONFIG[cita.estado]?.label}
-                    {TRANSICIONES[cita.estado]?.length > 0 && <ChevronDown className="w-3 h-3" />}
-                  </span>
-
-                  {dropdownEstadoId === cita.id && TRANSICIONES[cita.estado]?.length > 0 && (
-                    <div className="absolute left-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[140px]">
-                      {TRANSICIONES[cita.estado].map((estado) => (
-                        <button
-                          key={estado}
-                          onClick={() => cambiarEstado(cita.id, estado)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors text-left"
-                        >
-                          <span className={`w-2 h-2 rounded-full ${ESTADO_CONFIG[estado]?.dot}`} />
-                          {ESTADO_CONFIG[estado]?.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => abrirPanel(cita)}
-                    className="p-1.5 rounded-lg hover:bg-verde-fondo text-gray-300 hover:text-verde-claro transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => eliminar(cita.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+          {/* List */}
+          <Card padding={0}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--stone-50)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Agenda</h3>
+                <Badge tone="neutral" size="sm">{citasFiltradas.length} citas</Badge>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Overlay */}
-      {panelAbierto && (
-        <div
-          className="fixed inset-0 bg-black/30 z-30"
-          onClick={cerrarPanel}
-        />
-      )}
-
-      {/* Panel lateral */}
-      <div
-        className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${
-          panelAbierto ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {/* Header panel */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-blue-500" />
+              <UIInput icon={<IconSearch size={13}/>} placeholder="Buscar cita..." value={busqueda} onChange={e => setBusqueda(e.target.value)} style={{ width: 220 }}/>
             </div>
-            <h2 className="text-lg font-bold text-gray-900">
-              {citaEditando ? 'Editar Cita' : 'Nueva Cita'}
-            </h2>
-          </div>
-          <button onClick={cerrarPanel} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
 
-        <form onSubmit={guardar} className="flex-1 overflow-y-auto p-6 space-y-4">
-          {errorPanel && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-              {errorPanel}
-            </div>
-          )}
-
-          {/* Mascota */}
-          <div>
-            <label className="label">Mascota *</label>
-            {citaEditando ? (
-              <div className="input bg-gray-50 text-gray-700">{form.mascota_label}</div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-300" />
-                <input
-                  className="input pl-9"
-                  placeholder="Buscar mascota..."
-                  value={busqMascota}
-                  onChange={(e) => {
-                    setBusqMascota(e.target.value);
-                    setForm((f) => ({ ...f, mascota_id: '', mascota_label: '' }));
-                  }}
-                />
-                {busqMascota && !form.mascota_id && mascotasFiltradas.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto mt-1">
-                    {mascotasFiltradas.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setForm((f) => ({
-                            ...f,
-                            mascota_id: m.id,
-                            mascota_label: `${ESPECIES[m.especie] || '🐾'} ${m.nombre}`,
-                          }));
-                          setBusqMascota(`${ESPECIES[m.especie] || '🐾'} ${m.nombre}`);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left"
-                      >
-                        <span className="text-lg">{ESPECIES[m.especie] || '🐾'}</span>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{m.nombre}</p>
-                          <p className="text-xs text-gray-400">{m.dueno_nombre}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {error && (
+              <div style={{ padding: '12px 16px', background: 'var(--warn-soft)', border: '0 0 1px 0 solid var(--warn-ring)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconAlert size={14} color="var(--warn)"/>
+                <span style={{ fontSize: 12.5, color: 'var(--warn)' }}>No se pudo conectar al servidor</span>
               </div>
             )}
-          </div>
 
-          {/* Fecha y Hora */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Fecha *</label>
-              <input type="date" className="input" value={form.fecha} onChange={setF('fecha')} required />
+            {cargando ? (
+              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><div className="vp-spinner"/></div>
+            ) : citasFiltradas.length === 0 ? (
+              <EmptyState icon={<IconCalendar size={24}/>} title="Sin citas" subtitle="No hay citas que coincidan con los filtros aplicados"
+                action={<Button variant="primary" size="sm" icon={<IconPlus size={12}/>} onClick={() => setPanelAbierto(true)}>Nueva cita</Button>}/>
+            ) : citasFiltradas.map((c, i) => {
+              const especie = c.especie || 'otro';
+              const estado = ESTADO_CITA[c.estado] || ESTADO_CITA.pendiente;
+              const atendida = c.estado === 'atendida';
+              const hora = c.hora || c.hora_inicio || '';
+              const transiciones = TRANSICIONES[c.estado] || [];
+              return (
+                <div key={c.id} style={{
+                  display: 'grid', gridTemplateColumns: '70px 1fr 1fr 130px 110px auto',
+                  gap: 16, padding: '12px 16px',
+                  borderBottom: i < citasFiltradas.length - 1 ? '1px solid var(--divider)' : 'none',
+                  alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s', position: 'relative',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--stone-50)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{
+                    padding: '6px 10px',
+                    background: atendida ? 'var(--stone-100)' : 'var(--verde-50)',
+                    border: `1px solid ${atendida ? 'var(--border)' : 'var(--verde-200)'}`,
+                    borderRadius: 'var(--r-md)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 'fit-content',
+                  }}>
+                    <span className="mono tabular" style={{ fontSize: 12.5, fontWeight: 600, color: atendida ? 'var(--text-faint)' : 'var(--verde-700)' }}>{hora}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <SpeciesAvatar especie={especie} size={34}/>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', textDecoration: atendida ? 'line-through' : 'none', opacity: atendida ? 0.6 : 1 }}>{c.mascota_nombre || '—'}</p>
+                      <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.raza || ''}{c.dueno ? ` · ${c.dueno}` : ''}</p>
+                    </div>
+                  </div>
+
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.motivo || '—'}</p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'linear-gradient(135deg, var(--verde-400), var(--verde-700))', color: '#fff', fontSize: 9.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {(c.veterinario || 'V').charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.veterinario || '—'}</span>
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ cursor: transiciones.length > 0 ? 'pointer' : 'default' }}
+                      onClick={(e) => { e.stopPropagation(); if (transiciones.length > 0) setDropdownEstadoId(dropdownEstadoId === c.id ? null : c.id); }}>
+                      <Badge tone={estado.tone} dot>{estado.label}</Badge>
+                    </span>
+                    {dropdownEstadoId === c.id && transiciones.length > 0 && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, zIndex: 50, marginTop: 4,
+                        background: 'var(--surface)', border: '1px solid var(--border-strong)',
+                        borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-md)', overflow: 'hidden', minWidth: 140,
+                      }}
+                      onClick={e => e.stopPropagation()}>
+                        {transiciones.map(est => (
+                          <button key={est} onClick={() => cambiarEstado(c.id, est)} style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            padding: '8px 12px', border: 'none', background: 'transparent',
+                            cursor: 'pointer', fontSize: 12.5, fontWeight: 500, color: 'var(--text)',
+                            transition: 'background 0.12s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--stone-50)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                            <Badge tone={ESTADO_CITA[est]?.tone || 'neutral'} size="sm" dot>{ESTADO_CITA[est]?.label || est}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <button style={iconBtnStyle} title="WhatsApp"><IconWhatsApp size={12}/></button>
+                    <button style={iconBtnStyle} title="Editar" onClick={(e) => { e.stopPropagation(); setCitaEditando(c); setPanelAbierto(true); }}><IconEdit size={13} color="var(--text-muted)"/></button>
+                    <button style={iconBtnStyle} title="Más"><IconMore size={14} color="var(--text-muted)"/></button>
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        </Page>
+
+        {/* Panel lateral nueva cita */}
+        {panelAbierto && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 40,
+            background: 'rgba(28,25,23,0.4)', backdropFilter: 'blur(2px)',
+          }}
+          onClick={() => setPanelAbierto(false)}>
+            <div style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0,
+              width: 384, background: 'var(--surface)',
+              borderLeft: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
+              display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.2s ease-out',
+            }}
+            onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--verde-50)', border: '1px solid var(--verde-200)', color: 'var(--verde-600)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconCalendar size={16}/>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, letterSpacing: '-0.015em' }}>{citaEditando ? 'Editar cita' : 'Nueva cita'}</h2>
+                  <p style={{ margin: '1px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>Programa una consulta veterinaria</p>
+                </div>
+                <button onClick={() => setPanelAbierto(false)} style={iconBtnStyle}><IconX size={14} color="var(--text-muted)"/></button>
+              </div>
+              <div style={{ flex: 1, padding: 22, overflow: 'auto' }} className="scroll-thin">
+                <FormField label="Mascota" required>
+                  <UIInput placeholder="Buscar mascota..." defaultValue={citaEditando?.mascota_nombre || ''}/>
+                </FormField>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <FormField label="Fecha" required>
+                    <FormInput type="date" defaultValue={citaEditando?.fecha || hoy}/>
+                  </FormField>
+                  <FormField label="Hora" required>
+                    <FormInput type="time" defaultValue={citaEditando?.hora || '09:00'} mono/>
+                  </FormField>
+                </div>
+                <FormField label="Veterinario">
+                  <FormInput placeholder="Dr. Vega" defaultValue={citaEditando?.veterinario || ''}/>
+                </FormField>
+                <FormField label="Motivo" required>
+                  <FormInput placeholder="Vacunación, control general..." defaultValue={citaEditando?.motivo || ''}/>
+                </FormField>
+                <FormField label="Notas adicionales">
+                  <FormInput textarea placeholder="Información relevante para el veterinario..." defaultValue={citaEditando?.notas || ''}/>
+                </FormField>
+              </div>
+              <div style={{ padding: '14px 22px', borderTop: '1px solid var(--divider)', background: 'var(--stone-50)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                <Button variant="ghost" onClick={() => setPanelAbierto(false)}>Cancelar</Button>
+                <Button variant="primary">{citaEditando ? 'Guardar cambios' : 'Crear cita'}</Button>
+              </div>
             </div>
-            <div>
-              <label className="label">Hora *</label>
-              <input type="time" className="input" value={form.hora} onChange={setF('hora')} required />
-            </div>
           </div>
+        )}
 
-          {/* Veterinario */}
-          <div>
-            <label className="label">Veterinario *</label>
-            <input
-              className="input"
-              list="vets-list"
-              placeholder="Ej: Dr. García"
-              value={form.veterinario}
-              onChange={setF('veterinario')}
-              required
-            />
-            <datalist id="vets-list">
-              {veterinariosUnicos.map((v) => <option key={v} value={v} />)}
-            </datalist>
-          </div>
-
-          {/* Motivo */}
-          <div>
-            <label className="label">Motivo *</label>
-            <input
-              className="input"
-              placeholder="Ej: Vacuna anual, Control rutinario..."
-              value={form.motivo}
-              onChange={setF('motivo')}
-              required
-            />
-          </div>
-
-          {/* Notas */}
-          <div>
-            <label className="label">Notas <span className="text-gray-400 font-normal">(opcional)</span></label>
-            <textarea
-              className="input resize-none"
-              rows={3}
-              placeholder="Observaciones adicionales..."
-              value={form.notas}
-              onChange={setF('notas')}
-            />
-          </div>
-        </form>
-
-        {/* Footer panel */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-          <button type="button" onClick={cerrarPanel} className="btn-secondary flex-1 justify-center">
-            Cancelar
-          </button>
-          <button
-            onClick={guardar}
-            disabled={guardando}
-            className="btn-primary flex-1 justify-center disabled:opacity-60"
-          >
-            {guardando && <Loader2 className="w-4 h-4 animate-spin" />}
-            {citaEditando ? 'Guardar cambios' : 'Agendar'}
-          </button>
-        </div>
+        {dropdownEstadoId && <div style={{ position: 'fixed', inset: 0, zIndex: 30 }} onClick={() => setDropdownEstadoId(null)}/>}
       </div>
+    </>
+  );
+}
+
+function FormField({ label, required, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 5, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+        {label}{required && <span style={{ color: 'var(--danger)' }}>*</span>}
+      </label>
+      {children}
     </div>
   );
+}
+
+function FormInput({ textarea, mono, ...props }) {
+  const base = {
+    width: '100%', padding: '8px 12px', fontSize: 13,
+    fontFamily: mono ? 'var(--font-mono)' : 'var(--font-sans)',
+    background: 'var(--surface)', border: '1px solid var(--border-strong)',
+    borderRadius: 'var(--r-md)', color: 'var(--text)', outline: 'none',
+    transition: 'all 0.15s', lineHeight: 1.5,
+  };
+  const onFocus = (e) => { e.currentTarget.style.borderColor = 'var(--verde-500)'; e.currentTarget.style.boxShadow = 'var(--shadow-focus)'; };
+  const onBlur  = (e) => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.boxShadow = 'none'; };
+  if (textarea) return <textarea {...props} rows={2} onFocus={onFocus} onBlur={onBlur} style={{ ...base, resize: 'vertical' }}/>;
+  return <input {...props} onFocus={onFocus} onBlur={onBlur} style={{ ...base, height: 36 }}/>;
 }

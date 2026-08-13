@@ -22,6 +22,16 @@ router.get('/', (req, res) => {
      WHERE proxima_dosis BETWEEN date('now') AND date('now', '+30 days')`
   ).get();
 
+  const vacunasUrgentes = db.prepare(
+    `SELECT COUNT(*) as total FROM vacunas
+     WHERE proxima_dosis BETWEEN date('now') AND date('now', '+3 days')`
+  ).get();
+
+  const vacunasSemana = db.prepare(
+    `SELECT COUNT(*) as total FROM vacunas
+     WHERE proxima_dosis BETWEEN date('now', '+4 days') AND date('now', '+7 days')`
+  ).get();
+
   const citasDelDia = db.prepare(
     `SELECT c.*, m.nombre as mascota_nombre, m.especie
      FROM citas c
@@ -35,6 +45,8 @@ router.get('/', (req, res) => {
     atendidosHoy: atendidosHoy.total,
     totalMascotas: totalMascotas.total,
     vacunasProximas: vacunasProximas.total,
+    vacunasUrgentes: vacunasUrgentes.total,
+    vacunasSemana: vacunasSemana.total,
     citasDelDia
   });
 });

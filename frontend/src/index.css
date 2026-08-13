@@ -1,30 +1,194 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-gray-50 text-gray-900 font-sans;
-  }
-}
-
+/* Clases de formulario usadas por ModalMascota (label / input / botones) */
 @layer components {
-  .btn-primary {
-    @apply bg-verde-claro hover:bg-verde-medio text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
-  }
-  .btn-secondary {
-    @apply bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
-  }
-  .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150;
-  }
-  .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100;
+  .label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
   }
   .input {
-    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-verde-claro focus:border-transparent;
+    display: block;
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+  .input::placeholder { color: var(--text-disabled); }
+  .input:focus {
+    border-color: var(--verde-500);
+    box-shadow: var(--shadow-focus);
   }
+  select.input { appearance: none; cursor: pointer; }
+  textarea.input { height: auto; min-height: 72px; padding: 10px 12px; resize: vertical; }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 18px;
+    border: none;
+    border-radius: var(--r-md);
+    background: var(--verde-600);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--verde-700); }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-secondary:hover { background: var(--stone-100); color: var(--text); }
+}
+
+:root {
+  --verde-50:  #F0FDF4;
+  --verde-100: #DCFCE7;
+  --verde-200: #BBF7D0;
+  --verde-300: #86EFAC;
+  --verde-400: #52B788;
+  --verde-500: #40916C;
+  --verde-600: #2D6A4F;
+  --verde-700: #1B4332;
+  --verde-800: #0F2A1F;
+  --verde-900: #081710;
+
+  --stone-50:  #FAFAF9;
+  --stone-100: #F5F5F4;
+  --stone-150: #EFEDEB;
+  --stone-200: #E7E5E4;
+  --stone-300: #D6D3D1;
+  --stone-400: #A8A29E;
+  --stone-500: #78716C;
+  --stone-600: #57534E;
+  --stone-700: #44403C;
+  --stone-800: #292524;
+  --stone-900: #1C1917;
+
+  --info:        #2563EB;
+  --info-soft:   #EFF6FF;
+  --info-ring:   #BFDBFE;
+  --warn:        #D97706;
+  --warn-soft:   #FFFBEB;
+  --warn-ring:   #FDE68A;
+  --danger:      #DC2626;
+  --danger-soft: #FEF2F2;
+  --danger-ring: #FECACA;
+  --success:     #16A34A;
+  --success-soft:#F0FDF4;
+  --success-ring:#BBF7D0;
+
+  --sp-perro:   #2563EB;
+  --sp-gato:    #7C3AED;
+  --sp-ave:     #EAB308;
+  --sp-conejo:  #EC4899;
+  --sp-reptil:  #16A34A;
+  --sp-otro:    #78716C;
+
+  --bg:            #FAFAF9;
+  --bg-elevated:   #FFFFFF;
+  --surface:       #FFFFFF;
+  --surface-muted: #FAFAF9;
+  --border:        #E7E5E4;
+  --border-strong: #D6D3D1;
+  --divider:       #EFEDEB;
+
+  --text:          #1C1917;
+  --text-muted:    #57534E;
+  --text-faint:    #78716C;
+  --text-disabled: #A8A29E;
+  --text-on-dark:  #FAFAF9;
+
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --r-2xl: 20px;
+  --r-full: 9999px;
+
+  --shadow-xs: 0 1px 0 rgba(28,25,23,0.04);
+  --shadow-sm: 0 1px 2px rgba(28,25,23,0.05), 0 1px 1px rgba(28,25,23,0.03);
+  --shadow-md: 0 4px 12px -4px rgba(28,25,23,0.08), 0 2px 4px -2px rgba(28,25,23,0.04);
+  --shadow-lg: 0 16px 32px -8px rgba(28,25,23,0.10), 0 4px 8px -4px rgba(28,25,23,0.04);
+  --shadow-focus: 0 0 0 3px rgba(64,145,108,0.18);
+
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  letter-spacing: -0.005em;
+}
+
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; }
+
+.mono { font-family: var(--font-mono); font-feature-settings: 'tnum'; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--stone-200);
+  border-radius: 9999px;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: var(--stone-300); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(64,145,108,0.4); } 70% { box-shadow: 0 0 0 8px rgba(64,145,108,0); } 100% { box-shadow: 0 0 0 0 rgba(64,145,108,0); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes drawLine { from { stroke-dashoffset: var(--len, 1000); } to { stroke-dashoffset: 0; } }
+@keyframes growBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.anim-fade-in { animation: fadeIn 0.3s ease-out both; }
+.anim-pulse-ring { animation: pulseRing 2s ease-out infinite; }
+
+.vp-spinner {
+  width: 32px; height: 32px;
+  border: 2.5px solid var(--stone-200);
+  border-top-color: var(--verde-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
