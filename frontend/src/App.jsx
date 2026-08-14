@@ -6,6 +6,7 @@ import Historias from './pages/Historias';
 import Citas from './pages/Citas';
 import Calendario from './pages/Calendario';
 import Recordatorios from './pages/Recordatorios';
+import Operaciones from './pages/Operaciones';
 import Configuracion from './pages/Configuracion';
 import Landing from './pages/Landing';
 import Admin from './pages/Admin';
@@ -35,6 +36,7 @@ function AppShell() {
           <Route path="/citas/*" element={<Citas />} />
           <Route path="/calendario" element={<Calendario />} />
           <Route path="/recordatorios" element={<Recordatorios />} />
+          <Route path="/operaciones" element={<Operaciones />} />
           <Route path="/configuracion" element={<Configuracion />} />
         </Routes>
       </main>

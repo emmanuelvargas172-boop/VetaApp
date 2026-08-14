@@ -120,6 +120,11 @@ export const IconUser = mkIcon(<><circle cx="12" cy="8" r="4"/><path d="M4 21v-1
 export const IconMapPin = mkIcon(<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>);
 export const IconMore = mkIcon(<><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></>);
 export const IconCommand = mkIcon(<path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>);
+export const IconBox = mkIcon(<>
+  <path d="M21 8.5v7l-9 4.5-9-4.5v-7L12 4l9 4.5z"/>
+  <polyline points="3 8.5 12 13 21 8.5"/>
+  <line x1="12" y1="13" x2="12" y2="20"/>
+</>);
 export const IconLock = mkIcon(<>
   <rect x="4" y="10" width="16" height="11" rx="2.5"/>
   <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
