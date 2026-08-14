@@ -44,7 +44,11 @@ export default function AuthScreen({ modoInicial = 'login' }) {
     setError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/app` },
+      options: {
+        redirectTo: `${window.location.origin}/app`,
+        // Sin esto Google reutiliza la sesión activa y ni pregunta.
+        queryParams: { prompt: 'select_account' },
+      },
     });
     if (error) setError(traducir(error.message));
   }
