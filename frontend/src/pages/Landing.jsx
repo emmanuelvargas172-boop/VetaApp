@@ -13,7 +13,7 @@ const BENEFICIOS = [
   { emoji: '🐾', titulo: 'Historias Clínicas',     texto: 'El historial completo de cada mascota, siempre a mano.' },
   { emoji: '💬', titulo: 'Recordatorios WhatsApp', texto: 'Avisa a los dueños de vacunas próximas con un clic. Menos ausencias, más ingresos.' },
   { emoji: '💊', titulo: 'Inventario',             texto: 'Controla medicamentos y stock. Alertas cuando algo se agota.' },
-  { emoji: '💰', titulo: 'Facturación',            texto: 'Cobra, genera recibos e imprime. Lleva la caja de tu clínica.' },
+  { emoji: '💰', titulo: 'Caja y Reportes',        texto: 'Cobra, genera recibos e imprime. Lleva la caja de tu clínica.' },
   { emoji: '📊', titulo: 'Reportes',               texto: 'Mira tus ingresos, tus servicios más pedidos y crece con datos.' },
 ];
 
@@ -46,7 +46,7 @@ const PLANES = [
     features: [
       'Mascotas ilimitadas',
       'Todo lo del Esencial',
-      '+ Facturación e Inventario',
+      '+ Caja, Reportes e Inventario',
       'Hasta 3 veterinarios',
       'Soporte prioritario por WhatsApp',
     ],
@@ -167,7 +167,7 @@ export default function Landing() {
             <span className="lp-eyebrow">🐾 Software para clínicas veterinarias</span>
             <h1 className="lp-h1">El sistema de gestión que tu veterinaria necesita</h1>
             <p className="lp-lead">
-              Citas, historias clínicas, recordatorios por WhatsApp, inventario y facturación.
+              Citas, historias clínicas, recordatorios por WhatsApp, inventario y caja.
               Todo en un solo lugar, desde cualquier dispositivo.
             </p>
 
@@ -200,7 +200,7 @@ export default function Landing() {
             <h2 className="lp-h2">Todo lo que tu clínica necesita</h2>
             <p className="lp-section-sub">
               Un solo sistema para la operación diaria: desde que suena el teléfono hasta que se
-              entrega la factura.
+              entrega el recibo.
             </p>
           </div>
 
