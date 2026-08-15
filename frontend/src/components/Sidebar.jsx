@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import {
   IconDashboard, IconPaw, IconFile, IconCalendar, IconCalDays,
-  IconBell, IconSettings, IconSearch, IconBox, VetaAppLogo,
+  IconBell, IconSettings, IconSearch, IconBox, IconCash, VetaAppLogo,
 } from './icons';
 import { useAuth } from '../lib/AuthContext';
 
@@ -23,6 +23,7 @@ const NAV = [
   { path: '/app/calendario',   id: 'calendario',    label: 'Calendario',    Icon: IconCalDays },
   { path: '/app/recordatorios',id: 'recordatorios', label: 'Recordatorios', Icon: IconBell, count: 4 },
   { path: '/app/operaciones',  id: 'operaciones',   label: 'Operaciones',   Icon: IconBox },
+  { path: '/app/caja',         id: 'caja',          label: 'Caja y Reportes', Icon: IconCash },
 ];
 
 export default function Sidebar() {

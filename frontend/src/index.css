@@ -192,3 +192,22 @@ input, textarea, select { font-family: inherit; }
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* ---------- Impresión de recibos ----------
+   Se oculta toda la app y solo queda visible el bloque .recibo-print.
+   visibility (no display) para que los hijos puedan volver a mostrarse. */
+@media print {
+  body * { visibility: hidden !important; }
+  .recibo-print, .recibo-print * { visibility: visible !important; }
+  .recibo-print {
+    position: absolute !important;
+    left: 0; top: 0;
+    width: 100% !important; max-width: 100% !important;
+    margin: 0 !important; padding: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .no-print { background: transparent !important; }
+  @page { margin: 14mm; }
+}

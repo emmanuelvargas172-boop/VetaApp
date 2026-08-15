@@ -317,6 +317,46 @@ const routes = [
     return { mensaje: 'Producto eliminado correctamente' };
   }},
 
+  // ===== CAJA (cobros / recibos de control interno) =====
+  // Rango por días completos: `hasta` incluye ese día hasta las 23:59.
+  { m: 'GET', re: /^\/cobros$/, fn: async ({ params }) => {
+    let q = supabase.from('cobros').select('*').order('fecha', { ascending: false });
+    if (params.desde) q = q.gte('fecha', `${params.desde}T00:00:00`);
+    if (params.hasta) q = q.lte('fecha', `${params.hasta}T23:59:59.999`);
+    if (params.limit) q = q.limit(Number(params.limit));
+    return unwrap(await q);
+  }},
+  { m: 'GET', re: /^\/cobros\/(\d+)$/, fn: async ({ id }) =>
+    unwrap(await supabase.from('cobros').select('*').eq('id', id).single()) },
+  { m: 'POST', re: /^\/cobros$/, fn: async ({ body }) => {
+    const servicios = Array.isArray(body.servicios) ? body.servicios : [];
+    if (!servicios.length) throw apiError('Agrega al menos un servicio');
+    if (!body.mascota_id) throw apiError('Selecciona una mascota');
+
+    // Copia del nombre al momento del cobro: el recibo debe seguir siendo
+    // legible aunque después borren la mascota.
+    const mascota = flattenMascota(
+      unwrap(await supabase.from('mascotas').select(SEL_MASCOTA).eq('id', body.mascota_id).single())
+    );
+
+    // El total se recalcula aquí; se ignora el que mande el formulario.
+    const subtotal = servicios.reduce((a, s) => a + (Number(s.precio) || 0), 0);
+    const descuento = Math.min(Math.max(Number(body.descuento) || 0, 0), 100);
+    const total = Math.round(subtotal * (1 - descuento / 100));
+
+    return unwrap(await supabase.from('cobros').insert({
+      mascota_id: mascota.id,
+      mascota_nombre: mascota.nombre,
+      dueno_nombre: mascota.dueno_nombre,
+      servicios, subtotal, descuento, total,
+      metodo_pago: body.metodo_pago || 'efectivo',
+    }).select('*').single());
+  }},
+  { m: 'DELETE', re: /^\/cobros\/(\d+)$/, fn: async ({ id }) => {
+    unwrap(await supabase.from('cobros').delete().eq('id', id));
+    return { mensaje: 'Cobro anulado' };
+  }},
+
   // ===== ADMIN (solo rol = 'admin'; la BD valida es_admin() en cada RPC) =====
   { m: 'GET', re: /^\/admin\/veterinarias$/, fn: async () =>
     unwrap(await supabase.rpc('admin_listar_veterinarias')) },

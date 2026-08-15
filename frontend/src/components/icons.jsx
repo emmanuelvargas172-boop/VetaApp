@@ -143,6 +143,29 @@ export const IconRefresh = mkIcon(<>
   <path d="M20 12a8 8 0 1 1-2.3-5.6"/>
   <polyline points="20 3 20 8 15 8"/>
 </>);
+export const IconCash = mkIcon(<>
+  <rect x="2" y="6" width="20" height="12" rx="2"/>
+  <circle cx="12" cy="12" r="2.5"/>
+  <path d="M6 12h.01M18 12h.01"/>
+</>);
+export const IconReceipt = mkIcon(<>
+  <path d="M5 3v18l2.5-1.6L10 21l2-1.6L14 21l2.5-1.6L19 21V3z"/>
+  <line x1="9" y1="8" x2="15" y2="8"/>
+  <line x1="9" y1="12" x2="15" y2="12"/>
+</>);
+export const IconPrint = mkIcon(<>
+  <polyline points="7 8 7 3 17 3 17 8"/>
+  <path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/>
+  <rect x="7" y="14" width="10" height="7" rx="1"/>
+</>);
+export const IconChart = mkIcon(<>
+  <line x1="3" y1="21" x2="21" y2="21"/>
+  <rect x="5" y="11" width="4" height="7" rx="1"/>
+  <rect x="11" y="6" width="4" height="12" rx="1"/>
+  <rect x="17" y="14" width="4" height="4" rx="1"/>
+</>);
+export const IconArrowUp = mkIcon(<><line x1="12" y1="20" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></>);
+export const IconArrowDown = mkIcon(<><line x1="12" y1="4" x2="12" y2="19"/><polyline points="6 13 12 19 18 13"/></>);
 
 export const SpeciesDog = ({ size = 24, color = 'var(--sp-perro)' }) => (
   <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
