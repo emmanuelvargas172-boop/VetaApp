@@ -319,10 +319,12 @@ const routes = [
 
   // ===== CAJA (cobros / recibos de control interno) =====
   // Rango por días completos: `hasta` incluye ese día hasta las 23:59.
+  // El desfase -05:00 es obligatorio: sin él Postgres lee la fecha como UTC
+  // y los cobros de 7 p.m. a medianoche caen en el día siguiente.
   { m: 'GET', re: /^\/cobros$/, fn: async ({ params }) => {
     let q = supabase.from('cobros').select('*').order('fecha', { ascending: false });
-    if (params.desde) q = q.gte('fecha', `${params.desde}T00:00:00`);
-    if (params.hasta) q = q.lte('fecha', `${params.hasta}T23:59:59.999`);
+    if (params.desde) q = q.gte('fecha', `${params.desde}T00:00:00-05:00`);
+    if (params.hasta) q = q.lte('fecha', `${params.hasta}T23:59:59.999-05:00`);
     if (params.limit) q = q.limit(Number(params.limit));
     return unwrap(await q);
   }},
