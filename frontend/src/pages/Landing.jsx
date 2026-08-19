@@ -68,8 +68,8 @@ const PLANES = [
 ];
 
 const EMAIL_CONTACTO = 'hola@vetaapp.co';
-const WHATSAPP_CONTACTO = '+57 300 123 4567';
-const WHATSAPP_LINK = 'https://wa.me/573001234567';
+const WHATSAPP_CONTACTO = '+57 316 290 6253';
+const WHATSAPP_LINK = 'https://wa.me/573162906253';
 
 /* ------------------------------------------------------------------ */
 /* Animación de entrada al hacer scroll                                */
