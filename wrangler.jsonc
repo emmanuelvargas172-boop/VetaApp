@@ -1,0 +1,11 @@
+{
+  "name": "vetaapp",
+  "compatibility_date": "2026-08-20",
+  "assets": {
+    "directory": "./frontend/dist",
+    // Cualquier ruta que no sea un archivo real devuelve index.html:
+    // sin esto, recargar en /app/caja da 404 porque React Router vive
+    // solo en el navegador y el servidor no conoce esa ruta.
+    "not_found_handling": "single-page-application"
+  }
+}
