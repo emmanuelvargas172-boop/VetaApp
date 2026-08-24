@@ -10,6 +10,7 @@ import Operaciones from './pages/Operaciones';
 import Caja from './pages/Caja';
 import Configuracion from './pages/Configuracion';
 import Landing from './pages/Landing';
+import Legal from './pages/Legal';
 import Admin from './pages/Admin';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import AuthScreen from './components/AuthScreen';
@@ -81,6 +82,8 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Publico modo="login" />} />
           <Route path="/registro" element={<Publico modo="registro" />} />
+          <Route path="/privacidad" element={<Legal doc="privacidad" />} />
+          <Route path="/terminos" element={<Legal doc="terminos" />} />
           <Route path="/app/*" element={<Privado><AppShell /></Privado>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

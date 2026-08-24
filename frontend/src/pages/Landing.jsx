@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { VetaAppLogo } from '../components/icons';
 import { useAuth } from '../lib/AuthContext';
 import '../styles/landing.css';
@@ -322,6 +322,8 @@ export default function Landing() {
             <a href="#beneficios">Beneficios</a>
             <a href="#planes">Planes</a>
             <button type="button" className="lp-linklike" onClick={irALogin}>Iniciar sesión</button>
+            <Link to="/privacidad">Política de privacidad</Link>
+            <Link to="/terminos">Términos y condiciones</Link>
           </nav>
 
           <div className="lp-footer-contacto">
