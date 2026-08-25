@@ -67,7 +67,7 @@ const PLANES = [
   },
 ];
 
-const EMAIL_CONTACTO = 'hola@vetaapp.co';
+const EMAIL_CONTACTO = 'emmanuelvargas172@gmail.com';
 const WHATSAPP_CONTACTO = '+57 316 290 6253';
 const WHATSAPP_LINK = 'https://wa.me/573162906253';
 
@@ -363,7 +363,7 @@ function MockupDashboard() {
     <div className="lp-mock" role="img" aria-label="Vista previa del panel de VetaApp">
       <div className="lp-mock-bar">
         <span className="lp-dot" /><span className="lp-dot" /><span className="lp-dot" />
-        <span className="lp-mock-url">vetaapp.co/app</span>
+        <span className="lp-mock-url">vetaapp.emmanuelvargas172.workers.dev/app</span>
       </div>
 
       <div className="lp-mock-body">
