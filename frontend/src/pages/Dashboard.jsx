@@ -9,7 +9,7 @@ import {
 import {
   IconCalendar, IconCheckCircle, IconPaw, IconSyringe,
   IconWhatsApp, IconPlus, IconAlert, IconArrowRight,
-  SpeciesAvatar, SPECIES_ICONS,
+  SpeciesAvatar,
 } from '../components/icons';
 
 const ESTADO_BADGE = {

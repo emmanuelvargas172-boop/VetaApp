@@ -6,7 +6,7 @@ import {
 import {
   IconCalendar, IconPlus, IconChevronLeft, IconChevronRight,
   IconX, IconPhone, IconWhatsApp, IconTrash, IconSearch, IconClock,
-  SpeciesAvatar,
+  SpeciesAvatar, especieCfg,
 } from '../components/icons';
 
 const TIPOS_MOTIVO = [
@@ -21,7 +21,6 @@ const TIPOS_MOTIVO = [
 
 const MES_NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DIA_NOMBRES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const ESPECIES_EMOJI = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', reptil: '🦎', otro: '🐾' };
 
 function buildGrid(year, month) {
   const firstDay = new Date(year, month, 1);
@@ -620,7 +619,7 @@ export default function Calendario() {
                           <button key={m.id} type="button"
                             onClick={() => {
                               setForm(f => ({ ...f, mascota_id: m.id, mascota_label: `${m.nombre}` }));
-                              setBusqMascota(`${ESPECIES_EMOJI[m.especie] || '🐾'} ${m.nombre} — ${m.dueno_nombre}`);
+                              setBusqMascota(`${especieCfg(m.especie).emoji} ${m.nombre} — ${m.dueno_nombre}`);
                             }}
                             style={{
                               width: '100%', display: 'flex', alignItems: 'center', gap: 10,

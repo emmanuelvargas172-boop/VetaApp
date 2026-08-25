@@ -7,7 +7,7 @@ import {
 import {
   IconFile, IconPlus, IconSearch, IconArrowLeft, IconX, IconEdit, IconTrash,
   IconSyringe, IconActivity, IconAlert, IconCheckCircle, IconChevronRight, IconCalendar,
-  SpeciesAvatar, SPECIES_ICONS,
+  SpeciesAvatar, especieCfg,
 } from '../components/icons';
 
 const TIPO_REGISTRO = {
@@ -108,7 +108,7 @@ function BuscarMascota() {
             <SectionHeader title="Pacientes con historial" subtitle={`${filtradas.length} mostrados`}/>
             <div style={{ padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
               {filtradas.map(m => {
-                const cfg = SPECIES_ICONS[m.especie] || SPECIES_ICONS.otro;
+                const cfg = especieCfg(m.especie);
                 return (
                   <div key={m.id}
                     onClick={() => navigate(`/app/historias/${m.id}`)}
@@ -363,7 +363,7 @@ function HistorialMascota() {
     </Page>
   );
 
-  const cfg = SPECIES_ICONS[mascota.especie] || SPECIES_ICONS.otro;
+  const cfg = especieCfg(mascota.especie);
   const pesoData = consultas.filter(c => c.peso != null).slice(-6).map(c => c.peso);
 
   return (

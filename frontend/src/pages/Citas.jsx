@@ -4,7 +4,7 @@ import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle,
 } from '../components/ui';
 import {
-  SpeciesAvatar, SPECIES_ICONS,
+  SpeciesAvatar,
   IconCalendar, IconCalDays, IconPlus, IconSearch, IconClock, IconCheck,
   IconCheckCircle, IconWhatsApp, IconEdit, IconMore, IconX, IconChevronDown,
   IconAlert, IconPaw, IconSyringe,

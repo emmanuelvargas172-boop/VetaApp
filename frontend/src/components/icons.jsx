@@ -167,94 +167,34 @@ export const IconChart = mkIcon(<>
 export const IconArrowUp = mkIcon(<><line x1="12" y1="20" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></>);
 export const IconArrowDown = mkIcon(<><line x1="12" y1="4" x2="12" y2="19"/><polyline points="6 13 12 19 18 13"/></>);
 
-export const SpeciesDog = ({ size = 24, color = 'var(--sp-perro)' }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <path d="M7 9 C 5 6, 5 3, 8 3 C 11 4, 12 7, 12 10 Z" fill={color} opacity="0.85"/>
-    <path d="M25 9 C 27 6, 27 3, 24 3 C 21 4, 20 7, 20 10 Z" fill={color} opacity="0.85"/>
-    <ellipse cx="16" cy="17" rx="9" ry="8.5" fill={color}/>
-    <ellipse cx="16" cy="21" rx="5" ry="4" fill={color} opacity="0.55"/>
-    <circle cx="13" cy="15" r="1.3" fill="#fff"/>
-    <circle cx="19" cy="15" r="1.3" fill="#fff"/>
-    <ellipse cx="16" cy="19.5" rx="1.4" ry="1" fill="#1C1917"/>
-  </svg>
-);
-
-export const SpeciesCat = ({ size = 24, color = 'var(--sp-gato)' }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <path d="M6 14 L 8 4 L 13 11 Z" fill={color}/>
-    <path d="M26 14 L 24 4 L 19 11 Z" fill={color}/>
-    <path d="M7.5 11 L 8.5 6 L 11.5 10 Z" fill={color} opacity="0.5"/>
-    <path d="M24.5 11 L 23.5 6 L 20.5 10 Z" fill={color} opacity="0.5"/>
-    <ellipse cx="16" cy="17" rx="9" ry="8" fill={color}/>
-    <ellipse cx="12.5" cy="15.5" rx="1" ry="1.6" fill="#fff"/>
-    <ellipse cx="19.5" cy="15.5" rx="1" ry="1.6" fill="#fff"/>
-    <path d="M14.5 19 L 17.5 19 L 16 20.5 Z" fill="#1C1917"/>
-    <line x1="8" y1="19" x2="12" y2="19.5" stroke={color} strokeOpacity="0.4" strokeWidth="0.6" strokeLinecap="round"/>
-    <line x1="24" y1="19" x2="20" y2="19.5" stroke={color} strokeOpacity="0.4" strokeWidth="0.6" strokeLinecap="round"/>
-  </svg>
-);
-
-export const SpeciesBird = ({ size = 24, color = 'var(--sp-ave)' }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <ellipse cx="14" cy="17" rx="8" ry="9" fill={color}/>
-    <path d="M10 14 Q 8 19, 12 22 Q 15 20, 14 16 Z" fill={color} opacity="0.6"/>
-    <circle cx="20" cy="11" r="5" fill={color}/>
-    <circle cx="21" cy="10" r="1.1" fill="#fff"/>
-    <circle cx="21" cy="10" r="0.5" fill="#1C1917"/>
-    <path d="M24 11 L 28 12 L 24 13 Z" fill="#EA580C"/>
-    <line x1="13" y1="25" x2="13" y2="28" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
-export const SpeciesRabbit = ({ size = 24, color = 'var(--sp-conejo)' }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <ellipse cx="11" cy="7" rx="2" ry="6" fill={color}/>
-    <ellipse cx="21" cy="7" rx="2" ry="6" fill={color}/>
-    <ellipse cx="11" cy="7" rx="0.8" ry="4" fill="#FBCFE8"/>
-    <ellipse cx="21" cy="7" rx="0.8" ry="4" fill="#FBCFE8"/>
-    <ellipse cx="16" cy="18" rx="8" ry="7.5" fill={color}/>
-    <circle cx="13" cy="17" r="1.2" fill="#fff"/>
-    <circle cx="19" cy="17" r="1.2" fill="#fff"/>
-    <circle cx="13" cy="17" r="0.5" fill="#1C1917"/>
-    <circle cx="19" cy="17" r="0.5" fill="#1C1917"/>
-    <path d="M16 20 L 16 21 M 14.5 22.5 L 16 21 L 17.5 22.5" stroke="#1C1917" strokeWidth="0.8" strokeLinecap="round" fill="none"/>
-  </svg>
-);
-
-export const SpeciesReptile = ({ size = 24, color = 'var(--sp-reptil)' }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <path d="M3 20 Q 8 14, 14 17 Q 20 20, 24 14 Q 27 12, 29 14" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none"/>
-    <ellipse cx="27" cy="13.5" rx="3.5" ry="3" fill={color}/>
-    <circle cx="28" cy="12.5" r="0.8" fill="#fff"/>
-    <circle cx="28" cy="12.5" r="0.4" fill="#1C1917"/>
-    <path d="M30 14 L 31 15 M 30 14 L 31 13" stroke="#DC2626" strokeWidth="0.6" strokeLinecap="round"/>
-  </svg>
-);
-
-export const SpeciesOther = ({ size = 24, color = 'var(--sp-otro)' }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-    <ellipse cx="16" cy="22" rx="6.5" ry="5" fill={color}/>
-    <ellipse cx="10" cy="13" rx="2.2" ry="3" fill={color}/>
-    <ellipse cx="22" cy="13" rx="2.2" ry="3" fill={color}/>
-    <ellipse cx="6" cy="18" rx="1.8" ry="2.4" fill={color}/>
-    <ellipse cx="26" cy="18" rx="1.8" ry="2.4" fill={color}/>
-  </svg>
-);
-
 export const SPECIES_ICONS = {
-  perro:  { Icon: SpeciesDog,     label: 'Perro',  color: 'var(--sp-perro)',  soft: 'rgba(37,99,235,0.10)'  },
-  gato:   { Icon: SpeciesCat,     label: 'Gato',   color: 'var(--sp-gato)',   soft: 'rgba(124,58,237,0.10)' },
-  ave:    { Icon: SpeciesBird,    label: 'Ave',    color: 'var(--sp-ave)',    soft: 'rgba(234,179,8,0.12)'  },
-  conejo: { Icon: SpeciesRabbit,  label: 'Conejo', color: 'var(--sp-conejo)', soft: 'rgba(236,72,153,0.10)' },
-  reptil: { Icon: SpeciesReptile, label: 'Reptil', color: 'var(--sp-reptil)', soft: 'rgba(22,163,74,0.10)'  },
-  otro:   { Icon: SpeciesOther,   label: 'Otro',   color: 'var(--sp-otro)',   soft: 'rgba(120,113,108,0.10)'},
+  perro:  { emoji: '🐶', label: 'Perro',  plural: 'Perros',  color: 'var(--sp-perro)',  soft: 'rgba(37,99,235,0.10)'  },
+  gato:   { emoji: '🐱', label: 'Gato',   plural: 'Gatos',   color: 'var(--sp-gato)',   soft: 'rgba(124,58,237,0.10)' },
+  ave:    { emoji: '🐦', label: 'Ave',    plural: 'Aves',    color: 'var(--sp-ave)',    soft: 'rgba(234,179,8,0.12)'  },
+  conejo: { emoji: '🐰', label: 'Conejo', plural: 'Conejos', color: 'var(--sp-conejo)', soft: 'rgba(236,72,153,0.10)' },
+  reptil: { emoji: '🦎', label: 'Reptil', plural: 'Reptiles',color: 'var(--sp-reptil)', soft: 'rgba(22,163,74,0.10)'  },
+  otro:   { emoji: '🐾', label: 'Otro',   plural: 'Otros',   color: 'var(--sp-otro)',   soft: 'rgba(120,113,108,0.10)'},
 };
 
-const EMOJI_MAP = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', reptil: '🦎', otro: '🐾' };
+/** Clave canónica de una especie: minúsculas, sin tildes. Así "Hámster" y "hamster" son la misma. */
+export function normalizarEspecie(texto = '') {
+  return String(texto)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/** Config de presentación. Para una especie escrita a mano usa el texto como etiqueta. */
+export function especieCfg(especie) {
+  const key = normalizarEspecie(especie);
+  if (SPECIES_ICONS[key]) return SPECIES_ICONS[key];
+  if (!key) return SPECIES_ICONS.otro;
+  const label = key.charAt(0).toUpperCase() + key.slice(1);
+  return { ...SPECIES_ICONS.otro, label, plural: `${label}s` };
+}
 
 export const SpeciesAvatar = ({ especie = 'otro', size = 40, ring = false }) => {
-  const cfg = SPECIES_ICONS[especie] || SPECIES_ICONS.otro;
-  const emoji = EMOJI_MAP[especie] || '🐾';
+  const cfg = especieCfg(especie);
+  const emoji = cfg.emoji;
   return (
     <div style={{
       width: size, height: size, flexShrink: 0,

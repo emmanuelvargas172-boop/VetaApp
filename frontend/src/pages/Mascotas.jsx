@@ -5,7 +5,7 @@ import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle, Sparkline,
 } from '../components/ui';
 import {
-  SpeciesAvatar, SPECIES_ICONS,
+  SpeciesAvatar, SPECIES_ICONS, especieCfg, normalizarEspecie,
   IconPaw, IconPlus, IconFilter, IconSearch, IconEdit, IconTrash, IconWhatsApp,
   IconChevronRight, IconArrowLeft, IconCalendar, IconFile, IconSyringe, IconBell,
   IconClock, IconWeight, IconPhone, IconMapPin, IconActivity, IconAlert,
@@ -15,10 +15,16 @@ const FILTROS = [
   { id: 'todas', label: 'Todas' },
   { id: 'perro', label: 'Perros' },
   { id: 'gato', label: 'Gatos' },
-  { id: 'ave', label: 'Aves' },
-  { id: 'conejo', label: 'Conejos' },
-  { id: 'reptil', label: 'Reptiles' },
+  { id: 'otros', label: 'Otros' },
 ];
+
+/** 'otros' agrupa todo lo que no sea perro ni gato, incluidas las especies escritas a mano. */
+function coincideFiltro(especie, filtro) {
+  const esp = normalizarEspecie(especie);
+  if (filtro === 'todas') return true;
+  if (filtro === 'otros') return esp !== 'perro' && esp !== 'gato';
+  return esp === filtro;
+}
 
 function formatEdad(anios, meses) {
   const a = Number(anios) || 0;
@@ -53,7 +59,7 @@ function FilterChip({ active, onClick, children, count }) {
 }
 
 function MascotaRow({ m, onClick }) {
-  const cfg = SPECIES_ICONS[m.especie] || SPECIES_ICONS.otro;
+  const cfg = especieCfg(m.especie);
   const [hover, setHover] = useState(false);
   const edad = formatEdad(m.edad_anios, m.edad_meses);
   const waLink = `https://wa.me/57${(m.dueno_telefono || '').replace(/\D/g, '')}`;
@@ -112,8 +118,7 @@ function MascotaRow({ m, onClick }) {
 }
 
 function MascotaPerfil({ mascota, onBack }) {
-  const cfg = SPECIES_ICONS[mascota.especie] || SPECIES_ICONS.otro;
-  const Icon = cfg.Icon;
+  const cfg = especieCfg(mascota.especie);
   const [tab, setTab] = useState('resumen');
   const edad = formatEdad(mascota.edad_anios, mascota.edad_meses);
   const waLink = `https://wa.me/57${(mascota.dueno_telefono || '').replace(/\D/g, '')}`;
@@ -160,12 +165,12 @@ function MascotaPerfil({ mascota, onBack }) {
           background: `linear-gradient(135deg, ${cfg.soft}, transparent 80%)`,
           border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', marginBottom: 14, overflow: 'hidden',
         }}>
-          <div style={{ position: 'absolute', right: -20, top: -10, opacity: 0.08 }}>
-            <Icon size={200} color={cfg.color}/>
+          <div style={{ position: 'absolute', right: 10, top: -10, opacity: 0.08, fontSize: 170, lineHeight: 1 }}>
+            {cfg.emoji}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, position: 'relative' }}>
-            <div style={{ width: 72, height: 72, borderRadius: 18, background: cfg.soft, border: `2px solid ${cfg.color}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-sm)' }}>
-              <Icon size={50} color={cfg.color}/>
+            <div style={{ width: 72, height: 72, borderRadius: 18, background: cfg.soft, border: `2px solid ${cfg.color}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-sm)', fontSize: 40 }}>
+              {cfg.emoji}
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -326,7 +331,7 @@ export default function Mascotas() {
   }
 
   const filtradas = mascotas.filter(m => {
-    if (filtro !== 'todas' && m.especie !== filtro) return false;
+    if (!coincideFiltro(m.especie, filtro)) return false;
     if (busqueda) {
       const q = busqueda.toLowerCase();
       return (m.nombre || '').toLowerCase().includes(q) ||
@@ -337,7 +342,7 @@ export default function Mascotas() {
   });
 
   const counts = FILTROS.reduce((acc, f) => {
-    acc[f.id] = f.id === 'todas' ? mascotas.length : mascotas.filter(m => m.especie === f.id).length;
+    acc[f.id] = mascotas.filter(m => coincideFiltro(m.especie, f.id)).length;
     return acc;
   }, {});
 
@@ -373,10 +378,10 @@ export default function Mascotas() {
         </div>
 
         {/* Species mini-stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
-          {['perro','gato','ave','conejo','reptil'].map(esp => {
-            const cfg = SPECIES_ICONS[esp];
-            const count = mascotas.filter(m => m.especie === esp).length;
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+          {['perro','gato','otros'].map(esp => {
+            const cfg = SPECIES_ICONS[esp === 'otros' ? 'otro' : esp];
+            const count = mascotas.filter(m => coincideFiltro(m.especie, esp)).length;
             const isActive = filtro === esp;
             return (
               <button key={esp} onClick={() => setFiltro(filtro === esp ? 'todas' : esp)}
@@ -389,12 +394,12 @@ export default function Mascotas() {
                 onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--stone-50)'; }}
                 onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--surface)'; }}
               >
-                <div style={{ width: 32, height: 32, borderRadius: 10, background: cfg.soft, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <cfg.Icon size={20} color={cfg.color}/>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: cfg.soft, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  {cfg.emoji}
                 </div>
                 <div>
                   <p className="tabular" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{count}</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-faint)', fontWeight: 500 }}>{cfg.label}s</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-faint)', fontWeight: 500 }}>{cfg.plural}</p>
                 </div>
               </button>
             );

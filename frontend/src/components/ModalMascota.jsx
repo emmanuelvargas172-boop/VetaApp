@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, PawPrint, Upload, Loader2 } from 'lucide-react';
 import api from '../api/axios';
+import { normalizarEspecie } from './icons';
 
 const INICIAL = {
-  nombre: '', especie: 'perro', raza: '',
+  nombre: '', especie: 'perro', especieOtro: '', raza: '',
   edad_anios: '', edad_meses: '', peso: '',
   dueno_nombre: '', dueno_telefono: '', dueno_direccion: '',
   foto: null,
@@ -22,9 +23,12 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
   useEffect(() => {
     if (!isOpen) return;
     if (mascotaEditar) {
+      const esp = normalizarEspecie(mascotaEditar.especie) || 'perro';
+      const esBase = esp === 'perro' || esp === 'gato';
       setForm({
         nombre: mascotaEditar.nombre || '',
-        especie: mascotaEditar.especie || 'perro',
+        especie: esBase ? esp : 'otro',
+        especieOtro: esBase || esp === 'otro' ? '' : esp,
         raza: mascotaEditar.raza || '',
         edad_anios: mascotaEditar.edad_anios ?? '',
         edad_meses: mascotaEditar.edad_meses ?? '',
@@ -74,6 +78,10 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
       setError('Nombre de la mascota, nombre y teléfono del dueño son requeridos.');
       return;
     }
+    // Se guarda normalizado para que "Hámster" y "hamster" no sean dos especies.
+    const especieFinal = form.especie === 'otro'
+      ? (normalizarEspecie(form.especieOtro) || 'otro')
+      : form.especie;
     setCargando(true);
     setError('');
     try {
@@ -102,7 +110,7 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
 
       const fd = new FormData();
       fd.append('nombre', form.nombre.trim());
-      fd.append('especie', form.especie);
+      fd.append('especie', especieFinal);
       fd.append('raza', form.raza.trim());
       fd.append('edad_anios', form.edad_anios || 0);
       fd.append('edad_meses', form.edad_meses || 0);
@@ -197,12 +205,20 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
                 <select className="input" value={form.especie} onChange={set('especie')}>
                   <option value="perro">🐶 Perro</option>
                   <option value="gato">🐱 Gato</option>
-                  <option value="ave">🐦 Ave</option>
-                  <option value="conejo">🐰 Conejo</option>
-                  <option value="reptil">🦎 Reptil</option>
                   <option value="otro">🐾 Otro</option>
                 </select>
               </div>
+              {form.especie === 'otro' && (
+                <div className="col-span-2">
+                  <label className="label">¿Qué animal es?</label>
+                  <input
+                    className="input"
+                    placeholder="Ej: Conejo, Hámster, Loro"
+                    value={form.especieOtro}
+                    onChange={set('especieOtro')}
+                  />
+                </div>
+              )}
               <div className="col-span-2">
                 <label className="label">Raza</label>
                 <input className="input" placeholder="Ej: Golden Retriever" value={form.raza} onChange={set('raza')} />
