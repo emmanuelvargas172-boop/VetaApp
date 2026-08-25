@@ -5,7 +5,7 @@ import { VetaAppLogo } from './icons';
 
 export default function AuthScreen({ modoInicial = 'login' }) {
   const navigate = useNavigate();
-  const [modo, setModo] = useState(modoInicial); // 'login' | 'registro'
+  const [modo, setModo] = useState(modoInicial); // 'login' | 'registro' | 'recuperar'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -13,6 +13,13 @@ export default function AuthScreen({ modoInicial = 'login' }) {
   const [aviso, setAviso] = useState('');
 
   const esRegistro = modo === 'registro';
+  const esRecuperar = modo === 'recuperar';
+
+  function cambiarModo(nuevo) {
+    setModo(nuevo);
+    setError('');
+    setAviso('');
+  }
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -20,7 +27,15 @@ export default function AuthScreen({ modoInicial = 'login' }) {
     setAviso('');
     setCargando(true);
     try {
-      if (esRegistro) {
+      if (esRecuperar) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/nueva-clave`,
+        });
+        if (error) throw error;
+        // Mismo mensaje exista o no la cuenta: revelar cuáles correos están
+        // registrados le daría a un atacante una lista de clientes.
+        setAviso('Si ese correo tiene una cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa tu bandeja y la carpeta de spam.');
+      } else if (esRegistro) {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         // Si el proyecto tiene confirmación de correo activada, no hay sesión inmediata
@@ -65,22 +80,28 @@ export default function AuthScreen({ modoInicial = 'login' }) {
         <h1 style={S.title}>VetaApp</h1>
         <p style={S.subtitle}>Gestión Veterinaria Profesional</p>
 
-        <div style={S.toggle}>
-          <button
-            type="button"
-            onClick={() => { setModo('login'); setError(''); setAviso(''); }}
-            style={{ ...S.toggleBtn, ...(!esRegistro ? S.toggleActive : {}) }}
-          >
-            Iniciar sesión
-          </button>
-          <button
-            type="button"
-            onClick={() => { setModo('registro'); setError(''); setAviso(''); }}
-            style={{ ...S.toggleBtn, ...(esRegistro ? S.toggleActive : {}) }}
-          >
-            Crear cuenta
-          </button>
-        </div>
+        {esRecuperar ? (
+          <p style={S.instruccion}>
+            Escribe el correo de tu cuenta y te enviamos un enlace para crear una contraseña nueva.
+          </p>
+        ) : (
+          <div style={S.toggle}>
+            <button
+              type="button"
+              onClick={() => cambiarModo('login')}
+              style={{ ...S.toggleBtn, ...(!esRegistro ? S.toggleActive : {}) }}
+            >
+              Iniciar sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarModo('registro')}
+              style={{ ...S.toggleBtn, ...(esRegistro ? S.toggleActive : {}) }}
+            >
+              Crear cuenta
+            </button>
+          </div>
+        )}
 
         <form onSubmit={onSubmit} style={S.form}>
           <label style={S.label}>
@@ -96,38 +117,54 @@ export default function AuthScreen({ modoInicial = 'login' }) {
             />
           </label>
 
-          <label style={S.label}>
-            Contraseña
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={esRegistro ? 'new-password' : 'current-password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              style={S.input}
-            />
-          </label>
+          {!esRecuperar && (
+            <label style={S.label}>
+              Contraseña
+              <input
+                type="password"
+                required
+                minLength={6}
+                autoComplete={esRegistro ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                style={S.input}
+              />
+            </label>
+          )}
 
           {error && <div style={S.error}>{error}</div>}
           {aviso && <div style={S.aviso}>{aviso}</div>}
 
           <button type="submit" disabled={cargando} style={{ ...S.primary, ...(cargando ? S.disabled : {}) }}>
-            {cargando ? 'Un momento…' : esRegistro ? 'Crear cuenta' : 'Iniciar sesión'}
+            {cargando ? 'Un momento…' : esRecuperar ? 'Enviar enlace' : esRegistro ? 'Crear cuenta' : 'Iniciar sesión'}
           </button>
         </form>
 
-        <div style={S.divider}>
-          <span style={S.dividerLine} />
-          <span style={S.dividerText}>o</span>
-          <span style={S.dividerLine} />
-        </div>
+        {modo === 'login' && (
+          <button type="button" onClick={() => cambiarModo('recuperar')} style={S.enlace}>
+            ¿Olvidaste tu contraseña?
+          </button>
+        )}
 
-        <button type="button" onClick={onGoogle} style={S.google}>
-          <GoogleIcon />
-          Continuar con Google
-        </button>
+        {esRecuperar ? (
+          <button type="button" onClick={() => cambiarModo('login')} style={S.enlace}>
+            ← Volver a iniciar sesión
+          </button>
+        ) : (
+          <>
+            <div style={S.divider}>
+              <span style={S.dividerLine} />
+              <span style={S.dividerText}>o</span>
+              <span style={S.dividerLine} />
+            </div>
+
+            <button type="button" onClick={onGoogle} style={S.google}>
+              <GoogleIcon />
+              Continuar con Google
+            </button>
+          </>
+        )}
 
         <p style={S.secure}>🔒 Tus datos están seguros y son solo tuyos</p>
 
@@ -139,13 +176,19 @@ export default function AuthScreen({ modoInicial = 'login' }) {
   );
 }
 
-function traducir(msg = '') {
+export function traducir(msg = '') {
   const m = msg.toLowerCase();
   if (m.includes('invalid login')) return 'Correo o contraseña incorrectos.';
   if (m.includes('already registered') || m.includes('already exists')) return 'Ese correo ya tiene una cuenta. Inicia sesión.';
   if (m.includes('password should be at least')) return 'La contraseña debe tener al menos 6 caracteres.';
   if (m.includes('email not confirmed')) return 'Confirma tu correo antes de iniciar sesión.';
   if (m.includes('provider is not enabled')) return 'Google aún no está habilitado en Supabase.';
+  if (m.includes('for security purposes')) return 'Espera un minuto antes de pedir otro enlace.';
+  if (m.includes('rate limit')) return 'Se enviaron demasiados correos. Intenta más tarde.';
+  if (m.includes('same as the old password')) return 'La contraseña nueva debe ser distinta a la anterior.';
+  if (m.includes('auth session missing') || m.includes('is invalid or has expired')) {
+    return 'El enlace ya venció o se usó. Pide uno nuevo.';
+  }
   return msg || 'Ocurrió un error. Intenta de nuevo.';
 }
 
@@ -200,6 +243,11 @@ const S = {
     cursor: 'pointer', transition: 'all 0.15s',
   },
   toggleActive: { background: 'var(--verde-600)', color: '#fff', boxShadow: 'var(--shadow-sm)' },
+  instruccion: { margin: '0 0 18px', textAlign: 'center', fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted)' },
+  enlace: {
+    margin: '14px auto 0', padding: 0, border: 'none', background: 'none',
+    fontSize: 12.5, fontWeight: 600, color: 'var(--verde-700)', cursor: 'pointer',
+  },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   label: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)' },
   input: {
