@@ -11,6 +11,7 @@ import Caja from './pages/Caja';
 import Configuracion from './pages/Configuracion';
 import Landing from './pages/Landing';
 import Legal from './pages/Legal';
+import NuevaClave from './pages/NuevaClave';
 import Admin from './pages/Admin';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import AuthScreen from './components/AuthScreen';
@@ -82,6 +83,9 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Publico modo="login" />} />
           <Route path="/registro" element={<Publico modo="registro" />} />
+          {/* Fuera de <Publico>: el enlace de recuperación ya trae sesión y
+              esa puerta lo mandaría al panel sin dejarlo cambiar la clave. */}
+          <Route path="/nueva-clave" element={<NuevaClave />} />
           <Route path="/privacidad" element={<Legal doc="privacidad" />} />
           <Route path="/terminos" element={<Legal doc="terminos" />} />
           <Route path="/app/*" element={<Privado><AppShell /></Privado>} />
