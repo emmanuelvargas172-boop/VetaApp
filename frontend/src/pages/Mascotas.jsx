@@ -58,7 +58,7 @@ function FilterChip({ active, onClick, children, count }) {
   );
 }
 
-function MascotaRow({ m, onClick }) {
+function MascotaRow({ m, onClick, onEdit }) {
   const cfg = especieCfg(m.especie);
   const [hover, setHover] = useState(false);
   const edad = formatEdad(m.edad_anios, m.edad_meses);
@@ -104,7 +104,7 @@ function MascotaRow({ m, onClick }) {
         <Badge tone="neutral" size="sm">Registrado</Badge>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: hover ? 1 : 0, transition: 'opacity 0.15s' }} onClick={e => e.stopPropagation()}>
-        <button title="Editar" style={iconBtnStyle}><IconEdit size={14} color="var(--text-muted)"/></button>
+        <button title="Editar" style={iconBtnStyle} onClick={onEdit}><IconEdit size={14} color="var(--text-muted)"/></button>
         {m.dueno_telefono && (
           <a href={waLink} target="_blank" rel="noopener noreferrer" title="WhatsApp" style={{ ...iconBtnStyle, color: '#25D366', textDecoration: 'none' }}>
             <IconWhatsApp size={12}/>
@@ -431,7 +431,12 @@ export default function Mascotas() {
               action={filtro !== 'todas' || busqueda ? <Button variant="secondary" size="sm" onClick={() => { setFiltro('todas'); setBusqueda(''); }}>Limpiar filtros</Button> : null}
             />
           ) : filtradas.map(m => (
-            <MascotaRow key={m.id} m={m} onClick={() => setPerfilActivo(m)}/>
+            <MascotaRow
+              key={m.id}
+              m={m}
+              onClick={() => setPerfilActivo(m)}
+              onEdit={() => { setEditando(m); setModalOpen(true); }}
+            />
           ))}
         </Card>
       </Page>
