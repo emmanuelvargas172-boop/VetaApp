@@ -58,7 +58,7 @@ function FilterChip({ active, onClick, children, count }) {
   );
 }
 
-function MascotaRow({ m, onClick, onEdit }) {
+function MascotaRow({ m, onClick, onEdit, onEliminar }) {
   const cfg = especieCfg(m.especie);
   const [hover, setHover] = useState(false);
   const edad = formatEdad(m.edad_anios, m.edad_meses);
@@ -110,7 +110,7 @@ function MascotaRow({ m, onClick, onEdit }) {
             <IconWhatsApp size={12}/>
           </a>
         )}
-        <button title="Eliminar" style={iconBtnStyle}><IconTrash size={14} color="var(--danger)"/></button>
+        <button title="Eliminar" style={iconBtnStyle} onClick={onEliminar}><IconTrash size={14} color="var(--danger)"/></button>
         <span style={{ marginLeft: 4 }}><IconChevronRight size={14} color="var(--text-disabled)"/></span>
       </div>
     </div>
@@ -326,6 +326,19 @@ export default function Mascotas() {
 
   useEffect(() => { cargar(); }, []);
 
+  async function eliminarMascota(m) {
+    // Las historias, vacunas, citas y tratamientos cuelgan de mascota_id
+    // con on delete cascade: se van con ella.
+    const aviso = `¿Eliminar a ${m.nombre}?\n\nSe borra también su historia clínica, vacunas y citas. Esta acción no se puede deshacer.`;
+    if (!window.confirm(aviso)) return;
+    try {
+      await api.delete(`/mascotas/${m.id}`);
+      cargar();
+    } catch {
+      alert('No se pudo eliminar la mascota. Intenta de nuevo.');
+    }
+  }
+
   if (perfilActivo) {
     return <MascotaPerfil mascota={perfilActivo} onBack={() => setPerfilActivo(null)}/>;
   }
@@ -436,6 +449,7 @@ export default function Mascotas() {
               m={m}
               onClick={() => setPerfilActivo(m)}
               onEdit={() => { setEditando(m); setModalOpen(true); }}
+              onEliminar={() => eliminarMascota(m)}
             />
           ))}
         </Card>
