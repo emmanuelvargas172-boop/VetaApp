@@ -16,6 +16,7 @@ import Admin from './pages/Admin';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import PantallaBloqueo from './components/PantallaBloqueo';
+import ModuloNoIncluido from './components/ModuloNoIncluido';
 
 function Splash() {
   return (
@@ -24,6 +25,20 @@ function Splash() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
+}
+
+/**
+ * Módulo que depende del plan. Si el plan no lo incluye se muestra la
+ * pantalla de cambio de plan en vez de la página.
+ *
+ * Esto NO es la seguridad: quien bloquea de verdad es RLS (004_planes.sql),
+ * porque desde la consola del navegador se puede llamar a supabase-js sin
+ * pasar por React. Aquí solo se evita mostrar una página vacía.
+ */
+function ConPlan({ modulo, titulo, descripcion, children }) {
+  const { tieneModulo } = useAuth();
+  if (tieneModulo(modulo)) return children;
+  return <ModuloNoIncluido titulo={titulo} descripcion={descripcion} />;
 }
 
 /** La app privada: sidebar + páginas. Vive bajo /app. */
@@ -38,9 +53,27 @@ function AppShell() {
           <Route path="/historias/*" element={<Historias />} />
           <Route path="/citas/*" element={<Citas />} />
           <Route path="/calendario" element={<Calendario />} />
-          <Route path="/recordatorios" element={<Recordatorios />} />
-          <Route path="/operaciones" element={<Operaciones />} />
-          <Route path="/caja" element={<Caja />} />
+          <Route path="/recordatorios" element={
+            <ConPlan
+              modulo="recordatorios"
+              titulo="Recordatorios"
+              descripcion="Avisa a tus clientes de las próximas dosis y controles sin revisar carpeta por carpeta."
+            ><Recordatorios /></ConPlan>
+          } />
+          <Route path="/operaciones" element={
+            <ConPlan
+              modulo="inventario"
+              titulo="El inventario"
+              descripcion="Controla medicamentos, vacunas e insumos, con alertas cuando algo se está acabando."
+            ><Operaciones /></ConPlan>
+          } />
+          <Route path="/caja" element={
+            <ConPlan
+              modulo="caja"
+              titulo="Caja y reportes"
+              descripcion="Registra cobros, imprime recibos y mira cuánto entró en el mes."
+            ><Caja /></ConPlan>
+          } />
           <Route path="/configuracion" element={<Configuracion />} />
         </Routes>
       </main>

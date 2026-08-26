@@ -1,13 +1,24 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
 
+// Qué módulos incluye cada plan. Es el espejo de tiene_modulo() en
+// 004_planes.sql: aquí solo sirve para esconder menús — quien bloquea de
+// verdad es RLS, porque con F12 cualquiera llama a supabase-js directo.
+const MODULOS_POR_PLAN = {
+  fichas:      [],   // mascotas, historias, citas, vacunas y calendario van en todos los planes
+  completo:    ['inventario', 'caja', 'recordatorios'],
+  facturacion: ['inventario', 'caja', 'recordatorios', 'facturacion'],
+};
+
 const AuthContext = createContext({
   user: null,
   session: null,
   perfil: null,
+  plan: 'completo',
   esAdmin: false,
   bloqueado: false,
   loading: true,
+  tieneModulo: () => true,
   signOut: () => {},
   recargarPerfil: () => {},
 });
@@ -49,11 +60,16 @@ export function AuthProvider({ children }) {
       setPerfilListo(true);
       return;
     }
-    const { data, error } = await supabase
-      .from('perfiles')
-      .select('id, email, nombre, rol, estado_suscripcion, fecha_registro')
-      .eq('id', id)
-      .maybeSingle();
+    const leer = (cols) =>
+      supabase.from('perfiles').select(cols).eq('id', id).maybeSingle();
+
+    let { data, error } = await leer('id, email, nombre, rol, estado_suscripcion, plan, fecha_registro');
+    // Si el deploy del frontend va por delante de la migración 004, la
+    // columna `plan` todavía no existe. Se reintenta sin ella para no
+    // dejar a nadie sin perfil (y sin panel de admin) por ese desfase.
+    if (error) {
+      ({ data, error } = await leer('id, email, nombre, rol, estado_suscripcion, fecha_registro'));
+    }
 
     if (uidActual.current !== id) return;
     // Sin perfil (o tabla aún sin migrar) se entra normal: nunca dejar a
@@ -69,12 +85,20 @@ export function AuthProvider({ children }) {
     cargarPerfil(uid);
   }, [uid, cargarPerfil]);
 
+  const esAdmin = perfil?.rol === 'admin';
+  // Sin columna `plan` (migración aún sin correr) se asume 'completo':
+  // el criterio de siempre es no dejar a nadie fuera por una lectura fallida.
+  const plan = perfil?.plan || 'completo';
+
   const value = {
     session,
     user: session?.user ?? null,
     perfil,
-    esAdmin: perfil?.rol === 'admin',
+    plan,
+    esAdmin,
     bloqueado: perfil?.rol === 'veterinaria' && perfil?.estado_suscripcion === 'inactivo',
+    tieneModulo: (modulo) =>
+      esAdmin || (MODULOS_POR_PLAN[plan] ?? MODULOS_POR_PLAN.completo).includes(modulo),
     loading: loading || !perfilListo,
     signOut: () => supabase.auth.signOut(),
     recargarPerfil: () => cargarPerfil(uidActual.current),

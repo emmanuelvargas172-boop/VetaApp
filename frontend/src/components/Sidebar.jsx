@@ -21,16 +21,16 @@ const NAV = [
   { path: '/app/historias',    id: 'historias',     label: 'Historias',     Icon: IconFile },
   { path: '/app/citas',        id: 'citas',         label: 'Citas',         Icon: IconCalendar },
   { path: '/app/calendario',   id: 'calendario',    label: 'Calendario',    Icon: IconCalDays },
-  { path: '/app/recordatorios',id: 'recordatorios', label: 'Recordatorios', Icon: IconBell, count: 4 },
-  { path: '/app/operaciones',  id: 'operaciones',   label: 'Operaciones',   Icon: IconBox },
-  { path: '/app/caja',         id: 'caja',          label: 'Caja y Reportes', Icon: IconCash },
+  { path: '/app/recordatorios',id: 'recordatorios', label: 'Recordatorios', Icon: IconBell, count: 4, modulo: 'recordatorios' },
+  { path: '/app/operaciones',  id: 'operaciones',   label: 'Operaciones',   Icon: IconBox, modulo: 'inventario' },
+  { path: '/app/caja',         id: 'caja',          label: 'Caja y Reportes', Icon: IconCash, modulo: 'caja' },
 ];
 
 export default function Sidebar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
-  const { user, signOut } = useAuth();
+  const { user, signOut, tieneModulo } = useAuth();
   const email = user?.email || '';
   const [perfil, setPerfil] = useState(null);
 
@@ -102,7 +102,10 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {NAV.map(({ path, id, label, Icon, count }) => {
+        {/* Los módulos que el plan no incluye ni se muestran. El bloqueo real
+            está en RLS (004_planes.sql); esto es solo para no ofrecer
+            botones que la base de datos va a rechazar. */}
+        {NAV.filter(({ modulo }) => !modulo || tieneModulo(modulo)).map(({ path, id, label, Icon, count }) => {
           const active = isActive(path);
           return (
             <button

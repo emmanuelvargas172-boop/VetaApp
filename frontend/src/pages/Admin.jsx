@@ -24,6 +24,44 @@ const td = {
   borderBottom: '1px solid var(--divider)', verticalAlign: 'middle',
 };
 
+// Mismos valores que el check de perfiles.plan en 004_planes.sql.
+const PLANES = [
+  { id: 'fichas',      label: 'Fichas' },
+  { id: 'completo',    label: 'Completo' },
+  { id: 'facturacion', label: 'Facturación' },
+];
+
+/** Selector de plan. Escribe vía RPC admin_set_plan (la BD valida es_admin). */
+function CeldaPlan({ fila, onCambiar }) {
+  const [estado, setEstado] = useState('idle'); // idle | guardando | error
+
+  const cambiar = async (nuevo) => {
+    if (nuevo === fila.plan) return;
+    setEstado('guardando');
+    try {
+      await onCambiar(fila.id, nuevo);
+      setEstado('idle');
+    } catch {
+      setEstado('error');
+    }
+  };
+
+  return (
+    <select
+      value={fila.plan || 'completo'}
+      disabled={estado === 'guardando'}
+      onChange={(e) => cambiar(e.target.value)}
+      style={{
+        padding: '6px 9px', fontSize: 12.5, background: 'var(--surface)',
+        border: `1px solid ${estado === 'error' ? 'var(--danger)' : 'var(--border)'}`,
+        borderRadius: 'var(--r-md)', color: 'var(--text)', cursor: 'pointer',
+      }}
+    >
+      {PLANES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+    </select>
+  );
+}
+
 /** Notas del admin: se guardan al salir del campo, solo si cambiaron. */
 function CeldaNotas({ fila, onGuardar }) {
   const [valor, setValor] = useState(fila.notas_admin || '');
@@ -119,6 +157,17 @@ export default function Admin() {
     }
   };
 
+  const cambiarPlan = async (id, plan) => {
+    setError(null);
+    try {
+      const { data } = await api.patch(`/admin/veterinarias/${id}/plan`, { plan });
+      setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, plan: data.plan } : f)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'No se pudo cambiar el plan');
+      throw err;
+    }
+  };
+
   const guardarNotas = async (id, notas) => {
     const { data } = await api.patch(`/admin/veterinarias/${id}/notas`, { notas });
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, notas_admin: data.notas_admin } : f)));
@@ -195,6 +244,7 @@ export default function Admin() {
                     <th style={th}>Veterinaria</th>
                     <th style={th}>Registro</th>
                     <th style={th}>Estado</th>
+                    <th style={th}>Plan</th>
                     <th style={th}>Notas</th>
                     <th style={{ ...th, textAlign: 'right' }}>Acción</th>
                   </tr>
@@ -221,6 +271,13 @@ export default function Admin() {
                             <Badge tone="success" dot>Activo</Badge>
                           ) : (
                             <Badge tone="danger" dot>Inactivo</Badge>
+                          )}
+                        </td>
+                        <td style={td}>
+                          {admin ? (
+                            <span style={{ fontSize: 12.5, color: 'var(--text-disabled)' }}>—</span>
+                          ) : (
+                            <CeldaPlan fila={f} onCambiar={cambiarPlan} />
                           )}
                         </td>
                         <td style={{ ...td, minWidth: 200 }}>
