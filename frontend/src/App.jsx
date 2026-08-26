@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from './lib/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import PantallaBloqueo from './components/PantallaBloqueo';
 import ModuloNoIncluido from './components/ModuloNoIncluido';
+import AvisoPrueba from './components/AvisoPrueba';
 
 function Splash() {
   return (
@@ -47,6 +48,7 @@ function AppShell() {
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
+        <AvisoPrueba />
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/mascotas/*" element={<Mascotas />} />
