@@ -63,10 +63,10 @@ export function AuthProvider({ children }) {
     const leer = (cols) =>
       supabase.from('perfiles').select(cols).eq('id', id).maybeSingle();
 
-    let { data, error } = await leer('id, email, nombre, rol, estado_suscripcion, plan, fecha_registro');
-    // Si el deploy del frontend va por delante de la migración 004, la
-    // columna `plan` todavía no existe. Se reintenta sin ella para no
-    // dejar a nadie sin perfil (y sin panel de admin) por ese desfase.
+    let { data, error } = await leer('id, email, nombre, rol, estado_suscripcion, plan, prueba_hasta, fecha_registro');
+    // Si el deploy del frontend va por delante de las migraciones 004/005,
+    // las columnas `plan` o `prueba_hasta` todavía no existen. Se reintenta
+    // sin ellas para no dejar a nadie sin perfil (y sin panel de admin).
     if (error) {
       ({ data, error } = await leer('id, email, nombre, rol, estado_suscripcion, fecha_registro'));
     }
@@ -90,13 +90,28 @@ export function AuthProvider({ children }) {
   // el criterio de siempre es no dejar a nadie fuera por una lectura fallida.
   const plan = perfil?.plan || 'completo';
 
+  // Prueba gratis. Espejo de esta_activo() en 005_prueba.sql: quien bloquea
+  // de verdad es RLS, esto solo decide qué pantalla se muestra.
+  const enPrueba = perfil?.estado_suscripcion === 'prueba';
+  const finPrueba = perfil?.prueba_hasta ? new Date(perfil.prueba_hasta) : null;
+  // Sin fecha se trata como vigente: no bloquear por un dato incompleto.
+  const pruebaVencida = enPrueba && !!finPrueba && finPrueba.getTime() <= Date.now();
+  const diasPrueba = enPrueba && finPrueba
+    ? Math.ceil((finPrueba.getTime() - Date.now()) / 86400000)
+    : null;
+
   const value = {
     session,
     user: session?.user ?? null,
     perfil,
     plan,
     esAdmin,
-    bloqueado: perfil?.rol === 'veterinaria' && perfil?.estado_suscripcion === 'inactivo',
+    enPrueba,
+    diasPrueba,
+    pruebaVencida,
+    bloqueado:
+      perfil?.rol === 'veterinaria' &&
+      (perfil?.estado_suscripcion === 'inactivo' || pruebaVencida),
     tieneModulo: (modulo) =>
       esAdmin || (MODULOS_POR_PLAN[plan] ?? MODULOS_POR_PLAN.completo).includes(modulo),
     loading: loading || !perfilListo,

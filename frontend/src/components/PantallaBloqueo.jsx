@@ -5,12 +5,18 @@ import { IconLock, IconWhatsApp, IconLogout, VetaAppLogo } from './icons';
 // Número de soporte en formato internacional, solo dígitos (VITE_SOPORTE_WHATSAPP).
 const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
 
-/** Lo que ve una veterinaria con estado_suscripcion = 'inactivo'. */
+/**
+ * Lo que ve una veterinaria bloqueada: suspendida a mano (inactivo) o con
+ * la prueba de 14 días ya vencida. Los datos no se borran en ninguno de
+ * los dos casos, solo dejan de ser accesibles (RLS, ver 005_prueba.sql).
+ */
 export default function PantallaBloqueo() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, pruebaVencida } = useAuth();
 
   const abrirWhatsApp = () => {
-    const msg = `Hola, mi cuenta de VetaApp (${user?.email || ''}) está suspendida. Quiero reactivarla.`;
+    const msg = pruebaVencida
+      ? `Hola, se me acabaron los 14 días de prueba de VetaApp (${user?.email || ''}). Quiero activar mi plan.`
+      : `Hola, mi cuenta de VetaApp (${user?.email || ''}) está suspendida. Quiero reactivarla.`;
     window.open(`https://wa.me/${SOPORTE}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
   };
 
@@ -43,14 +49,16 @@ export default function PantallaBloqueo() {
             margin: 0, fontSize: 20, fontWeight: 700,
             color: 'var(--text)', letterSpacing: '-0.02em',
           }}>
-            Tu acceso está suspendido
+            {pruebaVencida ? 'Se acabaron tus 14 días de prueba' : 'Tu acceso está suspendido'}
           </h1>
 
           <p style={{
             margin: '10px 0 0', fontSize: 14, lineHeight: 1.55,
             color: 'var(--text-muted)',
           }}>
-            Por favor comunícate con nosotros para reactivar tu cuenta.
+            {pruebaVencida
+              ? 'Escríbenos para elegir tu plan y seguir usando VetaApp con la misma información.'
+              : 'Por favor comunícate con nosotros para reactivar tu cuenta.'}
           </p>
 
           {user?.email && (
@@ -69,7 +77,7 @@ export default function PantallaBloqueo() {
               title={SOPORTE ? undefined : 'Falta configurar VITE_SOPORTE_WHATSAPP'}
               style={{ width: '100%' }}
             >
-              <span style={{ marginLeft: 8 }}>Contactar por WhatsApp</span>
+              <span style={{ marginLeft: 8 }}>{pruebaVencida ? 'Quiero activar mi plan' : 'Contactar por WhatsApp'}</span>
             </Button>
 
             <Button

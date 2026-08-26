@@ -368,6 +368,8 @@ const routes = [
     unwrap(await supabase.rpc('admin_set_notas', { p_id: id, p_notas: body.notas ?? '' })) },
   { m: 'PATCH', re: /^\/admin\/veterinarias\/([0-9a-fA-F-]{36})\/plan$/, fn: async ({ id, body }) =>
     unwrap(await supabase.rpc('admin_set_plan', { p_id: id, p_plan: body.plan })) },
+  { m: 'PATCH', re: /^\/admin\/veterinarias\/([0-9a-fA-F-]{36})\/prueba$/, fn: async ({ id, body }) =>
+    unwrap(await supabase.rpc('admin_extender_prueba', { p_id: id, p_dias: body.dias })) },
 
   // ===== CONFIGURACIÓN (ajustes: 1 fila por usuario) =====
   { m: 'GET', re: /^\/configuracion$/, fn: async () => {

@@ -14,6 +14,14 @@ const fmtFecha = (iso) => {
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+/** Días que faltan para que venza la prueba. Negativo = ya venció. */
+const diasRestantes = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.ceil((d.getTime() - Date.now()) / 86400000);
+};
+
 const th = {
   textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600,
   color: 'var(--text-faint)', letterSpacing: '0.04em', textTransform: 'uppercase',
@@ -133,7 +141,11 @@ export default function Admin() {
 
   const veterinarias = useMemo(() => filas.filter((f) => f.rol === 'veterinaria'), [filas]);
   const activas = veterinarias.filter((f) => f.estado_suscripcion === 'activo').length;
-  const inactivas = veterinarias.length - activas;
+  const enPrueba = veterinarias.filter(
+    (f) => f.estado_suscripcion === 'prueba' && (diasRestantes(f.prueba_hasta) ?? 1) > 0
+  ).length;
+  // Una prueba vencida cuenta como inactiva: la base ya no la deja entrar.
+  const inactivas = veterinarias.length - activas - enPrueba;
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -152,6 +164,21 @@ export default function Admin() {
       setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, estado_suscripcion: data.estado_suscripcion } : f)));
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo cambiar el estado');
+    } finally {
+      setOcupada(null);
+    }
+  };
+
+  const extenderPrueba = async (fila, dias) => {
+    setOcupada(fila.id);
+    setError(null);
+    try {
+      const { data } = await api.patch(`/admin/veterinarias/${fila.id}/prueba`, { dias });
+      setFilas((prev) => prev.map((f) => (f.id === fila.id
+        ? { ...f, estado_suscripcion: data.estado_suscripcion, prueba_hasta: data.prueba_hasta }
+        : f)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'No se pudo extender la prueba');
     } finally {
       setOcupada(null);
     }
@@ -206,6 +233,7 @@ export default function Admin() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 18 }}>
           <KPI label="Total veterinarias" value={veterinarias.length} icon={<IconUser size={15} />} />
           <KPI label="Activas"   value={activas}   icon={<IconCheckCircle size={15} />} />
+          <KPI label="En prueba" value={enPrueba}  icon={<IconRefresh size={15} />} />
           <KPI label="Inactivas" value={inactivas} icon={<IconLock size={15} />} />
         </div>
 
@@ -253,6 +281,9 @@ export default function Admin() {
                   {visibles.map((f) => {
                     const admin = f.rol === 'admin';
                     const activa = f.estado_suscripcion === 'activo';
+                    const prueba = f.estado_suscripcion === 'prueba';
+                    const dias = diasRestantes(f.prueba_hasta);
+                    const pruebaViva = prueba && (dias ?? 1) > 0;
                     return (
                       <tr key={f.id}>
                         <td style={td}>
@@ -269,6 +300,12 @@ export default function Admin() {
                             <Badge tone="info" dot><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconShield size={11} />Admin</span></Badge>
                           ) : activa ? (
                             <Badge tone="success" dot>Activo</Badge>
+                          ) : pruebaViva ? (
+                            <Badge tone="info" dot>
+                              Prueba · {dias === 1 ? 'último día' : `${dias} días`}
+                            </Badge>
+                          ) : prueba ? (
+                            <Badge tone="danger" dot>Prueba vencida</Badge>
                           ) : (
                             <Badge tone="danger" dot>Inactivo</Badge>
                           )}
@@ -291,14 +328,27 @@ export default function Admin() {
                           {admin ? (
                             <span style={{ fontSize: 12, color: 'var(--text-disabled)' }}>Tu cuenta</span>
                           ) : (
-                            <Button
-                              variant={activa ? 'danger' : 'primary'}
-                              size="sm"
-                              onClick={() => cambiarEstado(f)}
-                              disabled={ocupada === f.id}
-                            >
-                              {ocupada === f.id ? '…' : activa ? 'Desactivar' : 'Activar'}
-                            </Button>
+                            <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+                              {prueba && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => extenderPrueba(f, 14)}
+                                  disabled={ocupada === f.id}
+                                  title="Le da 14 días más de prueba (desde hoy si ya venció)"
+                                >
+                                  +14 días
+                                </Button>
+                              )}
+                              <Button
+                                variant={activa ? 'danger' : 'primary'}
+                                size="sm"
+                                onClick={() => cambiarEstado(f)}
+                                disabled={ocupada === f.id}
+                              >
+                                {ocupada === f.id ? '…' : activa ? 'Desactivar' : 'Activar'}
+                              </Button>
+                            </div>
                           )}
                         </td>
                       </tr>
