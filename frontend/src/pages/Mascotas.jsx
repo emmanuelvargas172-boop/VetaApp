@@ -117,7 +117,7 @@ function MascotaRow({ m, onClick, onEdit, onEliminar }) {
   );
 }
 
-function MascotaPerfil({ mascota, onBack }) {
+function MascotaPerfil({ mascota, onBack, onEdit }) {
   const cfg = especieCfg(mascota.especie);
   const [tab, setTab] = useState('resumen');
   const edad = formatEdad(mascota.edad_anios, mascota.edad_meses);
@@ -153,7 +153,7 @@ function MascotaPerfil({ mascota, onBack }) {
         actions={
           <>
             <Button variant="secondary" size="md" icon={<IconArrowLeft size={13}/>} onClick={onBack}>Volver</Button>
-            <Button variant="secondary" size="md" icon={<IconEdit size={13}/>}>Editar</Button>
+            <Button variant="secondary" size="md" icon={<IconEdit size={13}/>} onClick={onEdit}>Editar</Button>
             <Button variant="primary" size="md" icon={<IconCalendar size={13}/>}>Agendar cita</Button>
           </>
         }
@@ -320,7 +320,14 @@ export default function Mascotas() {
 
   const cargar = () => {
     api.get('/mascotas')
-      .then(res => { setMascotas(res.data || []); setCargando(false); })
+      .then(res => {
+        const lista = res.data || [];
+        setMascotas(lista);
+        // Si hay un perfil abierto, lo reemplazamos por la versión recién traída.
+        // Si la mascota ya no está (la borraron), se cierra el perfil.
+        setPerfilActivo(prev => (prev ? lista.find(m => m.id === prev.id) || null : null));
+        setCargando(false);
+      })
       .catch(() => setCargando(false));
   };
 
@@ -339,8 +346,27 @@ export default function Mascotas() {
     }
   }
 
+  // El modal vive fuera del return temprano para poder abrirlo también desde el perfil.
+  const modal = (
+    <ModalMascota
+      isOpen={modalOpen}
+      onClose={() => setModalOpen(false)}
+      onSuccess={cargar}
+      mascotaEditar={editando}
+    />
+  );
+
   if (perfilActivo) {
-    return <MascotaPerfil mascota={perfilActivo} onBack={() => setPerfilActivo(null)}/>;
+    return (
+      <>
+        <MascotaPerfil
+          mascota={perfilActivo}
+          onBack={() => setPerfilActivo(null)}
+          onEdit={() => { setEditando(perfilActivo); setModalOpen(true); }}
+        />
+        {modal}
+      </>
+    );
   }
 
   const filtradas = mascotas.filter(m => {
@@ -455,12 +481,7 @@ export default function Mascotas() {
         </Card>
       </Page>
 
-      <ModalMascota
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSuccess={cargar}
-        mascotaEditar={editando}
-      />
+      {modal}
     </>
   );
 }
