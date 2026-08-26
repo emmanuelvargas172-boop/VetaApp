@@ -490,6 +490,19 @@ html.lp-smooth { scroll-behavior: smooth; }
   box-shadow: 0 6px 14px -6px rgba(27, 67, 50, 0.6);
 }
 
+/* Plan que todavía no existe: se ve claramente distinto al que sí puedes comprar. */
+.lp-plan-pronto {
+  border-style: dashed;
+  background: var(--stone-50, #fafaf9);
+}
+.lp-plan-pronto .lp-plan-monto,
+.lp-plan-pronto .lp-plan-moneda { color: var(--text-faint); }
+
+.lp-badge-pronto {
+  background: var(--text-faint, #78716c);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.4);
+}
+
 .lp-plan-nombre {
   margin: 0;
   font-size: 19px;

@@ -23,46 +23,52 @@ const PASOS = [
   { n: '3', titulo: 'Empieza a gestionar',   texto: 'Agenda, cobra y envía recordatorios.' },
 ];
 
+// Los planes se separan por lo que hace la app, no por cuántas mascotas caben:
+// muchas veterinarias ya facturan por otro lado y solo necesitan organizarse.
+// Ninguno limita mascotas ni usuarios.
 const PLANES = [
   {
-    id: 'esencial',
-    nombre: 'Esencial',
+    id: 'fichas',
+    nombre: 'Fichas',
     precio: '69.000',
-    resumen: 'Para clínicas que arrancan',
+    resumen: 'Si ya facturas por otro lado',
     popular: false,
     features: [
-      'Hasta 200 mascotas',
-      'Citas, Mascotas, Historias, Recordatorios WhatsApp',
-      '1 veterinario',
-      'Soporte por correo',
+      'Mascotas, dueños e historias clínicas',
+      'Citas y calendario',
+      'Vacunas y control de peso',
+      'Mascotas y usuarios sin límite',
+      'Soporte por WhatsApp',
     ],
   },
   {
-    id: 'profesional',
-    nombre: 'Profesional',
-    precio: '119.000',
-    resumen: 'La opción de la mayoría',
+    id: 'completo',
+    nombre: 'Completo',
+    precio: '99.000',
+    resumen: 'La clínica entera en un solo lugar',
     popular: true,
     features: [
-      'Mascotas ilimitadas',
-      'Todo lo del Esencial',
-      '+ Caja, Reportes e Inventario',
-      'Hasta 3 veterinarios',
-      'Soporte prioritario por WhatsApp',
+      'Todo lo de Fichas',
+      '+ Recordatorios automáticos por WhatsApp',
+      '+ Caja: cobros y recibos',
+      '+ Inventario de medicamentos e insumos',
+      '+ Reportes de ingresos',
     ],
   },
   {
-    id: 'clinica',
-    nombre: 'Clínica',
-    precio: '199.000',
-    resumen: 'Para equipos grandes',
+    id: 'facturacion',
+    nombre: 'Facturación',
+    precio: '149.000',
+    resumen: 'Cuando necesitas facturar electrónicamente',
     popular: false,
+    // Todavía no está construido. Se muestra sin botón de pago para no
+    // cobrar por algo que la app no hace.
+    proximamente: true,
     features: [
-      'Todo ilimitado',
-      '+ Reportes y estadísticas',
-      '+ Exportar a Excel',
-      'Usuarios ilimitados',
-      'Soporte + capacitación',
+      'Todo lo de Completo',
+      '+ Facturación electrónica DIAN',
+      '+ Resolución y numeración',
+      '+ Envío automático al cliente',
     ],
   },
 ];
@@ -253,10 +259,11 @@ export default function Landing() {
             {PLANES.map((plan, i) => (
               <article
                 key={plan.id}
-                className={`lp-plan lp-reveal${plan.popular ? ' lp-plan-popular' : ''}`}
+                className={`lp-plan lp-reveal${plan.popular ? ' lp-plan-popular' : ''}${plan.proximamente ? ' lp-plan-pronto' : ''}`}
                 style={{ transitionDelay: `${i * 80}ms` }}
               >
                 {plan.popular && <span className="lp-badge">MÁS POPULAR</span>}
+                {plan.proximamente && <span className="lp-badge lp-badge-pronto">DISPONIBLE PRONTO</span>}
 
                 <h3 className="lp-plan-nombre">{plan.nombre}</h3>
                 <p className="lp-plan-resumen">{plan.resumen}</p>
@@ -276,18 +283,30 @@ export default function Landing() {
                   ))}
                 </ul>
 
-                <button
-                  className={`lp-btn lp-btn-block ${plan.popular ? 'lp-btn-primary' : 'lp-btn-outline'}`}
-                  onClick={irARegistro}
-                >
-                  Empezar
-                </button>
+                {plan.proximamente ? (
+                  <a
+                    className="lp-btn lp-btn-block lp-btn-outline"
+                    href={`${WHATSAPP_LINK}?text=${encodeURIComponent('Hola, me interesa el plan Facturación de VetaApp. Avísenme cuando esté listo.')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Avísenme cuando esté
+                  </a>
+                ) : (
+                  <button
+                    className={`lp-btn lp-btn-block ${plan.popular ? 'lp-btn-primary' : 'lp-btn-outline'}`}
+                    onClick={irARegistro}
+                  >
+                    Empezar
+                  </button>
+                )}
               </article>
             ))}
           </div>
 
           <p className="lp-planes-nota lp-reveal">
-            Todos los planes incluyen 14 días de prueba gratis. Paga el año y llévate 2 meses gratis.
+            Fichas y Completo incluyen 14 días de prueba gratis, sin tarjeta. El plan Facturación
+            todavía está en construcción: déjanos tu contacto y te avisamos apenas esté listo.
           </p>
         </div>
       </section>
