@@ -9,7 +9,7 @@ import {
 import {
   IconCalendar, IconCheckCircle, IconPaw, IconSyringe,
   IconWhatsApp, IconPlus, IconAlert, IconArrowRight,
-  SpeciesAvatar,
+  SpeciesAvatar, especieCfg,
 } from '../components/icons';
 
 const ESTADO_BADGE = {
@@ -19,14 +19,35 @@ const ESTADO_BADGE = {
   cancelada:  { tone: 'danger',  label: 'Cancelada'  },
 };
 
-const ESPECIES_DATA = [
-  { label: 'Perros',  value: 82, color: 'var(--sp-perro)' },
-  { label: 'Gatos',   value: 64, color: 'var(--sp-gato)' },
-  { label: 'Aves',    value: 18, color: 'var(--sp-ave)' },
-  { label: 'Conejos', value: 12, color: 'var(--sp-conejo)' },
-  { label: 'Otros',   value: 8,  color: 'var(--sp-otro)' },
-];
-const SEMANA = { dias: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'], data: [8, 11, 9, 12, 14, 6, 3], hoy: 4 };
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+/**
+ * Agrupa las especies que devuelve el backend (texto crudo, como lo escribió
+ * la veterinaria) en las categorías con color: "Hámster" y "hamster" son la
+ * misma, y lo que no está en SPECIES_ICONS cae en su propia etiqueta.
+ */
+// Colores de reserva para especies escritas a mano: sin esto todas saldrían
+// del mismo gris y el donut se vería como un solo arco.
+const COLORES_EXTRA = ['var(--info)', 'var(--warn)', 'var(--sp-reptil)', 'var(--verde-500)', 'var(--sp-conejo)'];
+
+function agruparEspecies(especies = []) {
+  const mapa = new Map();
+  for (const { especie, total } of especies) {
+    const cfg = especieCfg(especie);
+    const prev = mapa.get(cfg.plural) || { label: cfg.plural, value: 0, color: cfg.color, propia: cfg.plural === 'Otros' ? false : cfg.color === 'var(--sp-otro)' };
+    prev.value += total;
+    mapa.set(cfg.plural, prev);
+  }
+  const lista = [...mapa.values()].sort((a, b) => b.value - a.value);
+  const usados = new Set(lista.filter((s) => !s.propia).map((s) => s.color));
+  let i = 0;
+  for (const s of lista) {
+    if (!s.propia) continue;
+    while (i < COLORES_EXTRA.length && usados.has(COLORES_EXTRA[i])) i += 1;
+    if (i < COLORES_EXTRA.length) { s.color = COLORES_EXTRA[i]; usados.add(s.color); i += 1; }
+  }
+  return lista;
+}
 
 function AgendaItem({ cita, isNow = false }) {
   const especie = cita.especie || 'otro';
@@ -90,10 +111,18 @@ export default function Dashboard() {
     );
   }
 
-  const stats = datos || { citasHoy: 0, atendidosHoy: 0, totalMascotas: 0, vacunasProximas: 0, vacunasUrgentes: 0, citasDelDia: [] };
+  const stats = datos || {
+    citasHoy: 0, atendidosHoy: 0, citasAyer: 0, totalMascotas: 0, mascotasNuevasMes: 0,
+    vacunasProximas: 0, vacunasUrgentes: 0, citasDelDia: [], semana: [], especies: [], semanaHoy: -1,
+  };
   const progreso = stats.citasHoy > 0 ? Math.round((stats.atendidosHoy / stats.citasHoy) * 100) : 0;
   const proximaIdx = (stats.citasDelDia || []).findIndex(c => c.estado !== 'atendida');
-  const totalEspecies = ESPECIES_DATA.reduce((a, s) => a + s.value, 0);
+  const especiesData = agruparEspecies(stats.especies);
+  const totalEspecies = especiesData.reduce((a, s) => a + s.value, 0);
+  const semana = stats.semana?.length === 7 ? stats.semana : [0, 0, 0, 0, 0, 0, 0];
+  const citasSemana = semana.reduce((a, n) => a + n, 0);
+  const dCitas = stats.citasHoy - (stats.citasAyer || 0);
+  const nuevasMes = stats.mascotasNuevasMes || 0;
   const fechaHoy = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const hora = new Date().getHours();
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
@@ -144,18 +173,26 @@ export default function Dashboard() {
 
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
-          <KPI label="Citas hoy" value={stats.citasHoy} delta="+2" deltaTone="success"
-               spark={[7, 9, 8, 11, 10, 13, stats.citasHoy]} icon={<IconCalendar size={13}/>}/>
+          {/* Deltas y sparkline salen de la base. Donde no hay serie real no
+              se dibuja gráfica: mejor un número solo que una línea inventada. */}
+          <KPI label="Citas hoy" value={stats.citasHoy}
+               delta={dCitas === 0 ? 'igual' : dCitas > 0 ? `+${dCitas}` : `${dCitas}`}
+               deltaTone={dCitas > 0 ? 'success' : dCitas < 0 ? 'danger' : 'info'}
+               deltaLabel="vs. ayer"
+               spark={citasSemana > 0 ? semana : []}
+               icon={<IconCalendar size={13}/>}/>
           <KPI label="Atendidos" value={stats.atendidosHoy} suffix={`/ ${stats.citasHoy}`}
-               delta={`${progreso}%`} deltaTone="verde"
-               spark={[3, 4, 6, 5, 4, 7, stats.atendidosHoy]} sparkColor="var(--verde-500)"
+               delta={`${progreso}%`} deltaTone="verde" deltaLabel="de las citas de hoy"
                icon={<IconCheckCircle size={13}/>}/>
-          <KPI label="Mascotas activas" value={stats.totalMascotas} delta="+6" deltaTone="success"
-               spark={[160, 165, 170, 172, 178, 180, stats.totalMascotas]} sparkColor="var(--sp-gato)"
+          <KPI label="Mascotas activas" value={stats.totalMascotas}
+               delta={nuevasMes > 0 ? `+${nuevasMes}` : 'sin altas'}
+               deltaTone={nuevasMes > 0 ? 'success' : 'info'}
+               deltaLabel="este mes"
                icon={<IconPaw size={13}/>}/>
           <KPI label="Vacunas próximas" value={stats.vacunasProximas}
-               delta={`${stats.vacunasUrgentes || 0} urgentes`} deltaTone="danger"
-               spark={[12, 10, 11, 9, 9, 8, stats.vacunasProximas]} sparkColor="var(--warn)"
+               delta={`${stats.vacunasUrgentes || 0} urgentes`}
+               deltaTone={stats.vacunasUrgentes > 0 ? 'danger' : 'info'}
+               deltaLabel="en 3 días"
                icon={<IconSyringe size={13}/>}/>
         </div>
 
@@ -216,18 +253,30 @@ export default function Dashboard() {
         {/* Charts row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 14 }}>
           <Card padding={0}>
-            <SectionHeader title="Citas esta semana" subtitle="Actividad de los últimos 7 días"
-              action={<Badge tone="success" dot>Activo</Badge>}/>
+            <SectionHeader title="Citas esta semana" subtitle={`Lunes a domingo · ${citasSemana} citas`}
+              action={<Badge tone={citasSemana > 0 ? 'success' : 'neutral'} dot>{citasSemana > 0 ? 'Con agenda' : 'Sin citas'}</Badge>}/>
             <div style={{ padding: '16px 20px 18px' }}>
-              <BarChart data={SEMANA.data} labels={SEMANA.dias} height={140}
-                accent="var(--verde-500)" faded="var(--stone-150)" highlight={SEMANA.hoy}/>
+              {citasSemana === 0 ? (
+                <EmptyState icon={<IconCalendar size={24}/>} title="Ninguna cita esta semana"
+                  subtitle="Las barras aparecen apenas agendes la primera"/>
+              ) : (
+                <BarChart data={semana} labels={DIAS_SEMANA} height={140}
+                  accent="var(--verde-500)" faded="var(--stone-150)" highlight={stats.semanaHoy}/>
+              )}
             </div>
           </Card>
 
           <Card padding={0}>
             <SectionHeader title="Distribución" subtitle="Mascotas activas por especie"/>
+            {especiesData.length === 0 ? (
+              <div style={{ padding: 8 }}>
+                <EmptyState icon={<IconPaw size={24}/>} title="Sin mascotas registradas"
+                  subtitle="Registra la primera y aquí verás la distribución"
+                  action={<Button variant="primary" size="sm" icon={<IconPlus size={12}/>} onClick={() => navigate('/app/mascotas')}>Registrar</Button>}/>
+              </div>
+            ) : (
             <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 18 }}>
-              <Donut segments={ESPECIES_DATA} size={104} thickness={14}
+              <Donut segments={especiesData} size={104} thickness={14}
                 center={
                   <>
                     <span className="tabular" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{totalEspecies}</span>
@@ -236,7 +285,7 @@ export default function Dashboard() {
                 }
               />
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {ESPECIES_DATA.map((s, i) => (
+                {especiesData.map((s, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }}/>
                     <span style={{ flex: 1, color: 'var(--text-muted)' }}>{s.label}</span>
@@ -245,6 +294,7 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+            )}
           </Card>
 
           <Card padding={0}>

@@ -100,6 +100,13 @@ export function AuthProvider({ children }) {
     ? Math.ceil((finPrueba.getTime() - Date.now()) / 86400000)
     : null;
 
+  // Estable mientras no cambien plan ni rol: si cambiara en cada render,
+  // los efectos que dependen de ella se dispararían en bucle.
+  const tieneModulo = useCallback(
+    (modulo) => esAdmin || (MODULOS_POR_PLAN[plan] ?? MODULOS_POR_PLAN.completo).includes(modulo),
+    [esAdmin, plan],
+  );
+
   const value = {
     session,
     user: session?.user ?? null,
@@ -112,8 +119,7 @@ export function AuthProvider({ children }) {
     bloqueado:
       perfil?.rol === 'veterinaria' &&
       (perfil?.estado_suscripcion === 'inactivo' || pruebaVencida),
-    tieneModulo: (modulo) =>
-      esAdmin || (MODULOS_POR_PLAN[plan] ?? MODULOS_POR_PLAN.completo).includes(modulo),
+    tieneModulo,
     loading: loading || !perfilListo,
     signOut: () => supabase.auth.signOut(),
     recargarPerfil: () => cargarPerfil(uidActual.current),
