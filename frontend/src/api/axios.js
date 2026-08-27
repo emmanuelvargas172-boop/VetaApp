@@ -163,20 +163,55 @@ const routes = [
   }},
 
   // ===== DASHBOARD =====
+  // Todo lo que devuelve sale de la base. Si una clínica no tiene datos, el
+  // dashboard muestra ceros: es preferible a inventar cifras bonitas.
   { m: 'GET', re: /^\/dashboard$/, fn: async () => {
     const h = hoy();
-    const [citasHoy, atendidosHoy, totalMascotas, vacunasProximas, vacunasUrgentes, vacunasSemana] = await Promise.all([
+    const [lunes, domingo] = boundsSemana(h);
+    // Instante real del 1 del mes en hora local; created_at es timestamptz y
+    // comparar contra un texto sin zona corre la frontera 5 horas en Colombia.
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
+    const [citasHoy, atendidosHoy, citasAyer, totalMascotas, mascotasNuevasMes, vacunasProximas, vacunasUrgentes, vacunasSemana] = await Promise.all([
       count('citas', (q) => q.eq('fecha', h)),
       count('citas', (q) => q.eq('fecha', h).eq('estado', 'atendida')),
+      count('citas', (q) => q.eq('fecha', masDias(-1))),
       count('mascotas'),
+      count('mascotas', (q) => q.gte('created_at', inicioMes)),
       count('vacunas', (q) => q.gte('proxima_dosis', h).lte('proxima_dosis', masDias(30))),
       count('vacunas', (q) => q.gte('proxima_dosis', h).lte('proxima_dosis', masDias(3))),
       count('vacunas', (q) => q.gte('proxima_dosis', masDias(4)).lte('proxima_dosis', masDias(7))),
     ]);
-    const citasDelDia = (unwrap(
-      await supabase.from('citas').select('*, mascotas(nombre,especie)').eq('fecha', h).neq('estado', 'cancelada').order('hora', { ascending: true })
-    )).map((c) => { const m = c.mascotas || {}; const { mascotas, ...r } = c; return { ...r, mascota_nombre: m.nombre ?? null, especie: m.especie ?? null }; });
-    return { citasHoy, atendidosHoy, totalMascotas, vacunasProximas, vacunasUrgentes, vacunasSemana, citasDelDia };
+
+    const [citasDelDiaRaw, citasSemanaRaw, mascotasEspecie] = await Promise.all([
+      supabase.from('citas').select('*, mascotas(nombre,especie)').eq('fecha', h).neq('estado', 'cancelada').order('hora', { ascending: true }),
+      supabase.from('citas').select('fecha').gte('fecha', lunes).lte('fecha', domingo).neq('estado', 'cancelada'),
+      supabase.from('mascotas').select('especie'),
+    ]).then((rs) => rs.map(unwrap));
+
+    const citasDelDia = citasDelDiaRaw.map((c) => {
+      const m = c.mascotas || {}; const { mascotas, ...r } = c;
+      return { ...r, mascota_nombre: m.nombre ?? null, especie: m.especie ?? null };
+    });
+
+    // Lunes..domingo de la semana en curso, contando citas reales por día.
+    const idxDia = (fecha) => { const d = new Date(`${fecha}T00:00:00`).getDay(); return d === 0 ? 6 : d - 1; };
+    const semana = [0, 0, 0, 0, 0, 0, 0];
+    for (const c of citasSemanaRaw) semana[idxDia(c.fecha)] += 1;
+
+    // Se agrupa por el texto crudo; normalizar y elegir color es cosa de la UI.
+    const porEspecie = new Map();
+    for (const m of mascotasEspecie) {
+      const k = (m.especie || '').trim() || 'otro';
+      porEspecie.set(k, (porEspecie.get(k) || 0) + 1);
+    }
+    const especies = [...porEspecie].map(([especie, total]) => ({ especie, total })).sort((a, b) => b.total - a.total);
+
+    return {
+      citasHoy, atendidosHoy, citasAyer, totalMascotas, mascotasNuevasMes,
+      vacunasProximas, vacunasUrgentes, vacunasSemana,
+      citasDelDia, semana, semanaHoy: idxDia(h), especies,
+    };
   }},
 
   // ===== CITAS =====
@@ -232,6 +267,11 @@ const routes = [
   }},
 
   // ===== RECORDATORIOS (derivado de vacunas) =====
+  // Contador del badge del menú: mismas vacunas que la página marca como
+  // "urgentes" (hoy y los próximos 7 días). head:true, no trae filas.
+  { m: 'GET', re: /^\/recordatorios\/pendientes$/, fn: async () => ({
+    urgentes: await count('vacunas', (q) => q.gte('proxima_dosis', hoy()).lte('proxima_dosis', masDias(7))),
+  })},
   { m: 'GET', re: /^\/recordatorios\/vacunas$/, fn: async ({ params = {} }) => {
     const dias = parseInt(params.dias) || 30;
     const rows = unwrap(await supabase.from('vacunas')

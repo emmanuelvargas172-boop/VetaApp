@@ -238,7 +238,9 @@ export const UIInput = ({ icon, placeholder, value, onChange, style, ...rest }) 
   </div>
 );
 
-export const KPI = ({ label, value, delta, deltaTone = 'success', spark = [], sparkColor = 'var(--verde-500)', icon, suffix }) => (
+// `deltaLabel` dice contra qué se compara el delta. Sin él no se escribe nada:
+// antes ponía "vs. ayer" siempre, incluso cuando el delta no era comparación.
+export const KPI = ({ label, value, delta, deltaTone = 'success', deltaLabel = '', spark = [], sparkColor = 'var(--verde-500)', icon, suffix }) => (
   <Card padding={0} style={{ overflow: 'hidden' }}>
     <div style={{ padding: '14px 16px 8px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -254,7 +256,7 @@ export const KPI = ({ label, value, delta, deltaTone = 'success', spark = [], sp
       {delta && (
         <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
           <Badge tone={deltaTone} size="sm">{delta}</Badge>
-          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>vs. ayer</span>
+          {deltaLabel && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{deltaLabel}</span>}
         </div>
       )}
     </div>

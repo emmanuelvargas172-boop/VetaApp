@@ -21,7 +21,7 @@ const NAV = [
   { path: '/app/historias',    id: 'historias',     label: 'Historias',     Icon: IconFile },
   { path: '/app/citas',        id: 'citas',         label: 'Citas',         Icon: IconCalendar },
   { path: '/app/calendario',   id: 'calendario',    label: 'Calendario',    Icon: IconCalDays },
-  { path: '/app/recordatorios',id: 'recordatorios', label: 'Recordatorios', Icon: IconBell, count: 4, modulo: 'recordatorios' },
+  { path: '/app/recordatorios',id: 'recordatorios', label: 'Recordatorios', Icon: IconBell, modulo: 'recordatorios' },
   { path: '/app/operaciones',  id: 'operaciones',   label: 'Operaciones',   Icon: IconBox, modulo: 'inventario' },
   { path: '/app/caja',         id: 'caja',          label: 'Caja y Reportes', Icon: IconCash, modulo: 'caja' },
 ];
@@ -31,12 +31,31 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const { user, signOut, tieneModulo } = useAuth();
+  const verRecordatorios = tieneModulo('recordatorios');
   const email = user?.email || '';
   const [perfil, setPerfil] = useState(null);
+  // Vacunas urgentes de verdad (hoy y los próximos 7 días), el mismo criterio
+  // que usa la página de Recordatorios. Antes el badge decía 4 siempre.
+  const [urgentes, setUrgentes] = useState(0);
 
   useEffect(() => {
     api.get('/configuracion').then(res => setPerfil(res.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!verRecordatorios) { setUrgentes(0); return; }
+    let vivo = true;
+    const cargar = () => api.get('/recordatorios/pendientes')
+      .then(res => { if (vivo) setUrgentes(res.data?.urgentes || 0); })
+      .catch(() => {});
+    cargar();
+    // Sin websockets: se refresca al volver a la pestaña y cada 5 minutos,
+    // que para un contador de vacunas es más que suficiente.
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar(); };
+    document.addEventListener('visibilitychange', alVolver);
+    const t = setInterval(cargar, 5 * 60 * 1000);
+    return () => { vivo = false; document.removeEventListener('visibilitychange', alVolver); clearInterval(t); };
+  }, [verRecordatorios]);
 
   const nombre = (perfil?.perfil_nombre || '').trim();
   const fotoUrl = perfil?.foto_url || '';
@@ -105,8 +124,9 @@ export default function Sidebar() {
         {/* Los módulos que el plan no incluye ni se muestran. El bloqueo real
             está en RLS (004_planes.sql); esto es solo para no ofrecer
             botones que la base de datos va a rechazar. */}
-        {NAV.filter(({ modulo }) => !modulo || tieneModulo(modulo)).map(({ path, id, label, Icon, count }) => {
+        {NAV.filter(({ modulo }) => !modulo || tieneModulo(modulo)).map(({ path, id, label, Icon }) => {
           const active = isActive(path);
+          const count = id === 'recordatorios' ? urgentes : 0;
           return (
             <button
               key={id}
