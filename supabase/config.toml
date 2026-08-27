@@ -1,0 +1,17 @@
+# Configuración de las Edge Functions de VetaApp.
+#
+# pago-webhook lo llama Wompi, que obviamente no tiene un JWT de nuestro
+# proyecto. Supabase exige JWT por defecto, así que sin este verify_jwt
+# = false TODOS los webhooks rebotarían con 401 antes de tocar el
+# código, los pagos se cobrarían y ninguna cuenta se activaría.
+#
+# Que el endpoint sea público no lo deja abierto: su autenticación es el
+# checksum del evento, firmado con WOMPI_EVENTS_SECRET y verificado en
+# _compartido/wompi.ts antes de tocar la base de datos.
+[functions.pago-webhook]
+verify_jwt = false
+
+# pago-iniciar sí exige sesión: la llama la veterinaria desde la app, y
+# el user_id sale del token, nunca del cuerpo del request.
+[functions.pago-iniciar]
+verify_jwt = true
