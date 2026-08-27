@@ -36,7 +36,16 @@ export default function AuthScreen({ modoInicial = 'login' }) {
         // registrados le daría a un atacante una lista de clientes.
         setAviso('Si ese correo tiene una cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa tu bandeja y la carpeta de spam.');
       } else if (esRegistro) {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // Sin emailRedirectTo, Supabase manda al Site URL del proyecto: el
+        // enlace del correo caía en la landing con el token colgando del
+        // hash, la landing no lo lee, y el recién registrado quedaba mirando
+        // la página de ventas sin saber si su cuenta quedó confirmada.
+        // /app sí procesa la sesión (y si algo falla, Privado devuelve a login).
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/app` },
+        });
         if (error) throw error;
         // Si el proyecto tiene confirmación de correo activada, no hay sesión inmediata
         if (data.session == null) {
