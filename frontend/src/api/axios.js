@@ -31,6 +31,40 @@ async function count(table, build) {
   return c || 0;
 }
 
+// ---------- avisos enviados (migración 006) ----------
+// Cuántos días se considera que un dueño "ya fue avisado". Pasado ese
+// plazo la vacuna vuelve a la lista: si no contestó en una semana, toca
+// insistir.
+const VENTANA_AVISO_DIAS = 7;
+
+// La vista `avisos_ultimo` puede no existir todavía si el frontend se
+// despliega antes de correr la migración 006. En ese caso se devuelve
+// vacío: la página funciona como antes en vez de romperse entera.
+async function ultimoAvisoPorVacuna(ids) {
+  const mapa = new Map();
+  if (!ids || ids.length === 0) return mapa;
+  const { data, error } = await supabase
+    .from('avisos_ultimo').select('vacuna_id, enviado_at').in('vacuna_id', ids);
+  if (error) {
+    console.warn('[avisos] sin historial de recordatorios:', error.message);
+    return mapa;
+  }
+  for (const a of data || []) mapa.set(a.vacuna_id, a.enviado_at);
+  return mapa;
+}
+
+// Ids de vacunas con aviso dentro de la ventana. Set para filtrar barato.
+async function avisosRecientes(ids) {
+  const corte = new Date();
+  corte.setDate(corte.getDate() - VENTANA_AVISO_DIAS);
+  const mapa = await ultimoAvisoPorVacuna(ids);
+  const recientes = new Set();
+  for (const [id, enviado] of mapa) {
+    if (new Date(enviado) >= corte) recientes.add(id);
+  }
+  return recientes;
+}
+
 // Aplana la relación anidada de dueño sobre la mascota
 function flattenMascota(m) {
   if (!m) return m;
@@ -267,18 +301,50 @@ const routes = [
   }},
 
   // ===== RECORDATORIOS (derivado de vacunas) =====
-  // Contador del badge del menú: mismas vacunas que la página marca como
-  // "urgentes" (hoy y los próximos 7 días). head:true, no trae filas.
-  { m: 'GET', re: /^\/recordatorios\/pendientes$/, fn: async () => ({
-    urgentes: await count('vacunas', (q) => q.gte('proxima_dosis', hoy()).lte('proxima_dosis', masDias(7))),
-  })},
+  // Contador del badge del menú: vacunas urgentes (hoy y los próximos 7
+  // días) a las que NO se les ha avisado en esa misma ventana. Si el badge
+  // contara también las ya avisadas, seguiría en rojo para siempre y la
+  // veterinaria aprendería a ignorarlo.
+  { m: 'GET', re: /^\/recordatorios\/pendientes$/, fn: async () => {
+    const urgentes = unwrap(await supabase.from('vacunas').select('id')
+      .gte('proxima_dosis', hoy()).lte('proxima_dosis', masDias(7)));
+    if (urgentes.length === 0) return { urgentes: 0 };
+    const avisados = await avisosRecientes(urgentes.map((v) => v.id));
+    return { urgentes: urgentes.filter((v) => !avisados.has(v.id)).length };
+  }},
   { m: 'GET', re: /^\/recordatorios\/vacunas$/, fn: async ({ params = {} }) => {
     const dias = parseInt(params.dias) || 30;
     const rows = unwrap(await supabase.from('vacunas')
       .select('*, mascotas(nombre,especie,raza,duenos(nombre,telefono))')
       .gte('proxima_dosis', hoy()).lte('proxima_dosis', masDias(dias))
       .order('proxima_dosis', { ascending: true }));
-    return rows.map((v) => { const m = v.mascotas || {}; const d = m.duenos || {}; const { mascotas, ...r } = v; return { ...r, mascota_nombre: m.nombre ?? null, especie: m.especie ?? null, raza: m.raza ?? null, dueno_nombre: d.nombre ?? null, dueno_telefono: d.telefono ?? null }; });
+    const avisos = await ultimoAvisoPorVacuna(rows.map((v) => v.id));
+    return rows.map((v) => {
+      const m = v.mascotas || {}; const d = m.duenos || {}; const { mascotas, ...r } = v;
+      return { ...r, mascota_nombre: m.nombre ?? null, especie: m.especie ?? null, raza: m.raza ?? null,
+               dueno_nombre: d.nombre ?? null, dueno_telefono: d.telefono ?? null,
+               avisado_at: avisos.get(v.id) ?? null };
+    });
+  }},
+  // Registro de un aviso ya enviado. Lo llama la página DESPUÉS de abrir
+  // WhatsApp: no envía nada, solo deja constancia de que se escribió.
+  // Copia nombre y teléfono porque la vacuna puede borrarse después.
+  { m: 'POST', re: /^\/recordatorios\/avisos$/, fn: async ({ body }) => {
+    const { vacuna_id, mascota_nombre, dueno_nombre, telefono, mensaje } = body || {};
+    return unwrap(await supabase.from('avisos').insert({
+      vacuna_id: vacuna_id ?? null,
+      mascota_nombre: mascota_nombre || null,
+      dueno_nombre: dueno_nombre || null,
+      telefono: telefono || null,
+      mensaje: mensaje || null,
+    }).select('*').single());
+  }},
+  { m: 'GET', re: /^\/recordatorios\/avisos$/, fn: async ({ params = {} }) => {
+    const dias = parseInt(params.dias) || 30;
+    const desde = new Date(); desde.setDate(desde.getDate() - dias);
+    return unwrap(await supabase.from('avisos').select('*')
+      .gte('enviado_at', desde.toISOString())
+      .order('enviado_at', { ascending: false }));
   }},
 
   // ===== HISTORIAS CLÍNICAS =====

@@ -11,7 +11,7 @@ import '../styles/landing.css';
 const BENEFICIOS = [
   { emoji: '📅', titulo: 'Agenda de Citas',        texto: 'Organiza tu día. Nunca más una cita perdida o duplicada.' },
   { emoji: '🐾', titulo: 'Historias Clínicas',     texto: 'El historial completo de cada mascota, siempre a mano.' },
-  { emoji: '💬', titulo: 'Recordatorios WhatsApp', texto: 'Avisa a los dueños de vacunas próximas con un clic. Menos ausencias, más ingresos.' },
+  { emoji: '💬', titulo: 'Recordatorios WhatsApp', texto: 'VetaApp arma la lista y el mensaje; tú envías con un clic y queda registrado a quién le escribiste.' },
   { emoji: '💊', titulo: 'Inventario',             texto: 'Controla medicamentos y stock. Alertas cuando algo se agota.' },
   { emoji: '💰', titulo: 'Caja y Reportes',        texto: 'Cobra, genera recibos e imprime. Lleva la caja de tu clínica.' },
   { emoji: '📊', titulo: 'Reportes',               texto: 'Mira tus ingresos, tus servicios más pedidos y crece con datos.' },
@@ -49,7 +49,7 @@ const PLANES = [
     popular: true,
     features: [
       'Todo lo de Fichas',
-      '+ Recordatorios automáticos por WhatsApp',
+      '+ Recordatorios de vacunas por WhatsApp',
       '+ Caja: cobros y recibos',
       '+ Inventario de medicamentos e insumos',
       '+ Reportes de ingresos',
