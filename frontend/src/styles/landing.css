@@ -708,7 +708,7 @@ html.lp-smooth { scroll-behavior: smooth; }
   box-shadow: var(--shadow-sm);
 }
 
-/* Completo es el que se recomienda: se marca con el borde, no con un
+/* Profesional es el que se recomienda: se marca con el borde, no con un
    badge, porque el badge "MÁS POPULAR" ya vive en las tarjetas de arriba
    y repetirlo dos veces en la misma página lo vuelve ruido. */
 .lp-detalle-destacado {

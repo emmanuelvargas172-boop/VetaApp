@@ -34,8 +34,8 @@ const td = {
 
 // Mismos valores que el check de perfiles.plan en 004_planes.sql.
 const PLANES = [
-  { id: 'fichas',      label: 'Fichas' },
-  { id: 'completo',    label: 'Completo' },
+  { id: 'fichas',      label: 'Esencial' },
+  { id: 'completo',    label: 'Profesional' },
   { id: 'facturacion', label: 'Facturación' },
 ];
 

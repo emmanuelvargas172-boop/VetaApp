@@ -5,10 +5,10 @@ import { IconLock, IconWhatsApp } from './icons';
 // Número de soporte en formato internacional, solo dígitos (VITE_SOPORTE_WHATSAPP).
 const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
 
-const NOMBRE_PLAN = { fichas: 'Fichas', completo: 'Completo', facturacion: 'Facturación' };
+const NOMBRE_PLAN = { fichas: 'Esencial', completo: 'Profesional', facturacion: 'Facturación' };
 
 /**
- * Lo que ve alguien del plan Fichas si entra por URL a un módulo que su plan
+ * Lo que ve alguien del plan Esencial si entra por URL a un módulo que su plan
  * no incluye. No es seguridad — RLS ya devuelve cero filas y rechaza los
  * inserts (004_planes.sql). Esto solo evita una pantalla vacía sin explicación.
  */
