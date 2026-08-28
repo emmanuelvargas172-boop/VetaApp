@@ -48,10 +48,30 @@ export async function iniciarPago(plan, meses = 1) {
   });
 
   if (error) {
-    // functions.invoke mete el cuerpo de la respuesta en error.context y
-    // deja en error.message un genérico ("Edge Function returned a
-    // non-2xx status code"). Sin desenvolverlo, un 503 "el cobro no está
-    // configurado todavía" se vería como un error técnico incomprensible.
+    // functions.invoke tira TRES errores distintos y solo uno trae cuerpo.
+    // Verificado en @supabase/functions-js/dist/module/FunctionsClient.js:
+    //
+    //   línea 264  .catch(fetchError => throw new FunctionsFetchError(...))
+    //              → context = el error de fetch pelado, NO una Response.
+    //   línea 271  if (!response.ok) throw new FunctionsHttpError(response)
+    //              → context SÍ es una Response, se le puede pedir .json().
+    //
+    // Antes esto solo contemplaba el segundo. Cuando la función no está
+    // desplegada, el navegador no recibe respuesta con CORS y el fetch
+    // falla, así que caía al `error.message` crudo y la veterinaria veía
+    // "Failed to send a request to the Edge Function" — en inglés y sin
+    // ninguna pista de qué hacer.
+    if (error.name === 'FunctionsFetchError') {
+      throw new Error(
+        'No pudimos conectarnos con el servicio de pagos. Revisa tu internet ' +
+        'e inténtalo de nuevo; si sigue igual, escríbenos por WhatsApp y te ' +
+        'activamos el plan a mano.',
+      );
+    }
+
+    // Http y Relay sí pueden traer un cuerpo JSON que la función escribió
+    // a propósito (por ejemplo el 503 "El cobro en línea no está
+    // configurado todavía"). Ese texto es mejor que cualquier genérico.
     let detalle = error.message;
     try {
       const cuerpo = await error.context?.json?.();
