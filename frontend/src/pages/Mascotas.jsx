@@ -26,6 +26,26 @@ function coincideFiltro(especie, filtro) {
   return esp === filtro;
 }
 
+/**
+ * El código visible de la mascota.
+ *
+ * Sale de `codigo` — la numeración por veterinaria de 008_codigo_mascota.sql —
+ * y NO de `id`, que es la secuencia global de la tabla.
+ *
+ * Con el id se filtraba negocio ajeno: una clínica recién abierta veía
+ * MASC-0025 en su primera mascota y ahí quedaba dicho que en TODA la
+ * plataforma había 25 mascotas. Dos clínicas comparando códigos deducían
+ * cuántos pacientes registró la otra, y los huecos entre consecutivos eran
+ * la actividad de los demás. RLS nunca dejó ver una fila ajena; el que
+ * hablaba de más era el número.
+ *
+ * Sin `codigo` (base todavía sin migrar) devuelve null y la línea no se
+ * pinta. Volver a caer en `id` como respaldo sería reabrir la fuga.
+ */
+function codigoMascota(m) {
+  return m?.codigo ? `MASC-${String(m.codigo).padStart(4, '0')}` : null;
+}
+
 function formatEdad(anios, meses) {
   const a = Number(anios) || 0;
   const m = Number(meses) || 0;
@@ -80,9 +100,11 @@ function MascotaRow({ m, onClick, onEdit, onEliminar }) {
         <SpeciesAvatar especie={m.especie} size={38}/>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: hover ? 'var(--verde-700)' : 'var(--text)', letterSpacing: '-0.01em', transition: 'color 0.15s' }}>{m.nombre}</p>
-          <p className="mono" style={{ margin: '1px 0 0', fontSize: 10.5, color: 'var(--text-faint)' }}>
-            MASC-{String(m.id).padStart(4, '0')}
-          </p>
+          {codigoMascota(m) && (
+            <p className="mono" style={{ margin: '1px 0 0', fontSize: 10.5, color: 'var(--text-faint)' }}>
+              {codigoMascota(m)}
+            </p>
+          )}
         </div>
       </div>
       <div>
@@ -149,7 +171,8 @@ function MascotaPerfil({ mascota, onBack, onEdit }) {
       <Topbar
         breadcrumb={['Mascotas', mascota.nombre]}
         title={mascota.nombre}
-        subtitle={`${cfg.label} · ${mascota.raza || ''} · ID MASC-${String(mascota.id).padStart(4, '0')}`}
+        subtitle={[cfg.label, mascota.raza, codigoMascota(mascota) && `ID ${codigoMascota(mascota)}`]
+          .filter(Boolean).join(' · ')}
         actions={
           <>
             <Button variant="secondary" size="md" icon={<IconArrowLeft size={13}/>} onClick={onBack}>Volver</Button>
@@ -298,10 +321,12 @@ function MascotaPerfil({ mascota, onBack, onEdit }) {
               </div>
             </Card>
 
-            <Card style={{ background: 'var(--stone-50)' }}>
-              <p className="mono" style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.04em' }}>ID DEL REGISTRO</p>
-              <p className="mono" style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>MASC-{String(mascota.id).padStart(4, '0')}</p>
-            </Card>
+            {codigoMascota(mascota) && (
+              <Card style={{ background: 'var(--stone-50)' }}>
+                <p className="mono" style={{ margin: 0, fontSize: 10.5, color: 'var(--text-faint)', letterSpacing: '0.04em' }}>ID DEL REGISTRO</p>
+                <p className="mono" style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{codigoMascota(mascota)}</p>
+              </Card>
+            )}
           </div>
         </div>
       </Page>
