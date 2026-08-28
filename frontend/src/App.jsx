@@ -13,6 +13,7 @@ import Landing from './pages/Landing';
 import Legal from './pages/Legal';
 import NuevaClave from './pages/NuevaClave';
 import Admin from './pages/Admin';
+import Pago from './pages/Pago';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import PantallaBloqueo from './components/PantallaBloqueo';
@@ -100,6 +101,27 @@ function Privado({ children }) {
   return children;
 }
 
+/**
+ * El regreso del checkout de Wompi.
+ *
+ * Deliberadamente NO pasa por <Privado>. Quien vuelve de pagar casi siempre
+ * sigue bloqueado en este instante: el webhook aterriza segundos después, y
+ * la puerta normal lo mandaría a PantallaBloqueo justo cuando se está
+ * desbloqueando — vería "tu acceso está suspendido" con el pago ya hecho.
+ *
+ * Aflojar aquí no abre nada: esta página no activa ninguna cuenta, solo lee
+ * la tabla `pagos`, y esa tabla solo deja ver las filas propias (RLS,
+ * 007_pagos.sql). Quien activa es el webhook, con firma verificada.
+ */
+function RegresoDePago() {
+  const { loading, session } = useAuth();
+  const location = useLocation();
+
+  if (loading) return <Splash />;
+  if (!session) return <Navigate to="/login" replace state={{ desde: location.pathname }} />;
+  return <Pago />;
+}
+
 /** Login / registro. Con sesión activa entra directo al panel. */
 function Publico({ modo }) {
   const { loading, session } = useAuth();
@@ -123,6 +145,8 @@ export default function App() {
           <Route path="/nueva-clave" element={<NuevaClave />} />
           <Route path="/privacidad" element={<Legal doc="privacidad" />} />
           <Route path="/terminos" element={<Legal doc="terminos" />} />
+          {/* Antes de /app/*: si quedara después, <Privado> lo interceptaría. */}
+          <Route path="/app/pago" element={<RegresoDePago />} />
           <Route path="/app/*" element={<Privado><AppShell /></Privado>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
