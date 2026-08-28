@@ -683,3 +683,174 @@ html.lp-smooth { scroll-behavior: smooth; }
   .lp-mock-list { display: none; }
   .lp-cta { padding: 72px 0; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Detalle de planes — el apartado que explica, no el que compara.     */
+/* Las tarjetas de arriba caben en una línea cada una; esto es para    */
+/* la veterinaria que todavía no sabe qué significa "inventario".      */
+/* ------------------------------------------------------------------ */
+
+.lp-detalle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+  margin-top: 8px;
+}
+
+.lp-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Completo es el que se recomienda: se marca con el borde, no con un
+   badge, porque el badge "MÁS POPULAR" ya vive en las tarjetas de arriba
+   y repetirlo dos veces en la misma página lo vuelve ruido. */
+.lp-detalle-destacado {
+  border-color: var(--verde-400);
+  box-shadow: 0 0 0 1px var(--verde-200), var(--shadow-md, var(--shadow-sm));
+}
+
+.lp-detalle-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-detalle-nombre {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.lp-detalle-precio {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--verde-700);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.lp-detalle-precio small { font-size: 12.5px; font-weight: 500; color: var(--text-muted); }
+
+.lp-detalle-para {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* El escenario concreto. Es lo que más convierte: la vet se reconoce en
+   la escena antes de entender la lista de módulos. */
+.lp-detalle-dia {
+  padding: 14px 16px;
+  background: var(--verde-50);
+  border: 1px solid var(--verde-100);
+  border-radius: var(--r-lg);
+}
+.lp-detalle-dia-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--verde-700);
+}
+.lp-detalle-dia p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.lp-detalle-gana {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.lp-detalle-gana li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.lp-detalle-gana li svg { flex: none; margin-top: 3px; }
+.lp-detalle-gana strong { color: var(--text); font-weight: 650; }
+
+.lp-detalle-vale {
+  margin: auto 0 0;
+  padding: 13px 15px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  font-weight: 600;
+  color: var(--verde-800, var(--verde-700));
+  background: var(--verde-50);
+  border-left: 3px solid var(--verde-500);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+/* Decir en voz alta lo que NO hace es lo que hace creíble todo lo demás. */
+.lp-detalle-no {
+  margin: auto 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-faint);
+}
+.lp-detalle-no strong { color: var(--text-muted); }
+
+/* ---------- tabla comparativa ---------- */
+.lp-tabla-wrap {
+  margin-top: 30px;
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+}
+
+.lp-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 420px;
+}
+.lp-tabla th,
+.lp-tabla td { padding: 13px 18px; text-align: left; }
+.lp-tabla thead th {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--stone-50);
+  border-bottom: 1px solid var(--border);
+}
+.lp-tabla thead th:not(:first-child),
+.lp-tabla tbody td:not(:first-child) { text-align: center; width: 110px; }
+.lp-tabla tbody tr + tr td { border-top: 1px solid var(--border); }
+.lp-tabla tbody td:first-child { color: var(--text); }
+
+.lp-tabla .lp-si { color: var(--verde-600); font-weight: 700; font-size: 16px; }
+.lp-tabla .lp-no { color: var(--text-faint); font-weight: 600; }
+
+@media (max-width: 860px) {
+  .lp-detalle-grid { grid-template-columns: 1fr; }
+  .lp-detalle { padding: 24px 20px; }
+  .lp-detalle-vale,
+  .lp-detalle-no { margin-top: 4px; }
+}

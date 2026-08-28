@@ -73,6 +73,86 @@ const PLANES = [
   },
 ];
 
+/**
+ * El detalle largo de cada plan.
+ *
+ * La tabla de tres columnas de arriba sirve para comparar de un vistazo,
+ * pero no alcanza para decidir: una veterinaria que nunca usó un software
+ * no sabe qué significa "inventario" en la práctica ni por qué le costaría
+ * $30.000 más al mes. Esto lo cuenta en el idioma en que ella lo vive.
+ *
+ * IMPORTANTE — esto no es material de marketing suelto. La diferencia real
+ * entre Fichas y Completo son EXACTAMENTE tres módulos, y así está escrito
+ * en tiene_modulo() (006_avisos.sql):
+ *
+ *   inventario    → completo, facturacion
+ *   caja          → completo, facturacion
+ *   recordatorios → completo, facturacion
+ *   else true     → mascotas, historias, citas, vacunas, calendario
+ *
+ * Todo lo que se prometa acá tiene que caer de ese lado. Si mañana un
+ * módulo cambia de plan en esa función, este texto queda mintiendo.
+ */
+const DETALLE_PLANES = [
+  {
+    id: 'fichas',
+    nombre: 'Fichas',
+    precio: '69.000',
+    para: 'Para el consultorio que todavía trabaja con cuaderno, Excel o memoria.',
+    dia:
+      'Llega Michi con vómito. Buscas su nombre y en dos segundos tienes todo: ' +
+      'qué le diagnosticaste en marzo, qué le recetaste, cuánto pesaba, qué ' +
+      'vacunas lleva y cuándo toca la próxima. No dependes de acordarte ni de ' +
+      'encontrar la hoja.',
+    gana: [
+      ['Nunca más pierdes una historia', 'El cuaderno se moja, se pierde o se lo lleva alguien. Esto no.'],
+      ['Atiendes con el antecedente en frente', 'Menos repetir exámenes, menos preguntarle al dueño lo que ya te dijo.'],
+      ['El dueño te ve organizado', 'Sacar el historial completo en el momento vale más que cualquier aviso.'],
+      ['Sin límite de mascotas ni de usuarios', 'No te cobramos por crecer. Registra las que sean.'],
+    ],
+    noIncluye:
+      'No lleva la plata ni el stock: no cobra, no hace recibos, no controla ' +
+      'medicamentos y no manda recordatorios. Si eso ya lo resuelves por otro ' +
+      'lado, este plan te sirve tal cual.',
+  },
+  {
+    id: 'completo',
+    nombre: 'Completo',
+    precio: '99.000',
+    para: 'Para la clínica que además de atender, vende, cobra y quiere que el cliente vuelva.',
+    dia:
+      'Mismo caso de Michi, pero además: le cobras la consulta y sale el recibo, ' +
+      'el antiparasitario que usaste se descuenta solo del inventario, y el mes ' +
+      'entrante la app te arma la lista de a quiénes les toca vacuna con el ' +
+      'mensaje listo para mandar por WhatsApp.',
+    gana: [
+      ['Los clientes vuelven', 'El recordatorio de vacuna es plata que ya era tuya y se estaba perdiendo porque nadie se acordó.'],
+      ['Sabes cuánto entró', 'Caja y reportes: qué se cobró, qué servicio es el que más te mueve.'],
+      ['No se te acaba nada de sorpresa', 'Inventario con alerta cuando algo se está agotando.'],
+      ['Una sola cuenta para todo', 'Deja de cuadrar la clínica entre tres cuadernos y un Excel.'],
+    ],
+    // El argumento honesto: la diferencia se paga sola con un cliente que vuelve.
+    vale:
+      'Son $30.000 más al mes. Una sola vacuna que se hubiera perdido y volvió ' +
+      'por el recordatorio ya lo pagó.',
+  },
+];
+
+/**
+ * Lo único que de verdad cambia entre los dos planes vendibles.
+ * Espejo literal de tiene_modulo(): tres módulos, ni uno más.
+ */
+const COMPARACION = [
+  { que: 'Mascotas, dueños e historias clínicas', fichas: true, completo: true },
+  { que: 'Citas y calendario',                    fichas: true, completo: true },
+  { que: 'Vacunas y control de peso',             fichas: true, completo: true },
+  { que: 'Mascotas y usuarios sin límite',        fichas: true, completo: true },
+  { que: 'Recordatorios por WhatsApp',            fichas: false, completo: true },
+  { que: 'Caja, cobros y recibos',                fichas: false, completo: true },
+  { que: 'Inventario de medicamentos',            fichas: false, completo: true },
+  { que: 'Reportes de ingresos',                  fichas: false, completo: true },
+];
+
 const EMAIL_CONTACTO = 'emmanuelvargas172@gmail.com';
 const WHATSAPP_CONTACTO = '+57 316 290 6253';
 const WHATSAPP_LINK = 'https://wa.me/573162906253';
@@ -307,6 +387,102 @@ export default function Landing() {
           <p className="lp-planes-nota lp-reveal">
             Fichas y Completo incluyen 14 días de prueba gratis, sin tarjeta. El plan Facturación
             todavía está en construcción: déjanos tu contacto y te avisamos apenas esté listo.
+          </p>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------- */}
+      {/* 5b. EL DETALLE: ¿CUÁL ME SIRVE?                             */}
+      {/* Las tarjetas de arriba comparan; esto explica. Una          */}
+      {/* veterinaria que nunca usó un software no decide con una     */}
+      {/* lista de viñetas.                                          */}
+      {/* ---------------------------------------------------------- */}
+      <section className="lp-section lp-section-alt" id="detalle-planes">
+        <div className="lp-container">
+          <div className="lp-section-head lp-reveal">
+            <span className="lp-kicker">En detalle</span>
+            <h2 className="lp-h2">¿Cuál me sirve a mí?</h2>
+            <p className="lp-section-sub">
+              La diferencia no es cuántas mascotas caben —  en eso los dos son ilimitados.
+              Es cuánto de tu clínica quieres meter adentro.
+            </p>
+          </div>
+
+          <div className="lp-detalle-grid">
+            {DETALLE_PLANES.map((p, i) => (
+              <article
+                key={p.id}
+                className={`lp-detalle lp-reveal${p.id === 'completo' ? ' lp-detalle-destacado' : ''}`}
+                style={{ transitionDelay: `${i * 90}ms` }}
+              >
+                <header className="lp-detalle-head">
+                  <h3 className="lp-detalle-nombre">{p.nombre}</h3>
+                  <span className="lp-detalle-precio">${p.precio}<small>/mes</small></span>
+                </header>
+
+                <p className="lp-detalle-para">{p.para}</p>
+
+                <div className="lp-detalle-dia">
+                  <span className="lp-detalle-dia-label">Un día con este plan</span>
+                  <p>{p.dia}</p>
+                </div>
+
+                <ul className="lp-detalle-gana">
+                  {p.gana.map(([titulo, texto]) => (
+                    <li key={titulo}>
+                      <CheckIcon />
+                      <span>
+                        <strong>{titulo}.</strong> {texto}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {p.vale && <p className="lp-detalle-vale">{p.vale}</p>}
+                {p.noIncluye && (
+                  <p className="lp-detalle-no">
+                    <strong>Lo que no incluye: </strong>{p.noIncluye}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+
+          {/* La tabla es el resumen honesto: se ve de un golpe que casi todo
+              está en los dos, y que lo que cambia son cuatro líneas. */}
+          <div className="lp-tabla-wrap lp-reveal">
+            <table className="lp-tabla">
+              <thead>
+                <tr>
+                  <th>Qué incluye</th>
+                  <th>Fichas</th>
+                  <th>Completo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARACION.map((f) => (
+                  <tr key={f.que}>
+                    <td>{f.que}</td>
+                    <td className={f.fichas ? 'lp-si' : 'lp-no'}>{f.fichas ? '✓' : '—'}</td>
+                    <td className="lp-si">{f.completo ? '✓' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Verificado antes de prometerlo:
+              · 004_planes.sql:28 — perfiles.plan nace `default 'completo'`,
+                así que la prueba de 14 días sí trae todo.
+              · bajar a Fichas no borra: las filas de inventario y caja se
+                quedan en la base, RLS solo deja de mostrarlas. Al volver a
+                Completo reaparecen. Por eso se dice "vuelven a aparecer" y
+                no "se guardan", que sonaría a respaldo. */}
+          <p className="lp-planes-nota lp-reveal">
+            ¿No sabes cuál? Empieza con los 14 días gratis: traen todo el plan Completo,
+            sin tarjeta. Si al final no usaste caja ni inventario, te pasas a Fichas y pagas
+            menos. Y si algún día vuelves a Completo, tu inventario y tus cobros vuelven a
+            aparecer: bajarse de plan no borra nada.
           </p>
         </div>
       </section>
