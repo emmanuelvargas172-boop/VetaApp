@@ -63,10 +63,14 @@ export function AuthProvider({ children }) {
     const leer = (cols) =>
       supabase.from('perfiles').select(cols).eq('id', id).maybeSingle();
 
-    let { data, error } = await leer('id, email, nombre, rol, estado_suscripcion, plan, prueba_hasta, fecha_registro');
-    // Si el deploy del frontend va por delante de las migraciones 004/005,
-    // las columnas `plan` o `prueba_hasta` todavía no existen. Se reintenta
-    // sin ellas para no dejar a nadie sin perfil (y sin panel de admin).
+    let { data, error } = await leer('id, email, nombre, rol, estado_suscripcion, plan, prueba_hasta, suscripcion_hasta, fecha_registro');
+    // Si el deploy del frontend va por delante de las migraciones 004/005/007,
+    // las columnas `plan`, `prueba_hasta` o `suscripcion_hasta` todavía no
+    // existen. Se reintenta sin ellas para no dejar a nadie sin perfil (y sin
+    // panel de admin).
+    if (error) {
+      ({ data, error } = await leer('id, email, nombre, rol, estado_suscripcion, plan, prueba_hasta, fecha_registro'));
+    }
     if (error) {
       ({ data, error } = await leer('id, email, nombre, rol, estado_suscripcion, fecha_registro'));
     }
@@ -100,6 +104,24 @@ export function AuthProvider({ children }) {
     ? Math.ceil((finPrueba.getTime() - Date.now()) / 86400000)
     : null;
 
+  // Suscripción paga. Espejo del caso 'activo' de esta_activo() en
+  // 007_pagos.sql, que ahora sí vence.
+  //
+  // Sin esto la app mentiría de la peor forma: la base cerraría la puerta
+  // (RLS) pero React seguiría mostrando el panel, y un USING en false no
+  // da error — devuelve cero filas. La veterinaria vería su clínica vacía,
+  // como si se le hubieran borrado los datos, en vez de "se venció tu plan".
+  //
+  // suscripcion_hasta null = sin vencimiento: es el caso de las cuentas
+  // que activó el admin a mano y de todas las anteriores a 007.
+  const finSuscripcion = perfil?.suscripcion_hasta ? new Date(perfil.suscripcion_hasta) : null;
+  const suscripcionVencida =
+    perfil?.estado_suscripcion === 'activo' &&
+    !!finSuscripcion && finSuscripcion.getTime() <= Date.now();
+  const diasSuscripcion = finSuscripcion && !suscripcionVencida
+    ? Math.ceil((finSuscripcion.getTime() - Date.now()) / 86400000)
+    : null;
+
   // Estable mientras no cambien plan ni rol: si cambiara en cada render,
   // los efectos que dependen de ella se dispararían en bucle.
   const tieneModulo = useCallback(
@@ -116,9 +138,11 @@ export function AuthProvider({ children }) {
     enPrueba,
     diasPrueba,
     pruebaVencida,
+    suscripcionVencida,
+    diasSuscripcion,
     bloqueado:
       perfil?.rol === 'veterinaria' &&
-      (perfil?.estado_suscripcion === 'inactivo' || pruebaVencida),
+      (perfil?.estado_suscripcion === 'inactivo' || pruebaVencida || suscripcionVencida),
     tieneModulo,
     loading: loading || !perfilListo,
     signOut: () => supabase.auth.signOut(),
