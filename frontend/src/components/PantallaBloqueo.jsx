@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { planesALaVenta, iniciarPago, enPesos } from '../lib/pagos';
+import SelectorPlanes from './SelectorPlanes';
 import { Button } from './ui';
-import { IconLock, IconWhatsApp, IconLogout, IconCash, VetaAppLogo } from './icons';
+import { IconLock, IconWhatsApp, IconLogout, VetaAppLogo } from './icons';
 
 // Número de soporte en formato internacional, solo dígitos (VITE_SOPORTE_WHATSAPP).
 const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
@@ -21,41 +21,13 @@ const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '')
 export default function PantallaBloqueo() {
   const { user, perfil, signOut, pruebaVencida, suscripcionVencida } = useAuth();
 
-  const [planes, setPlanes] = useState([]);
-  const [elegido, setElegido] = useState(null);
-  const [cargandoPlanes, setCargandoPlanes] = useState(true);
-  const [yendo, setYendo] = useState(false);
-  const [errorPago, setErrorPago] = useState('');
-
-  useEffect(() => {
-    let vivo = true;
-    planesALaVenta()
-      .then((lista) => {
-        if (!vivo) return;
-        setPlanes(lista);
-        // Se preselecciona el plan que ya tenía: renovar es el caso normal.
-        const suyo = lista.find((p) => p.plan === perfil?.plan);
-        setElegido((suyo ?? lista.find((p) => p.plan === 'completo') ?? lista[0])?.plan ?? null);
-      })
-      .catch(() => { /* sin lista solo queda WhatsApp; no es un error que mostrar */ })
-      .finally(() => { if (vivo) setCargandoPlanes(false); });
-    return () => { vivo = false; };
-  }, [perfil?.plan]);
-
-  const pagar = async () => {
-    if (!elegido) return;
-    setYendo(true);
-    setErrorPago('');
-    try {
-      const { url } = await iniciarPago(elegido, 1);
-      // Misma pestaña a propósito: window.open lo comería el bloqueador de
-      // popups en algunos navegadores y el pago moriría sin explicación.
-      window.location.href = url;
-    } catch (e) {
-      setErrorPago(e.message);
-      setYendo(false);
-    }
-  };
+  // Solo para saber si hubo planes que ofrecer: cambia el texto del botón de
+  // WhatsApp (respaldo vs. única salida). El pago lo maneja SelectorPlanes.
+  const [hayPlanes, setHayPlanes] = useState(false);
+  // useCallback porque SelectorPlanes la tiene en las dependencias de su
+  // efecto: una función nueva en cada render volvería a pedir los planes sin
+  // parar.
+  const alCargarPlanes = useCallback((lista) => setHayPlanes(lista.length > 0), []);
 
   const abrirWhatsApp = () => {
     const msg = pruebaVencida
@@ -78,7 +50,7 @@ export default function PantallaBloqueo() {
 
   // El selector solo aparece cuando comprar tiene sentido. A una cuenta
   // suspendida a mano (inactivo) la desbloquea el admin, no un pago.
-  const puedeComprar = (pruebaVencida || suscripcionVencida) && planes.length > 0;
+  const ofrecerPago = pruebaVencida || suscripcionVencida;
 
   return (
     <div style={{
@@ -125,69 +97,20 @@ export default function PantallaBloqueo() {
             </p>
           )}
 
-          {puedeComprar && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 22, textAlign: 'left' }}>
-              {planes.map((p) => {
-                const activo = p.plan === elegido;
-                return (
-                  <button
-                    key={p.plan}
-                    type="button"
-                    onClick={() => setElegido(p.plan)}
-                    disabled={yendo}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      gap: 12, padding: '13px 15px', borderRadius: 'var(--r-lg)',
-                      border: `1.5px solid ${activo ? 'var(--verde-500)' : 'var(--border)'}`,
-                      background: activo ? 'var(--verde-50)' : 'var(--surface)',
-                      cursor: yendo ? 'default' : 'pointer', textAlign: 'left',
-                      font: 'inherit', color: 'var(--text)', width: '100%',
-                    }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: activo ? 700 : 500 }}>
-                      {p.nombre_visible}
-                    </span>
-                    <span style={{
-                      fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap',
-                      fontVariantNumeric: 'tabular-nums',
-                      color: activo ? 'var(--verde-700)' : 'var(--text-muted)',
-                    }}>
-                      {enPesos(p.precio_centavos)}<span style={{ fontWeight: 500, fontSize: 12 }}> /mes</span>
-                    </span>
-                  </button>
-                );
-              })}
+          {ofrecerPago && (
+            <div style={{ marginTop: 22, textAlign: 'left' }}>
+              <SelectorPlanes
+                planActual={perfil?.plan}
+                permitirMeses
+                textoBoton="Pagar y desbloquear"
+                onPlanesCargados={alCargarPlanes}
+              />
             </div>
           )}
 
-          {errorPago && (
-            <p style={{
-              margin: '14px 0 0', padding: '10px 12px', fontSize: 12.5, lineHeight: 1.5,
-              background: 'var(--danger-soft)', border: '1px solid var(--danger-ring)',
-              borderRadius: 'var(--r-md)', color: 'var(--danger)', textAlign: 'left',
-            }}>
-              {errorPago}
-            </p>
-          )}
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 26 }}>
-            {puedeComprar && (
-              <Button
-                variant="primary"
-                size="lg"
-                icon={<IconCash size={17} />}
-                onClick={pagar}
-                disabled={yendo || cargandoPlanes || !elegido}
-                style={{ width: '100%' }}
-              >
-                <span style={{ marginLeft: 8 }}>
-                  {yendo ? 'Abriendo el pago…' : 'Pagar un mes'}
-                </span>
-              </Button>
-            )}
-
             <Button
-              variant={puedeComprar ? 'secondary' : 'wa'}
+              variant={hayPlanes ? 'secondary' : 'wa'}
               size="lg"
               icon={<IconWhatsApp size={17} />}
               onClick={abrirWhatsApp}
@@ -196,7 +119,7 @@ export default function PantallaBloqueo() {
               style={{ width: '100%' }}
             >
               <span style={{ marginLeft: 8 }}>
-                {puedeComprar ? 'Prefiero escribirles' : 'Contactar por WhatsApp'}
+                {hayPlanes ? 'Prefiero escribirles' : 'Contactar por WhatsApp'}
               </span>
             </Button>
 

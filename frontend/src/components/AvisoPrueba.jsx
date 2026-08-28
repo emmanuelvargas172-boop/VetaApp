@@ -1,24 +1,51 @@
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
-import { IconWhatsApp } from './icons';
+import { IconCash } from './icons';
 
-const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
+// Cuántos días antes empieza a avisarse que la suscripción paga se acaba.
+// Suficiente para alcanzar a pagar sin que la barra se vuelva parte del
+// paisaje y deje de leerse.
+const DIAS_AVISO = 7;
 
 /**
- * Barra de la prueba gratis. Nadie debería quedarse bloqueado de sorpresa:
- * el día 15 la cuenta deja de abrir (esta_activo() en 005_prueba.sql), así
- * que la cuenta atrás tiene que estar a la vista desde antes.
+ * La cuenta atrás, arriba de todo.
+ *
+ * Nadie debería quedarse bloqueado de sorpresa. El día que se vence, la
+ * cuenta deja de abrir (esta_activo() en 005_prueba.sql y 007_pagos.sql) y
+ * la app muestra la pantalla de bloqueo — así que el aviso tiene que estar
+ * a la vista desde antes.
+ *
+ * Cubre los dos vencimientos, que antes no era así: la prueba de 14 días y
+ * la suscripción paga. Faltaba el segundo, y era el peor de los dos: a la
+ * veterinaria que ya pagó una vez se le acababa el plan sin ningún aviso.
+ *
+ * El botón lleva a Ajustes → Plan y pagos, que es donde se puede renovar
+ * sin tener que esperar a quedar bloqueada.
  */
 export default function AvisoPrueba() {
-  const { enPrueba, diasPrueba, user } = useAuth();
+  const navigate = useNavigate();
+  const { enPrueba, diasPrueba, diasSuscripcion, perfil } = useAuth();
 
-  if (!enPrueba || diasPrueba === null || diasPrueba <= 0) return null;
+  const avisoPrueba = enPrueba && diasPrueba !== null && diasPrueba > 0;
+  const avisoPago =
+    !enPrueba &&
+    perfil?.estado_suscripcion === 'activo' &&
+    diasSuscripcion !== null &&
+    diasSuscripcion > 0 &&
+    diasSuscripcion <= DIAS_AVISO;
 
-  const urgente = diasPrueba <= 3;
+  if (!avisoPrueba && !avisoPago) return null;
 
-  const abrirWhatsApp = () => {
-    const msg = `Hola, estoy en la prueba de VetaApp (${user?.email || ''}) y quiero activar mi plan.`;
-    window.open(`https://wa.me/${SOPORTE}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
-  };
+  const dias = avisoPrueba ? diasPrueba : diasSuscripcion;
+  const urgente = dias <= 3;
+
+  const titulo = avisoPrueba
+    ? (dias === 1 ? 'Último día de prueba' : `Te quedan ${dias} días de prueba`)
+    : (dias === 1 ? 'Tu plan vence mañana' : `Tu plan vence en ${dias} días`);
+
+  const detalle = avisoPrueba
+    ? 'Después de eso la cuenta se bloquea, pero tu información queda guardada.'
+    : 'Renueva antes y no pierdes nada: los meses se suman a los días que te quedan.';
 
   return (
     <div style={{
@@ -28,15 +55,10 @@ export default function AvisoPrueba() {
       background: urgente ? 'var(--danger-soft, #FEF2F2)' : 'var(--verde-50)',
       color: urgente ? 'var(--danger, #B91C1C)' : 'var(--verde-700)',
     }}>
-      <span style={{ fontWeight: 600 }}>
-        {diasPrueba === 1 ? 'Último día de prueba' : `Te quedan ${diasPrueba} días de prueba`}
-      </span>
-      <span style={{ opacity: 0.85 }}>
-        Después de eso la cuenta se bloquea, pero tu información queda guardada.
-      </span>
+      <span style={{ fontWeight: 600 }}>{titulo}</span>
+      <span style={{ opacity: 0.85 }}>{detalle}</span>
       <button
-        onClick={abrirWhatsApp}
-        disabled={!SOPORTE}
+        onClick={() => navigate('/app/configuracion?tab=plan')}
         style={{
           marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '4px 10px', fontSize: 12, fontWeight: 600,
@@ -44,8 +66,8 @@ export default function AvisoPrueba() {
           background: 'transparent', color: 'inherit', cursor: 'pointer',
         }}
       >
-        <IconWhatsApp size={13} />
-        Activar mi plan
+        <IconCash size={13} />
+        {avisoPrueba ? 'Activar mi plan' : 'Renovar ahora'}
       </button>
     </div>
   );
