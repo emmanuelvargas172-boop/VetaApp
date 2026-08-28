@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../lib/AuthContext';
 import { getAdminPhone, saveAdminPhone } from '../utils/whatsapp';
+import SelectorPlanes from '../components/SelectorPlanes';
 import {
   Card, Button, Badge, Topbar, Page, iconBtnStyle,
 } from '../components/ui';
 import {
   IconCheck, IconCheckCircle, IconBell, IconWhatsApp, IconActivity,
-  IconPlus, IconPaw, IconUser, IconMore,
+  IconPlus, IconPaw, IconUser, IconMore, IconCash,
 } from '../components/icons';
 
 /* ─── helpers ────────────────────────────────────────────────────── */
@@ -105,11 +107,84 @@ function ConfigSection({ title, subtitle, action, children }) {
 const TABS = [
   { id: 'clinica',  label: 'Clínica',        Icon: IconPaw },
   { id: 'perfil',   label: 'Perfil',         Icon: IconUser },
+  { id: 'plan',     label: 'Plan y pagos',   Icon: IconCash },
   { id: 'equipo',   label: 'Equipo',         Icon: IconUser },
   { id: 'notif',    label: 'Notificaciones', Icon: IconBell },
   { id: 'whatsapp', label: 'WhatsApp',       Icon: IconWhatsApp },
   { id: 'datos',    label: 'Datos y backups',Icon: IconActivity },
 ];
+
+const FECHA_LARGA = { day: 'numeric', month: 'long', year: 'numeric' };
+
+/**
+ * Renovar ANTES de vencerse.
+ *
+ * Hasta ahora el único lugar donde se podía pagar era la pantalla de
+ * bloqueo, o sea que había que dejar la clínica a oscuras para poder pagar.
+ * Absurdo para quien quiere estar al día.
+ *
+ * Se puede prometer sin miedo que renovar antes no cuesta días, porque la
+ * base lo garantiza: registrar_pago_aprobado() usa
+ *   greatest(coalesce(suscripcion_hasta, now()), now()) + meses
+ * o sea que los meses se SUMAN a lo que quedaba. Si la fecha ya venció,
+ * cuentan desde hoy.
+ */
+function SeccionPlan({ perfil, plan, enPrueba, diasPrueba, diasSuscripcion }) {
+  const hasta = perfil?.suscripcion_hasta ? new Date(perfil.suscripcion_hasta) : null;
+  const estado = perfil?.estado_suscripcion;
+
+  // Vale la pena avisar cuando ya falta poco; antes de eso solo estorba.
+  const porVencer = diasSuscripcion !== null && diasSuscripcion <= 10;
+
+  return (
+    <ConfigSection
+      title="Tu plan"
+      subtitle="Renueva cuando quieras: los meses se suman a los días que te queden.">
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 16px', marginBottom: 16,
+        background: porVencer ? 'var(--danger-soft)' : 'var(--verde-50)',
+        border: `1px solid ${porVencer ? 'var(--danger-ring)' : 'var(--verde-200)'}`,
+        borderRadius: 'var(--r-md)',
+      }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+          background: 'var(--surface)',
+          color: porVencer ? 'var(--danger)' : 'var(--verde-600)',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <IconCash size={16} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize' }}>
+            Plan {plan}
+            {enPrueba && <span style={{ textTransform: 'none', fontWeight: 500 }}> · en prueba gratis</span>}
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>
+            {enPrueba && diasPrueba !== null
+              ? `Te ${diasPrueba === 1 ? 'queda 1 día' : `quedan ${diasPrueba} días`} de prueba.`
+              : estado === 'activo' && hasta && diasSuscripcion !== null
+                ? `Activo hasta el ${hasta.toLocaleDateString('es-CO', FECHA_LARGA)} · ${diasSuscripcion === 1 ? 'queda 1 día' : `quedan ${diasSuscripcion} días`}.`
+                : estado === 'activo' && !hasta
+                  ? 'Activo sin fecha de vencimiento.'
+                  : 'Sin suscripción activa.'}
+          </p>
+        </div>
+      </div>
+
+      <SelectorPlanes
+        planActual={plan}
+        permitirMeses
+        textoBoton="Pagar y renovar"
+      />
+
+      <p style={{ margin: '14px 0 0', fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-faint)' }}>
+        El pago se hace en Wompi. Tu plan se activa cuando el banco confirma,
+        no cuando vuelves a esta página; con PSE puede tardar unos minutos.
+      </p>
+    </ConfigSection>
+  );
+}
 
 const CFG_DEFAULT = {
   perfil_nombre: '', tarjeta_profesional: '', correo: '', telefono: '', especialidad: '', foto_url: '',
@@ -125,8 +200,18 @@ function normalizar(row) {
 }
 
 export default function Configuracion() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState('clinica');
+  const { user, perfil, plan, enPrueba, diasPrueba, diasSuscripcion } = useAuth();
+  // ?tab=plan permite enlazar directo desde el aviso de vencimiento.
+  const [params, setParams] = useSearchParams();
+  const pedida = params.get('tab');
+  const [tab, setTab] = useState(TABS.some((t) => t.id === pedida) ? pedida : 'clinica');
+
+  const irA = (id) => {
+    setTab(id);
+    // Se limpia el parámetro para que recargar no devuelva siempre a la
+    // pestaña del enlace.
+    if (params.has('tab')) { params.delete('tab'); setParams(params, { replace: true }); }
+  };
   const [cfg, setCfg] = useState(CFG_DEFAULT);
   const [guardando, setGuardando] = useState(false);
   const [okMsg, setOkMsg] = useState(false);
@@ -206,7 +291,7 @@ export default function Configuracion() {
           {/* Nav lateral */}
           <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {TABS.map(s => (
-              <button key={s.id} onClick={() => setTab(s.id)} style={{
+              <button key={s.id} onClick={() => irA(s.id)} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px',
                 background: tab === s.id ? 'var(--surface)' : 'transparent',
@@ -264,6 +349,16 @@ export default function Configuracion() {
                 <ConfigField label="Teléfono" value={cfg.telefono} onChange={upd('telefono')} mono placeholder="+57 300 123 4567"/>
                 <ConfigField label="Especialidad" value={cfg.especialidad} onChange={upd('especialidad')} placeholder="Medicina interna y cirugía menor"/>
               </ConfigSection>
+            )}
+
+            {tab === 'plan' && (
+              <SeccionPlan
+                perfil={perfil}
+                plan={plan}
+                enPrueba={enPrueba}
+                diasPrueba={diasPrueba}
+                diasSuscripcion={diasSuscripcion}
+              />
             )}
 
             {tab === 'equipo' && (
