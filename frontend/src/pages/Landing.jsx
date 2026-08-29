@@ -28,7 +28,7 @@ const PASOS = [
 // Ninguno limita mascotas ni usuarios.
 //
 // OJO con el desfase entre `id` y `nombre`: los ids siguen diciendo 'fichas'
-// y 'completo' mientras que en pantalla se lee Esencial y Profesional. No es
+// y 'completo' mientras que en pantalla se lee Esencial y Avanzado. No es
 // un descuido, es a propósito (009_nombres_planes.sql). Esos ids están
 // cableados en tiene_modulo(), en las políticas RLS, en el check
 // perfiles_plan_check y en el plan que hoy tiene guardado cada cuenta viva.
@@ -52,7 +52,7 @@ const PLANES = [
   },
   {
     id: 'completo',
-    nombre: 'Profesional',
+    nombre: 'Avanzado',
     precio: '99.000',
     resumen: 'La clínica entera en un solo lugar',
     popular: true,
@@ -74,7 +74,7 @@ const PLANES = [
     // cobrar por algo que la app no hace.
     proximamente: true,
     features: [
-      'Todo lo de Profesional',
+      'Todo lo de Avanzado',
       '+ Facturación electrónica DIAN',
       '+ Resolución y numeración',
       '+ Envío automático al cliente',
@@ -91,7 +91,7 @@ const PLANES = [
  * $30.000 más al mes. Esto lo cuenta en el idioma en que ella lo vive.
  *
  * IMPORTANTE — esto no es material de marketing suelto. La diferencia real
- * entre Esencial y Profesional son EXACTAMENTE tres módulos, y así está escrito
+ * entre Esencial y Avanzado son EXACTAMENTE tres módulos, y así está escrito
  * en tiene_modulo() (006_avisos.sql):
  *
  *   inventario    → completo, facturacion
@@ -126,7 +126,7 @@ const DETALLE_PLANES = [
   },
   {
     id: 'completo',
-    nombre: 'Profesional',
+    nombre: 'Avanzado',
     precio: '99.000',
     para: 'Para la clínica que además de atender, vende, cobra y quiere que el cliente vuelva.',
     dia:
@@ -394,7 +394,7 @@ export default function Landing() {
           </div>
 
           <p className="lp-planes-nota lp-reveal">
-            Esencial y Profesional incluyen 14 días de prueba gratis, sin tarjeta. El plan Facturación
+            Esencial y Avanzado incluyen 14 días de prueba gratis, sin tarjeta. El plan Facturación
             todavía está en construcción: déjanos tu contacto y te avisamos apenas esté listo.
           </p>
         </div>
@@ -465,7 +465,7 @@ export default function Landing() {
                 <tr>
                   <th>Qué incluye</th>
                   <th>Esencial</th>
-                  <th>Profesional</th>
+                  <th>Avanzado</th>
                 </tr>
               </thead>
               <tbody>
@@ -485,12 +485,12 @@ export default function Landing() {
                 así que la prueba de 14 días sí trae todo.
               · bajar a Esencial no borra: las filas de inventario y caja se
                 quedan en la base, RLS solo deja de mostrarlas. Al volver a
-                Profesional reaparecen. Por eso se dice "vuelven a aparecer" y
+                Avanzado reaparecen. Por eso se dice "vuelven a aparecer" y
                 no "se guardan", que sonaría a respaldo. */}
           <p className="lp-planes-nota lp-reveal">
-            ¿No sabes cuál? Empieza con los 14 días gratis: traen todo el plan Profesional,
+            ¿No sabes cuál? Empieza con los 14 días gratis: traen todo el plan Avanzado,
             sin tarjeta. Si al final no usaste caja ni inventario, te pasas a Esencial y pagas
-            menos. Y si algún día vuelves a Profesional, tu inventario y tus cobros vuelven a
+            menos. Y si algún día vuelves a Avanzado, tu inventario y tus cobros vuelven a
             aparecer: bajarse de plan no borra nada.
           </p>
         </div>

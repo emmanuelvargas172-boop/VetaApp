@@ -5,7 +5,7 @@ import { IconLock, IconWhatsApp } from './icons';
 // Número de soporte en formato internacional, solo dígitos (VITE_SOPORTE_WHATSAPP).
 const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
 
-const NOMBRE_PLAN = { fichas: 'Esencial', completo: 'Profesional', facturacion: 'Facturación' };
+const NOMBRE_PLAN = { fichas: 'Esencial', completo: 'Avanzado', facturacion: 'Facturación' };
 
 /**
  * Lo que ve alguien del plan Esencial si entra por URL a un módulo que su plan

@@ -1,6 +1,6 @@
 -- ============================================================
 -- VetaApp · 009_nombres_planes.sql
--- Fichas → Esencial, Completo → Profesional (solo el nombre visible)
+-- Fichas → Esencial, Completo → Avanzado (solo el nombre visible)
 --
 -- ---------- POR QUÉ ----------
 -- "Fichas" nombraba el artefacto, y en Colombia una ficha suena a tarjeta
@@ -46,7 +46,7 @@ update public.planes_precios
    and nombre_visible = 'Fichas';
 
 update public.planes_precios
-   set nombre_visible = 'Profesional',
+   set nombre_visible = 'Avanzado',
        updated_at     = now()
  where plan = 'completo'
    and nombre_visible = 'Completo';
@@ -71,7 +71,7 @@ update public.planes_precios
 --   select string_agg(plan || '=' || nombre_visible || '/' || activo, ' | ' order by precio_centavos)
 --     into v_txt from public.planes_precios;
 --   -- Esperado:
---   --   fichas=Esencial/true | completo=Profesional/true | facturacion=Facturación/false
+--   --   fichas=Esencial/true | completo=Avanzado/true | facturacion=Facturación/false
 --   raise exception 'A: %', v_txt;
 -- end $$;
 
