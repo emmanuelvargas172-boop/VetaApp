@@ -1,14 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
-
-// Qué módulos incluye cada plan. Es el espejo de tiene_modulo() en
-// 004_planes.sql: aquí solo sirve para esconder menús — quien bloquea de
+// El mapa vivía escrito a mano aquí y otra vez, distinto, en Landing.jsx.
+// Ahora sale de lib/planes.js, que es el único espejo de tiene_modulo()
+// (006_avisos.sql). Aquí solo sirve para esconder menús: quien bloquea de
 // verdad es RLS, porque con F12 cualquiera llama a supabase-js directo.
-const MODULOS_POR_PLAN = {
-  fichas:      [],   // mascotas, historias, citas, vacunas y calendario van en todos los planes
-  completo:    ['inventario', 'caja', 'recordatorios'],
-  facturacion: ['inventario', 'caja', 'recordatorios', 'facturacion'],
-};
+import { MODULOS_POR_PLAN } from './planes';
 
 const AuthContext = createContext({
   user: null,

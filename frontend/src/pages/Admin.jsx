@@ -6,6 +6,9 @@ import {
   IconSearch, IconUser, IconCheckCircle, IconLock, IconShield,
   IconLogout, IconRefresh, IconAlert, VetaAppLogo,
 } from '../components/icons';
+import {
+  PLANES as CATALOGO, MODULOS, MODULOS_BASE, planIncluye,
+} from '../lib/planes';
 
 const fmtFecha = (iso) => {
   if (!iso) return '—';
@@ -33,11 +36,114 @@ const td = {
 };
 
 // Mismos valores que el check de perfiles.plan en 004_planes.sql.
-const PLANES = [
-  { id: 'fichas',      label: 'Esencial' },
-  { id: 'completo',    label: 'Avanzado' },
-  { id: 'facturacion', label: 'Facturación' },
-];
+// Salen de lib/planes.js para que el selector de esta tabla y el cuadro
+// de "qué diferencia a cada plan" no puedan decir cosas distintas.
+const PLANES = CATALOGO.map((p) => ({ id: p.id, label: p.nombre }));
+
+/**
+ * Qué diferencia un plan del otro, con cuántas cuentas hay en cada uno.
+ *
+ * Está aquí porque el dueño de VetaApp necesita responder en el momento,
+ * al teléfono, qué gana una veterinaria si sube de plan — y hasta ahora
+ * eso solo se sabía leyendo tiene_modulo() en el SQL, o confiando en la
+ * memoria, que es de donde salen las promesas que después no se cumplen.
+ *
+ * Los números son de las cuentas que existen hoy, no de las que pagan:
+ * una cuenta en prueba nace en 'completo' (004_planes.sql:28) y cuenta
+ * como Avanzado aunque todavía no haya dado un peso. Se dice en pantalla
+ * para que nadie lea la columna como si fuera facturación.
+ */
+function CuadroPlanes({ veterinarias }) {
+  const cuentas = useMemo(() => {
+    const n = Object.fromEntries(CATALOGO.map((p) => [p.id, 0]));
+    for (const v of veterinarias) if (v.plan in n) n[v.plan] += 1;
+    return n;
+  }, [veterinarias]);
+
+  const celda = { ...td, textAlign: 'center', width: 118 };
+
+  return (
+    <Card padding={0} style={{ marginBottom: 14 }}>
+      <div style={{ padding: '14px 16px 10px' }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
+          Qué diferencia a cada plan
+        </h3>
+        <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+          Tres módulos separan Esencial de Avanzado. Todo lo demás va en los tres planes.
+        </p>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+          <thead>
+            <tr>
+              <th style={th}>Módulo</th>
+              {CATALOGO.map((p) => (
+                <th key={p.id} style={{ ...th, textAlign: 'center' }}>
+                  {p.nombre}
+                  <span style={{ display: 'block', textTransform: 'none', letterSpacing: 0, fontSize: 11, fontWeight: 500, color: 'var(--text-faint)', marginTop: 2 }}>
+                    {cuentas[p.id]} cuenta{cuentas[p.id] === 1 ? '' : 's'}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={td}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>La aplicación base</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  {MODULOS_BASE.join(' · ')}
+                </p>
+              </td>
+              {CATALOGO.map((p) => (
+                <td key={p.id} style={celda}>
+                  <IconCheckCircle size={15} color="var(--verde-600)" />
+                </td>
+              ))}
+            </tr>
+
+            {MODULOS.map((m) => (
+              <tr key={m.id}>
+                <td style={td}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+                    {m.titulo}
+                    {m.aunNoExiste && (
+                      <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: 'var(--text-faint)' }}>
+                        · sin construir
+                      </span>
+                    )}
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>{m.porQue}</p>
+                </td>
+                {CATALOGO.map((p) => (
+                  <td key={p.id} style={celda}>
+                    {planIncluye(p.id, m.id)
+                      ? <IconCheckCircle size={15} color="var(--verde-600)" />
+                      : <span style={{ color: 'var(--text-disabled)', fontSize: 15 }}>—</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Dos advertencias que solo importan si eres el dueño: de dónde
+          sale este cuadro, y qué NO significan los números de arriba. */}
+      <div style={{ padding: '10px 16px 14px', borderTop: '1px solid var(--divider)' }}>
+        <p style={{ margin: 0, fontSize: 11.5, color: 'var(--text-faint)', lineHeight: 1.55 }}>
+          Quien bloquea de verdad es <span className="mono">tiene_modulo()</span> en la base
+          (006_avisos.sql); este cuadro solo la refleja. Si algún día mueves un módulo de plan,
+          cámbialo allá primero.
+          <br />
+          El conteo es de cuentas existentes, no de cuentas que pagan: una veterinaria en prueba
+          nace en Avanzado y aparece en esa columna sin haber pagado.
+        </p>
+      </div>
+    </Card>
+  );
+}
 
 /** Selector de plan. Escribe vía RPC admin_set_plan (la BD valida es_admin). */
 function CeldaPlan({ fila, onCambiar }) {
@@ -244,6 +350,8 @@ export default function Admin() {
             </div>
           </Card>
         )}
+
+        <CuadroPlanes veterinarias={veterinarias} />
 
         <Card padding={0}>
           <div style={{ padding: 14, borderBottom: '1px solid var(--divider)' }}>

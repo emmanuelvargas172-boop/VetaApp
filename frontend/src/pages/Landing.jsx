@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { VetaAppLogo } from '../components/icons';
 import { useAuth } from '../lib/AuthContext';
+import { planIncluye } from '../lib/planes';
 import '../styles/landing.css';
 
 /* ------------------------------------------------------------------ */
@@ -149,18 +150,35 @@ const DETALLE_PLANES = [
 
 /**
  * Lo único que de verdad cambia entre los dos planes vendibles.
- * Espejo literal de tiene_modulo(): tres módulos, ni uno más.
+ *
+ * Los ✓ y los — NO se escriben a mano: cada fila declara DE QUÉ MÓDULO
+ * depende, y quien responde es planIncluye() sobre el mismo mapa que usa
+ * la app para esconder menús (lib/planes.js, espejo de tiene_modulo()
+ * en 006_avisos.sql).
+ *
+ * Antes los booleanos estaban a dedo. Funcionaba, pero el día que un
+ * módulo cambiara de plan había que acordarse de venir a esta página, y
+ * de eso no se acuerda nadie. Una tabla de precios que miente es peor
+ * que no tenerla: el cliente paga por lo que leyó.
+ *
+ * `modulo: null` = va en todos los planes (el `else true` de la función).
+ * Cuatro filas para tres módulos porque "Reportes de ingresos" es parte
+ * de Caja: se nombran aparte porque el cliente los pide aparte.
  */
 const COMPARACION = [
-  { que: 'Mascotas, dueños e historias clínicas', fichas: true, completo: true },
-  { que: 'Citas y calendario',                    fichas: true, completo: true },
-  { que: 'Vacunas y control de peso',             fichas: true, completo: true },
-  { que: 'Mascotas y usuarios sin límite',        fichas: true, completo: true },
-  { que: 'Recordatorios por WhatsApp',            fichas: false, completo: true },
-  { que: 'Caja, cobros y recibos',                fichas: false, completo: true },
-  { que: 'Inventario de medicamentos',            fichas: false, completo: true },
-  { que: 'Reportes de ingresos',                  fichas: false, completo: true },
+  { que: 'Mascotas, dueños e historias clínicas', modulo: null },
+  { que: 'Citas y calendario',                    modulo: null },
+  { que: 'Vacunas y control de peso',             modulo: null },
+  { que: 'Mascotas y usuarios sin límite',        modulo: null },
+  { que: 'Descarga de tus datos en CSV',          modulo: null },
+  { que: 'Recordatorios por WhatsApp',            modulo: 'recordatorios' },
+  { que: 'Caja, cobros y recibos',                modulo: 'caja' },
+  { que: 'Inventario de medicamentos',            modulo: 'inventario' },
+  { que: 'Reportes de ingresos',                  modulo: 'caja' },
 ];
+
+/** ¿La fila entra en el plan? Sin módulo, entra en todos. */
+const filaEnPlan = (f, id) => f.modulo === null || planIncluye(id, f.modulo);
 
 const EMAIL_CONTACTO = 'emmanuelvargas172@gmail.com';
 const WHATSAPP_CONTACTO = '+57 316 290 6253';
@@ -469,13 +487,17 @@ export default function Landing() {
                 </tr>
               </thead>
               <tbody>
-                {COMPARACION.map((f) => (
-                  <tr key={f.que}>
-                    <td>{f.que}</td>
-                    <td className={f.fichas ? 'lp-si' : 'lp-no'}>{f.fichas ? '✓' : '—'}</td>
-                    <td className="lp-si">{f.completo ? '✓' : '—'}</td>
-                  </tr>
-                ))}
+                {COMPARACION.map((f) => {
+                  const enEsencial = filaEnPlan(f, 'fichas');
+                  const enAvanzado = filaEnPlan(f, 'completo');
+                  return (
+                    <tr key={f.que}>
+                      <td>{f.que}</td>
+                      <td className={enEsencial ? 'lp-si' : 'lp-no'}>{enEsencial ? '✓' : '—'}</td>
+                      <td className={enAvanzado ? 'lp-si' : 'lp-no'}>{enAvanzado ? '✓' : '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
