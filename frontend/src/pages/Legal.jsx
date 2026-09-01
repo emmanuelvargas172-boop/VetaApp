@@ -119,8 +119,11 @@ function Privacidad() {
 
       <H>8. Cuánto tiempo los conservamos</H>
       <P>
-        Mientras la cuenta esté activa y durante el tiempo adicional que exija la ley. Si cancelas,
-        puedes solicitar la exportación o eliminación de la información de tu clínica.
+        Mientras la cuenta esté activa y durante el tiempo adicional que exija la ley. Antes de
+        cancelar puedes descargar toda la información de tu clínica desde{' '}
+        <span className="font-medium">Configuración → Datos y backups</span>; después de cancelar
+        puedes pedirnos la exportación o la eliminación escribiendo a{' '}
+        <a className="text-emerald-700 underline" href={`mailto:${CORREO}`}>{CORREO}</a>.
       </P>
 
       <H>9. Menores de edad</H>
@@ -167,9 +170,11 @@ function Terminos() {
       <H>4. Suspensión por falta de pago</H>
       <P>
         Si la suscripción no se paga, la cuenta puede quedar suspendida. Durante la suspensión no se
-        puede consultar ni registrar información, pero los datos no se borran: se conservan durante
-        sesenta días para que puedas ponerte al día o solicitar su exportación. Pasado ese plazo
-        podemos eliminarlos de forma definitiva.
+        puede consultar ni registrar información —tampoco descargarla desde la aplicación—, pero los
+        datos no se borran: se conservan durante sesenta días para que puedas ponerte al día o
+        pedirnos una copia por correo, que te enviamos sin costo. Pasado ese plazo podemos
+        eliminarlos de forma definitiva. Por eso conviene descargar tus datos mientras la cuenta
+        esté al día.
       </P>
 
       <H>5. Uso aceptable</H>
@@ -192,8 +197,13 @@ function Terminos() {
 
       <H>7. Tus datos</H>
       <P>
-        La información que cargas sigue siendo tuya. Puedes solicitar una copia en cualquier momento
-        mientras la cuenta esté vigente. Recomendamos que descargues respaldos periódicos.
+        La información que cargas sigue siendo tuya. Puedes descargarla tú mismo cuando quieras,
+        en archivos CSV que abren en Excel o Google Sheets, desde{' '}
+        <span className="font-medium">Configuración → Datos y backups</span>. No necesitas pedirnos
+        permiso ni esperar respuesta, y no depende de tu plan. Los archivos incluyen dueños,
+        mascotas, historias clínicas, vacunas, tratamientos, citas, inventario y cobros; no incluyen
+        imágenes ni archivos adjuntos. Te recomendamos descargar una copia cada cierto tiempo y
+        guardarla fuera de VetaApp.
       </P>
 
       <H>8. Disponibilidad</H>

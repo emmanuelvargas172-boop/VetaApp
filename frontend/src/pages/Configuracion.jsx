@@ -4,6 +4,7 @@ import api from '../api/axios';
 import { useAuth } from '../lib/AuthContext';
 import { getAdminPhone, saveAdminPhone } from '../utils/whatsapp';
 import SelectorPlanes from '../components/SelectorPlanes';
+import { CONJUNTOS, exportarTabla } from '../lib/exportar';
 import {
   Card, Button, Badge, Topbar, Page, iconBtnStyle,
 } from '../components/ui';
@@ -181,6 +182,104 @@ function SeccionPlan({ perfil, plan, enPrueba, diasPrueba, diasSuscripcion }) {
       <p style={{ margin: '14px 0 0', fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-faint)' }}>
         El pago se hace en Wompi. Tu plan se activa cuando el banco confirma,
         no cuando vuelves a esta página; con PSE puede tardar unos minutos.
+      </p>
+    </ConfigSection>
+  );
+}
+
+/**
+ * Descargar los datos de la clínica.
+ *
+ * Los Términos dicen desde el principio que la información es de la
+ * veterinaria y que puede pedir una copia "en cualquier momento", y
+ * hasta ahora esta pestaña —que se llama "Datos y backups"— solo tenía
+ * un cartel verde diciendo que todo estaba guardado en la nube. Guardado
+ * en la nube de otro no es un respaldo: es exactamente lo contrario.
+ *
+ * Un botón por conjunto y no un único "descargar todo" porque bajar
+ * ocho archivos de un clic hace que el navegador pida permiso para
+ * "descargas múltiples", y ese cartel asusta más de lo que ayuda. Ocho
+ * clics conscientes son más lentos y más claros.
+ *
+ * No se bloquea por plan a propósito. Sacar los propios datos no puede
+ * costar plata ni depender de estar al día; es lo único que la clínica
+ * necesita el día que decide irse.
+ */
+function SeccionDatos() {
+  // Por tabla: 'bajando' | {filas:n} | {error:'...'}
+  const [estado, setEstado] = useState({});
+
+  const bajar = async (tabla) => {
+    setEstado((e) => ({ ...e, [tabla]: 'bajando' }));
+    try {
+      const filas = await exportarTabla(tabla);
+      setEstado((e) => ({ ...e, [tabla]: { filas } }));
+    } catch (err) {
+      setEstado((e) => ({ ...e, [tabla]: { error: err.message } }));
+    }
+  };
+
+  return (
+    <ConfigSection
+      title="Descargar tus datos"
+      subtitle="Un archivo CSV por cada tipo de registro. Se abren en Excel o Google Sheets."
+    >
+      <div style={{ display: 'grid', gap: 8 }}>
+        {CONJUNTOS.map(({ tabla, titulo, detalle, plan }) => {
+          const st = estado[tabla];
+          const bajando = st === 'bajando';
+          return (
+            <div key={tabla} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 12px', background: 'var(--surface)',
+              border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ flex: 1, minWidth: 190 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                  {titulo}
+                  {plan && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: 'var(--text-faint)' }}>· plan {plan}</span>}
+                </p>
+                <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>{detalle}</p>
+
+                {st?.filas > 0 && (
+                  <p style={{ margin: '3px 0 0', fontSize: 11.5, fontWeight: 600, color: 'var(--verde-600)' }}>
+                    Descargado · {st.filas.toLocaleString('es-CO')} registro{st.filas === 1 ? '' : 's'}
+                  </p>
+                )}
+                {st?.filas === 0 && (
+                  <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>
+                    Sin registros: no se descargó ningún archivo.
+                  </p>
+                )}
+                {st?.error && (
+                  <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'var(--danger)' }}>
+                    No se pudo descargar: {st.error}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => bajar(tabla)}
+                disabled={bajando}
+              >
+                {bajando ? 'Preparando…' : 'Descargar CSV'}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Se dice qué NO trae el archivo. Una veterinaria que cree tener
+          todo y no lo tiene está peor que una que sabe qué le falta. */}
+      <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--text-faint)', lineHeight: 1.5 }}>
+        Los archivos traen los registros tal como están guardados. No incluyen
+        las imágenes ni los archivos adjuntos. Si tu cuenta está en plan Esencial,
+        Inventario y Cobros salen vacíos aunque tengas datos de cuando estuviste
+        en Avanzado: vuelven a aparecer al subir de plan. ¿Necesitas todo junto o
+        en otro formato? Escríbenos y te lo enviamos.
       </p>
     </ConfigSection>
   );
@@ -428,23 +527,34 @@ export default function Configuracion() {
             )}
 
             {tab === 'datos' && (
-              <ConfigSection title="Respaldo de datos" subtitle="Tus datos están en la nube (Supabase)">
-                <div style={{
-                  padding: '14px 16px',
-                  background: 'var(--verde-50)',
-                  border: '1px solid var(--verde-200)',
-                  borderRadius: 'var(--r-md)',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--surface)', color: 'var(--verde-600)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <IconCheckCircle size={16}/>
+              <>
+                <ConfigSection title="Respaldo de datos" subtitle="Dónde vive tu información">
+                  <div style={{
+                    padding: '14px 16px',
+                    background: 'var(--verde-50)',
+                    border: '1px solid var(--verde-200)',
+                    borderRadius: 'var(--r-md)',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                  }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--surface)', color: 'var(--verde-600)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IconCheckCircle size={16}/>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Guardado en la nube</p>
+                      {/* Antes decía solo "se guarda automáticamente", que sonaba
+                          a respaldo y no lo es: si la clínica quiere una copia
+                          propia, tiene que bajarla. Ahora lo dice y abajo está
+                          el botón para hacerlo. */}
+                      <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                        Tus registros se guardan al instante en los servidores de VetaApp.
+                        Para tener una copia tuya, descárgala aquí abajo.
+                      </p>
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Guardado en la nube</p>
-                    <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-muted)' }}>Todos tus datos se guardan automáticamente en tu cuenta de Supabase.</p>
-                  </div>
-                </div>
-              </ConfigSection>
+                </ConfigSection>
+
+                <SeccionDatos />
+              </>
             )}
           </div>
         </div>
