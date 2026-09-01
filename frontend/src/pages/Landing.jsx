@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { VetaAppLogo } from '../components/icons';
 import { useAuth } from '../lib/AuthContext';
 import { planIncluye } from '../lib/planes';
+import {
+  MARCA, EMAIL_CONTACTO as EMAIL, WHATSAPP_VISIBLE, linkWhatsApp,
+} from '../config/marca';
 import '../styles/landing.css';
 
 /* ------------------------------------------------------------------ */
@@ -180,9 +183,12 @@ const COMPARACION = [
 /** ¿La fila entra en el plan? Sin módulo, entra en todos. */
 const filaEnPlan = (f, id) => f.modulo === null || planIncluye(id, f.modulo);
 
-const EMAIL_CONTACTO = 'emmanuelvargas172@gmail.com';
-const WHATSAPP_CONTACTO = '+57 316 290 6253';
-const WHATSAPP_LINK = 'https://wa.me/573162906253';
+// Estaban escritos a mano aquí; ahora salen de config/marca.js, que es
+// el único sitio donde vive el contacto. Se conservan los nombres viejos
+// para no tocar el JSX de más abajo.
+const EMAIL_CONTACTO = EMAIL;
+const WHATSAPP_CONTACTO = WHATSAPP_VISIBLE;
+const WHATSAPP_LINK = linkWhatsApp();
 
 /* ------------------------------------------------------------------ */
 /* Animación de entrada al hacer scroll                                */
@@ -589,7 +595,13 @@ function MockupDashboard() {
     <div className="lp-mock" role="img" aria-label="Vista previa del panel de VetaApp">
       <div className="lp-mock-bar">
         <span className="lp-dot" /><span className="lp-dot" /><span className="lp-dot" />
-        <span className="lp-mock-url">vetaapp.emmanuelvargas172.workers.dev/app</span>
+        {/* Etiqueta, no dirección. Antes decía el dominio real, que hoy
+            lleva el nombre de la cuenta de Cloudflare adentro y no tiene
+            por qué salir en una página de ventas. Tampoco se pone un
+            dominio bonito que todavía no se compró: sería anunciar una
+            dirección donde no hay nada. Cuando DOMINIO sea propio, aquí
+            puede volver a ir la dirección de verdad. */}
+        <span className="lp-mock-url">{MARCA} · Panel</span>
       </div>
 
       <div className="lp-mock-body">

@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
 import { ultimoPago, enPesos } from '../lib/pagos';
 import { Button } from '../components/ui';
+import { WHATSAPP, linkWhatsApp } from '../config/marca';
 import {
   IconCheckCircle, IconAlert, IconClock, IconWhatsApp, IconArrowRight, VetaAppLogo,
 } from '../components/icons';
 
-const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
+const SOPORTE = WHATSAPP;
 
 // Cada cuánto y cuántas veces se pregunta si el pago ya quedó.
 // 3s × 20 = un minuto. Wompi suele mandar el webhook en segundos, pero
@@ -83,7 +84,7 @@ export default function Pago() {
 
   const escribirSoporte = () => {
     const texto = `Hola, hice un pago en VetaApp (referencia ${pago?.referencia || 'sin referencia'}) y quiero confirmar que quedó registrado.`;
-    window.open(`https://wa.me/${SOPORTE}?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+    window.open(linkWhatsApp(texto), '_blank', 'noopener');
   };
 
   const vistas = {

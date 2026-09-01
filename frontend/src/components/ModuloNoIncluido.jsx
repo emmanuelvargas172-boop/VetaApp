@@ -1,9 +1,9 @@
 import { useAuth } from '../lib/AuthContext';
 import { Button, Page } from './ui';
 import { IconLock, IconWhatsApp } from './icons';
+import { WHATSAPP, linkWhatsApp } from '../config/marca';
 
-// Número de soporte en formato internacional, solo dígitos (VITE_SOPORTE_WHATSAPP).
-const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
+const SOPORTE = WHATSAPP;
 
 const NOMBRE_PLAN = { fichas: 'Esencial', completo: 'Avanzado', facturacion: 'Facturación' };
 
@@ -18,7 +18,7 @@ export default function ModuloNoIncluido({ titulo, descripcion, planNecesario = 
   const abrirWhatsApp = () => {
     const msg = `Hola, tengo VetaApp en el plan ${NOMBRE_PLAN[plan] || plan} (${user?.email || ''}) `
       + `y quiero pasarme al plan ${NOMBRE_PLAN[planNecesario]} para usar ${titulo}.`;
-    window.open(`https://wa.me/${SOPORTE}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    window.open(linkWhatsApp(msg), '_blank', 'noopener');
   };
 
   return (

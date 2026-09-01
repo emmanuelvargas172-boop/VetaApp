@@ -3,9 +3,9 @@ import { useAuth } from '../lib/AuthContext';
 import SelectorPlanes from './SelectorPlanes';
 import { Button } from './ui';
 import { IconLock, IconWhatsApp, IconLogout, VetaAppLogo } from './icons';
+import { WHATSAPP, linkWhatsApp } from '../config/marca';
 
-// Número de soporte en formato internacional, solo dígitos (VITE_SOPORTE_WHATSAPP).
-const SOPORTE = (import.meta.env.VITE_SOPORTE_WHATSAPP || '').replace(/\D/g, '');
+const SOPORTE = WHATSAPP;
 
 /**
  * Lo que ve una veterinaria bloqueada: suspendida a mano (inactivo), con la
@@ -33,7 +33,7 @@ export default function PantallaBloqueo() {
     const msg = pruebaVencida
       ? `Hola, se me acabaron los 14 días de prueba de VetaApp (${user?.email || ''}). Quiero activar mi plan.`
       : `Hola, mi cuenta de VetaApp (${user?.email || ''}) está suspendida. Quiero reactivarla.`;
-    window.open(`https://wa.me/${SOPORTE}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    window.open(linkWhatsApp(msg), '_blank', 'noopener');
   };
 
   const titulo = pruebaVencida

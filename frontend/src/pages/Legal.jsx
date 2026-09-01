@@ -1,8 +1,12 @@
 import { Link } from 'react-router-dom';
 import { VetaAppLogo } from '../components/icons';
+import { EMAIL_CONTACTO, WHATSAPP_VISIBLE } from '../config/marca';
 
-const CORREO = 'emmanuelvargas172@gmail.com';
-const WHATSAPP = '+57 316 290 6253';
+// Un contrato que da un correo al que nadie contesta no sirve de nada, y
+// aquí es donde se ejercen los derechos de la Ley 1581. Por eso sale del
+// mismo sitio que el resto del contacto y no de una copia escrita a mano.
+const CORREO = EMAIL_CONTACTO;
+const WHATSAPP = WHATSAPP_VISIBLE;
 const ACTUALIZADO = '20 de agosto de 2026';
 
 /* ------------------------------------------------------------------ */
