@@ -31,7 +31,7 @@ export const MARCA = 'VetaApp';
  * vuelve el cliente desde el checkout. Si se cambia aquí y allá no, el
  * pago deja de funcionar.
  */
-export const DOMINIO = 'vetaapp.emmanuelvargas172.workers.dev';
+export const DOMINIO = 'vetaapp.veta-co.workers.dev';
 export const URL_APP = `https://${DOMINIO}`;
 
 /**

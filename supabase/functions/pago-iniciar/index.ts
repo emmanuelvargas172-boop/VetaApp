@@ -18,7 +18,7 @@
 //                            reconstruir el frontend al cambiar de
 //                            sandbox a producción)
 //    WOMPI_INTEGRITY_SECRET  el que firma el monto. NUNCA al frontend.
-//    APP_URL                 https://vetaapp.emmanuelvargas172.workers.dev
+//    APP_URL                 https://vetaapp.veta-co.workers.dev
 // ============================================================
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
