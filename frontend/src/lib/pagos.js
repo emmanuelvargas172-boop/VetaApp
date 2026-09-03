@@ -10,6 +10,26 @@ import { supabase } from './supabase';
 //  servidor.
 // ============================================================
 
+/**
+ * ¿El cobro en línea existe hoy?
+ *
+ * En `false` mientras las Edge Functions no estén desplegadas y no haya
+ * cuenta de comercio de Wompi aprobada. Con la pasarela apagada, el botón
+ * de comprar no intenta pagar: abre WhatsApp con el plan y el total ya
+ * escritos, y la activación se hace a mano desde el panel de admin
+ * (admin_set_plan / admin_set_estado, que sí funcionan).
+ *
+ * Existe porque un botón que dice "Pagar" y falla es peor que no tenerlo:
+ * la veterinaria bloqueada lo aprieta, ve un error en el peor momento —
+ * cuando ya no puede entrar a sus historias— y concluye que el producto
+ * está roto. Prefiero ofrecerle menos y que funcione.
+ *
+ * Para prenderlo: desplegar pago-iniciar y pago-webhook, cargar los
+ * secretos WOMPI_* y APP_URL, probar un cobro real, y recién ahí `true`.
+ * No al revés.
+ */
+export const PASARELA_ACTIVA = false;
+
 /** $99.000 a partir de 9900000 centavos. */
 export const enPesos = (centavos) =>
   new Intl.NumberFormat('es-CO', {

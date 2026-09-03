@@ -4,6 +4,7 @@ import api from '../api/axios';
 import { useAuth } from '../lib/AuthContext';
 import { getAdminPhone, saveAdminPhone } from '../utils/whatsapp';
 import SelectorPlanes from '../components/SelectorPlanes';
+import { PASARELA_ACTIVA } from '../lib/pagos';
 import { CONJUNTOS, exportarTabla } from '../lib/exportar';
 import {
   Card, Button, Badge, Topbar, Page, iconBtnStyle,
@@ -179,9 +180,12 @@ function SeccionPlan({ perfil, plan, enPrueba, diasPrueba, diasSuscripcion }) {
         textoBoton="Pagar y renovar"
       />
 
+      {/* No se nombra a Wompi mientras no exista el checkout: decir dónde se
+          paga cuando todavía no se puede pagar es prometer de más. */}
       <p style={{ margin: '14px 0 0', fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-faint)' }}>
-        El pago se hace en Wompi. Tu plan se activa cuando el banco confirma,
-        no cuando vuelves a esta página; con PSE puede tardar unos minutos.
+        {PASARELA_ACTIVA
+          ? 'El pago se hace en Wompi. Tu plan se activa cuando el banco confirma, no cuando vuelves a esta página; con PSE puede tardar unos minutos.'
+          : 'El cobro se coordina por WhatsApp y tu plan lo activamos nosotros. Tus datos no se tocan mientras tanto.'}
       </p>
     </ConfigSection>
   );

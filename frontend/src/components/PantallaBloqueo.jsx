@@ -4,6 +4,7 @@ import SelectorPlanes from './SelectorPlanes';
 import { Button } from './ui';
 import { IconLock, IconWhatsApp, IconLogout, VetaAppLogo } from './icons';
 import { WHATSAPP, linkWhatsApp } from '../config/marca';
+import { PASARELA_ACTIVA } from '../lib/pagos';
 
 const SOPORTE = WHATSAPP;
 
@@ -13,10 +14,12 @@ const SOPORTE = WHATSAPP;
  * no se borran en ninguno de los tres casos, solo dejan de ser accesibles
  * (RLS, ver 005_prueba.sql y 007_pagos.sql).
  *
- * Es también la caja registradora: aquí se elige el plan y se sale al
- * checkout. Ningún monto se calcula acá — el precio viene de planes_precios
- * solo para mostrarlo, y quien lo firma es la Edge Function pago-iniciar.
- * Cambiar el número con F12 no cambia lo que se cobra.
+ * Es también la caja registradora: aquí se elige el plan. Mientras
+ * PASARELA_ACTIVA sea false la compra sale por WhatsApp y la activa el admin
+ * a mano; cuando se prenda, el mismo selector saldrá al checkout. Ningún
+ * monto se calcula acá — el precio viene de planes_precios solo para
+ * mostrarlo, y quien lo firma es la Edge Function pago-iniciar. Cambiar el
+ * número con F12 no cambia lo que se cobra.
  */
 export default function PantallaBloqueo() {
   const { user, perfil, signOut, pruebaVencida, suscripcionVencida } = useAuth();
@@ -109,19 +112,26 @@ export default function PantallaBloqueo() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 26 }}>
-            <Button
-              variant={hayPlanes ? 'secondary' : 'wa'}
-              size="lg"
-              icon={<IconWhatsApp size={17} />}
-              onClick={abrirWhatsApp}
-              disabled={!SOPORTE}
-              title={SOPORTE ? undefined : 'Falta configurar VITE_SOPORTE_WHATSAPP'}
-              style={{ width: '100%' }}
-            >
-              <span style={{ marginLeft: 8 }}>
-                {hayPlanes ? 'Prefiero escribirles' : 'Contactar por WhatsApp'}
-              </span>
-            </Button>
+            {/* Sin pasarela, el botón del selector YA es de WhatsApp: repetirlo
+                aquí dejaría dos botones verdes iguales y la veterinaria tendría
+                que adivinar cuál es cuál. Solo se muestra cuando el selector
+                lleva al checkout (respaldo) o cuando no hubo planes que
+                ofrecer (única salida). */}
+            {(!hayPlanes || PASARELA_ACTIVA) && (
+              <Button
+                variant={hayPlanes ? 'secondary' : 'wa'}
+                size="lg"
+                icon={<IconWhatsApp size={17} />}
+                onClick={abrirWhatsApp}
+                disabled={!SOPORTE}
+                title={SOPORTE ? undefined : 'Falta configurar VITE_SOPORTE_WHATSAPP'}
+                style={{ width: '100%' }}
+              >
+                <span style={{ marginLeft: 8 }}>
+                  {hayPlanes ? 'Prefiero escribirles' : 'Contactar por WhatsApp'}
+                </span>
+              </Button>
+            )}
 
             <Button
               variant="secondary"

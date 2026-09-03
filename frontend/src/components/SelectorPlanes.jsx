@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { planesALaVenta, iniciarPago, enPesos } from '../lib/pagos';
+import { planesALaVenta, iniciarPago, enPesos, PASARELA_ACTIVA } from '../lib/pagos';
+import { useAuth } from '../lib/AuthContext';
+import { WHATSAPP, linkWhatsApp } from '../config/marca';
 import { Button } from './ui';
-import { IconCash } from './icons';
+import { IconCash, IconWhatsApp } from './icons';
 
 const OPCIONES_MESES = [1, 3, 6, 12];
 
@@ -17,6 +19,11 @@ const OPCIONES_MESES = [1, 3, 6, 12];
  * mostrarse, y el total en pantalla es una CUENTA VISUAL: quien decide lo
  * que se cobra es abrir_pago() en la base (precio × meses) y quien lo firma
  * es la Edge Function. Cambiar el número con F12 no cambia el cobro.
+ *
+ * Con PASARELA_ACTIVA en false el mismo componente sigue mostrando planes y
+ * precios —esa parte es cierta, sale de la base— pero el botón lleva a
+ * WhatsApp en vez de al checkout. Se elige el plan igual; lo único que
+ * cambia es quién ejecuta el cobro.
  */
 export default function SelectorPlanes({
   planActual,
@@ -24,6 +31,7 @@ export default function SelectorPlanes({
   textoBoton = 'Pagar',
   onPlanesCargados,
 }) {
+  const { user } = useAuth();
   const [planes, setPlanes] = useState([]);
   const [elegido, setElegido] = useState(null);
   const [meses, setMeses] = useState(1);
@@ -63,6 +71,24 @@ export default function SelectorPlanes({
       setError(e.message);
       setYendo(false);
     }
+  };
+
+  /**
+   * El camino de hoy: la veterinaria elige plan y meses acá, y lo que sale
+   * por WhatsApp ya trae todo lo que hace falta para activarla a mano
+   * (correo de la cuenta, plan, meses, total). Sin el correo habría que
+   * preguntárselo, y cada pregunta de más es una venta que se enfría.
+   */
+  const pedirPorWhatsApp = () => {
+    if (!plan) return;
+    const lineas = [
+      'Hola, quiero activar mi plan de VetaApp.',
+      `Plan: ${plan.nombre_visible}`,
+      permitirMeses ? `Meses: ${meses}` : null,
+      `Total: ${enPesos(total)}`,
+      `Cuenta: ${user?.email || '(sin sesión iniciada)'}`,
+    ].filter(Boolean);
+    window.open(linkWhatsApp(lineas.join('\n')), '_blank', 'noopener');
   };
 
   if (cargando) {
@@ -159,16 +185,40 @@ export default function SelectorPlanes({
         </p>
       )}
 
-      <Button
-        variant="primary"
-        size="lg"
-        icon={<IconCash size={17} />}
-        onClick={pagar}
-        disabled={yendo || !elegido}
-        style={{ width: '100%' }}
-      >
-        <span style={{ marginLeft: 8 }}>{yendo ? 'Abriendo el pago…' : textoBoton}</span>
-      </Button>
+      {/* Sin pasarela se ignora `textoBoton` a propósito: las dos pantallas
+          que lo pasan dicen "Pagar y desbloquear" / "Pagar y renovar", y
+          apretar algo que dice pagar para terminar en un chat es la clase de
+          sorpresa que hace desconfiar del resto. */}
+      {PASARELA_ACTIVA ? (
+        <Button
+          variant="primary"
+          size="lg"
+          icon={<IconCash size={17} />}
+          onClick={pagar}
+          disabled={yendo || !elegido}
+          style={{ width: '100%' }}
+        >
+          <span style={{ marginLeft: 8 }}>{yendo ? 'Abriendo el pago…' : textoBoton}</span>
+        </Button>
+      ) : (
+        <div>
+          <Button
+            variant="wa"
+            size="lg"
+            icon={<IconWhatsApp size={17} />}
+            onClick={pedirPorWhatsApp}
+            disabled={!elegido || !WHATSAPP}
+            title={WHATSAPP ? undefined : 'Falta configurar VITE_SOPORTE_WHATSAPP'}
+            style={{ width: '100%' }}
+          >
+            <span style={{ marginLeft: 8 }}>Activar por WhatsApp</span>
+          </Button>
+          <p style={{ margin: '8px 0 0', fontSize: 11.5, lineHeight: 1.5, color: 'var(--text-faint)', textAlign: 'center' }}>
+            Todavía no tenemos pago en línea. Te escribimos, coordinamos el
+            pago y te activamos el plan el mismo día.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
