@@ -1,0 +1,40 @@
+<!--
+  La imagen que aparece cuando alguien pega el link de VetaApp en WhatsApp.
+
+  Mide 1200x630 porque es lo que esperan WhatsApp, Facebook y LinkedIn; con
+  otra proporción recortan por donde les parezca. Todo lo importante va en el
+  centro por la misma razón.
+
+  Fondo verde oscuro y no blanco: la vista previa se ve dentro de un chat que
+  ya es blanco, y sin fondo propio la tarjeta se pierde contra la burbuja.
+
+  La tipografía es la del sistema, no Inter. Esto se convierte a PNG una sola
+  vez en el computador de quien lo genere; si pidiera una fuente de Google,
+  el render saldría con otra letra sin avisar.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#1B4332"/>
+
+  <g transform="translate(600 245) scale(5.9) translate(-20 -17.25)">
+    <ellipse cx="10" cy="10" rx="3" ry="4" fill="#FFFFFF"/>
+    <ellipse cx="17" cy="6.5" rx="2.8" ry="4" fill="#FFFFFF"/>
+    <ellipse cx="24" cy="6.5" rx="2.8" ry="4" fill="#FFFFFF"/>
+    <ellipse cx="30" cy="10" rx="3" ry="4" fill="#FFFFFF"/>
+    <path d="M11 22 Q 9 15, 20 15 Q 31 15, 29 22 Q 28 30, 20 32 Q 12 30, 11 22 Z" fill="#FFFFFF"/>
+    <path d="M13 23 L 16 23 L 17.5 19 L 19 26 L 21 21 L 22.5 24 L 27 24"
+          stroke="#52B788" stroke-width="1.4" stroke-linecap="round"
+          stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <text x="600" y="475" text-anchor="middle" fill="#FFFFFF"
+        font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="86" font-weight="700" letter-spacing="-2">VetaApp</text>
+
+  <text x="600" y="533" text-anchor="middle" fill="#95D5B2"
+        font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="500">Historias clínicas, citas e inventario</text>
+
+  <text x="600" y="580" text-anchor="middle" fill="#74C69D"
+        font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="27" font-weight="400">para clínicas veterinarias</text>
+</svg>

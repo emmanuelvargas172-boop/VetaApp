@@ -1,0 +1,25 @@
+<!--
+  La misma huella, pero en blanco sobre un círculo verde.
+
+  Gmail, WhatsApp y las redes recortan la foto de perfil en círculo. El logo
+  suelto sobre fondo transparente se ve flaco y perdido ahí adentro, y sobre
+  el fondo oscuro de algunos clientes de correo desaparece: es verde muy
+  oscuro (#1B4332) sobre negro. Por eso esta versión trae su propio fondo.
+
+  La huella va escalada al 72% y recentrada porque el dibujo original no está
+  centrado en su lienzo (las almohadillas suben más de lo que baja la palma),
+  así que centrarlo a ojo lo dejaba pegado al borde de abajo.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 40 40" fill="none">
+  <circle cx="20" cy="20" r="20" fill="#1B4332"/>
+  <g transform="translate(20 20) scale(0.72) translate(-20 -17.25)">
+    <ellipse cx="10" cy="10" rx="3" ry="4" fill="#FFFFFF"/>
+    <ellipse cx="17" cy="6.5" rx="2.8" ry="4" fill="#FFFFFF"/>
+    <ellipse cx="24" cy="6.5" rx="2.8" ry="4" fill="#FFFFFF"/>
+    <ellipse cx="30" cy="10" rx="3" ry="4" fill="#FFFFFF"/>
+    <path d="M11 22 Q 9 15, 20 15 Q 31 15, 29 22 Q 28 30, 20 32 Q 12 30, 11 22 Z" fill="#FFFFFF"/>
+    <path d="M13 23 L 16 23 L 17.5 19 L 19 26 L 21 21 L 22.5 24 L 27 24"
+          stroke="#52B788" stroke-width="1.4" stroke-linecap="round"
+          stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

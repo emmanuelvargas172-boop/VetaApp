@@ -4,6 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VetaApp – Gestión Veterinaria</title>
+
+    <!-- Sin esto la pestaña salía con el ícono en blanco del navegador. Se
+         usa la huella sobre círculo verde y no el logo suelto: a 16 píxeles
+         el logo pelado es una mancha, el círculo al menos se distingue. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta name="description"
+          content="Software para clínicas veterinarias: historias clínicas, citas, vacunas, inventario y caja. Prueba de 14 días." />
+
+    <!-- La tarjeta que arma WhatsApp cuando se pega el link.
+
+         Importa más de lo que parece: el link se manda por WhatsApp a cada
+         veterinaria, y sin esto llega como texto pelado con el dominio de
+         Cloudflare a la vista, que es justo lo que no queremos que se lea.
+
+         La URL va absoluta y escrita a mano porque este archivo es HTML
+         estático y no puede importar DOMINIO de config/marca.js. Es la
+         segunda copia del dominio en el proyecto: si se compra uno propio,
+         hay que cambiarlo en los dos lados y en el secreto APP_URL. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VetaApp" />
+    <meta property="og:title" content="VetaApp · Gestión para clínicas veterinarias" />
+    <meta property="og:description"
+          content="Historias clínicas, citas, vacunas, inventario y caja en un solo lugar. Prueba de 14 días." />
+    <meta property="og:url" content="https://vetaapp.veta-co.workers.dev" />
+    <meta property="og:image" content="https://vetaapp.veta-co.workers.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
