@@ -37,13 +37,17 @@ export const URL_APP = `https://${DOMINIO}`;
 /**
  * El correo que se publica.
  *
- * Sigue siendo el Gmail personal. No se inventa uno con el dominio
- * todavía porque un correo que no existe es peor que uno feo: la
- * veterinaria escribe y nadie contesta. Se cambia el día que exista de
- * verdad — sirve un Gmail nuevo tipo hola.vetaapp@gmail.com, no hace
- * falta esperar al dominio.
+ * Ya no es el Gmail personal. Se cambió solo cuando el buzón existía de
+ * verdad, no antes: la política de privacidad nombra esta dirección como
+ * el canal para ejercer los derechos de la Ley 1581 de 2012, así que un
+ * correo que rebota no es un detalle estético, es una promesa incumplida
+ * por escrito.
+ *
+ * El prefijo es `hola` a propósito. El día que haya dominio propio pasa a
+ * ser `hola@vetaapp.co` y la veterinaria no nota el cambio; con un
+ * prefijo raro habría que reeducar a quien ya lo tenía guardado.
  */
-export const EMAIL_CONTACTO = 'emmanuelvargas172@gmail.com';
+export const EMAIL_CONTACTO = 'hola.vetaapp@gmail.com';
 
 /**
  * WhatsApp de soporte. Solo dígitos, con indicativo, como lo exige wa.me.
