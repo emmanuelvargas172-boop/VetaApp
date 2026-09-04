@@ -24,12 +24,26 @@ const BENEFICIOS = [
 const PASOS = [
   { n: '1', titulo: 'Regístrate',            texto: 'Crea tu cuenta con correo o Google en segundos.' },
   { n: '2', titulo: 'Carga tus mascotas',    texto: 'Agrega pacientes y sus dueños.' },
-  { n: '3', titulo: 'Empieza a gestionar',   texto: 'Agenda, cobra y envía recordatorios.' },
+  // "envía recordatorios" sonaba a que los manda la app sola. Los manda la
+  // veterinaria: VetaApp arma la lista y el texto, el clic de enviar es suyo.
+  { n: '3', titulo: 'Empieza a gestionar',   texto: 'Agenda, cobra y manda recordatorios con un clic.' },
 ];
 
 // Los planes se separan por lo que hace la app, no por cuántas mascotas caben:
 // muchas veterinarias ya facturan por otro lado y solo necesitan organizarse.
-// Ninguno limita mascotas ni usuarios.
+// Ninguno limita mascotas.
+//
+// OJO: acá decía "ni usuarios", y era falso en la práctica. Las políticas RLS
+// filtran por `auth.uid() = user_id` (001_init.sql:122), o sea por usuario
+// individual: no existe la idea de clínica en la base. Si dos veterinarios de
+// la misma clínica abren dos cuentas, el segundo entra y ve la aplicación
+// vacía. La frase era cierta en lo literal —no se cobra por usuario— y falsa
+// en lo que la veterinaria entiende, que es "mi equipo puede usarlo".
+//
+// Mientras no exista `clinica_id`, lo honesto es lo que se dice ahora: una
+// cuenta para toda la clínica. Sirve de verdad porque `historias_clinicas`
+// guarda el nombre del veterinario que atendió (001_init.sql:33-47), así que
+// no se pierde el rastro de quién hizo qué aunque la sesión sea compartida.
 //
 // OJO con el desfase entre `id` y `nombre`: los ids siguen diciendo 'fichas'
 // y 'completo' mientras que en pantalla se lee Esencial y Avanzado. No es
@@ -50,7 +64,8 @@ const PLANES = [
       'Mascotas, dueños e historias clínicas',
       'Citas y calendario',
       'Vacunas y control de peso',
-      'Mascotas y usuarios sin límite',
+      'Mascotas y dueños sin límite',
+      'Una cuenta para toda la clínica',
       'Soporte por WhatsApp',
     ],
   },
@@ -121,7 +136,7 @@ const DETALLE_PLANES = [
       ['Nunca más pierdes una historia', 'El cuaderno se moja, se pierde o se lo lleva alguien. Esto no.'],
       ['Atiendes con el antecedente en frente', 'Menos repetir exámenes, menos preguntarle al dueño lo que ya te dijo.'],
       ['El dueño te ve organizado', 'Sacar el historial completo en el momento vale más que cualquier aviso.'],
-      ['Sin límite de mascotas ni de usuarios', 'No te cobramos por crecer. Registra las que sean.'],
+      ['Sin límite de mascotas', 'No te cobramos por crecer. Registra las que sean.'],
     ],
     noIncluye:
       'No lleva la plata ni el stock: no cobra, no hace recibos, no controla ' +
@@ -134,10 +149,15 @@ const DETALLE_PLANES = [
     precio: '99.000',
     para: 'Para la clínica que además de atender, vende, cobra y quiere que el cliente vuelva.',
     dia:
+      // NO decir que el inventario se descuenta solo. No lo hace: en la
+      // consulta se pueden marcar medicamentos (Historias.jsx:274), pero eso
+      // solo guarda cuáles se usaron; la cantidad se ajusta a mano desde
+      // Operaciones. Existe /inventario/:id/ajustar en axios.js:416 y no lo
+      // llama nadie. El día que se conecte, este texto puede volver.
       'Mismo caso de Michi, pero además: le cobras la consulta y sale el recibo, ' +
-      'el antiparasitario que usaste se descuenta solo del inventario, y el mes ' +
-      'entrante la app te arma la lista de a quiénes les toca vacuna con el ' +
-      'mensaje listo para mandar por WhatsApp.',
+      'queda anotado qué medicamentos le pusiste, y el mes entrante la app te ' +
+      'arma la lista de a quiénes les toca vacuna con el mensaje listo para ' +
+      'mandar por WhatsApp.',
     gana: [
       ['Los clientes vuelven', 'El recordatorio de vacuna es plata que ya era tuya y se estaba perdiendo porque nadie se acordó.'],
       ['Sabes cuánto entró', 'Caja y reportes: qué se cobró, qué servicio es el que más te mueve.'],
@@ -172,7 +192,8 @@ const COMPARACION = [
   { que: 'Mascotas, dueños e historias clínicas', modulo: null },
   { que: 'Citas y calendario',                    modulo: null },
   { que: 'Vacunas y control de peso',             modulo: null },
-  { que: 'Mascotas y usuarios sin límite',        modulo: null },
+  { que: 'Mascotas y dueños sin límite',          modulo: null },
+  { que: 'Una cuenta para toda la clínica',        modulo: null },
   { que: 'Descarga de tus datos en CSV',          modulo: null },
   { que: 'Recordatorios por WhatsApp',            modulo: 'recordatorios' },
   { que: 'Caja, cobros y recibos',                modulo: 'caja' },
