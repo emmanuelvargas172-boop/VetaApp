@@ -6,3 +6,6 @@ uploads/
 .env
 dist/
 .DS_Store
+
+# Caché del CLI de Supabase, no es del proyecto
+supabase/.temp/
