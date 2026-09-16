@@ -167,6 +167,22 @@ input, textarea, select { font-family: inherit; }
 .mono { font-family: var(--font-mono); font-feature-settings: 'tnum'; }
 .tabular { font-variant-numeric: tabular-nums; }
 
+/* Alto de la app (App.jsx).
+   Dos declaraciones a propósito: en Safari de iPhone 100vh incluye la barra
+   de direcciones, así que la barra de navegación de abajo quedaba fuera de
+   la pantalla. 100dvh mide el alto real; la primera línea es el respaldo
+   para navegadores que aún no lo entienden. */
+.app-shell { height: 100vh; height: 100dvh; }
+
+/* En celular, Safari hace zoom solo al tocar un campo cuya letra mida menos
+   de 16px, y deja la pantalla corrida sin forma de volver. 16px es el piso.
+   Lleva !important porque los campos traen su tamaño en `style=` inline
+   (UIInput usa 13px) y el inline le gana a la hoja de estilos.
+   Fuera del celular se respeta el tamaño de diseño. */
+@media (max-width: 768px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
 .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 .scroll-thin::-webkit-scrollbar-thumb {

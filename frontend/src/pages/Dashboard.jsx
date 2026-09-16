@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { openAdminWhatsApp, msgResumenDia } from '../utils/whatsapp';
+import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Badge, KPI, SectionHeader, BarChart, Donut, ProgressRing,
   Sparkline, Topbar, Page, Button, EmptyState,
@@ -93,6 +94,7 @@ export default function Dashboard() {
   const [perfil, setPerfil] = useState(null);
   const [cargando, setCargando] = useState(true);
   const navigate = useNavigate();
+  const esMovil = useEsMovil();
 
   useEffect(() => {
     api.get('/dashboard')
@@ -172,7 +174,9 @@ export default function Dashboard() {
         )}
 
         {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 }}>
+        {/* Cuatro columnas en un celular dejan cada número en 80px y el
+            rótulo partido en tres renglones. De a dos se leen. */}
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: esMovil ? 10 : 14, marginBottom: 18 }}>
           {/* Deltas y sparkline salen de la base. Donde no hay serie real no
               se dibuja gráfica: mejor un número solo que una línea inventada. */}
           <KPI label="Citas hoy" value={stats.citasHoy}
@@ -197,7 +201,7 @@ export default function Dashboard() {
         </div>
 
         {/* Agenda + Vacunas */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.65fr 1fr', gap: 14, marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1.65fr 1fr', gap: 14, marginBottom: 14 }}>
           <Card padding={0}>
             <SectionHeader
               title="Agenda de hoy"
@@ -251,7 +255,7 @@ export default function Dashboard() {
         </div>
 
         {/* Charts row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1.5fr 1fr 1fr', gap: 14 }}>
           <Card padding={0}>
             <SectionHeader title="Citas esta semana" subtitle={`Lunes a domingo · ${citasSemana} citas`}
               action={<Badge tone={citasSemana > 0 ? 'success' : 'neutral'} dot>{citasSemana > 0 ? 'Con agenda' : 'Sin citas'}</Badge>}/>

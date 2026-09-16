@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle,
 } from '../components/ui';
@@ -34,6 +35,7 @@ export default function Citas() {
   const [citaEditando, setCitaEditando] = useState(null);
   const [dropdownEstadoId, setDropdownEstadoId] = useState(null);
   const [busqueda, setBusqueda] = useState('');
+  const esMovil = useEsMovil();
 
   const hoy = new Date().toISOString().split('T')[0];
 
@@ -111,7 +113,7 @@ export default function Citas() {
           </div>
 
           {/* Status cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: esMovil ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
             {[
               { label: 'Pendientes',  value: stats.pendientes,  tone: 'warn',    Icon: IconClock,        filter: 'pendiente' },
               { label: 'Confirmadas', value: stats.confirmadas, tone: 'info',    Icon: IconCheck,        filter: 'confirmada' },
@@ -171,8 +173,12 @@ export default function Citas() {
               const transiciones = TRANSICIONES[c.estado] || [];
               return (
                 <div key={c.id} style={{
-                  display: 'grid', gridTemplateColumns: '70px 1fr 1fr 130px 110px auto',
-                  gap: 16, padding: '12px 16px',
+                  // Los seis bloques (hora, mascota, motivo, veterinario,
+                  // estado, acciones) no caben en fila en un celular: en una
+                  // sola columna cada uno queda en su renglón y se lee.
+                  display: 'grid',
+                  gridTemplateColumns: esMovil ? '1fr' : '70px 1fr 1fr 130px 110px auto',
+                  gap: esMovil ? 8 : 16, padding: esMovil ? '12px 14px' : '12px 16px',
                   borderBottom: i < citasFiltradas.length - 1 ? '1px solid var(--divider)' : 'none',
                   alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s', position: 'relative',
                 }}
@@ -254,7 +260,9 @@ export default function Citas() {
           onClick={() => setPanelAbierto(false)}>
             <div style={{
               position: 'absolute', right: 0, top: 0, bottom: 0,
-              width: 384, background: 'var(--surface)',
+              // Ancho fijo de 384px: en un celular el formulario quedaba
+              // cortado por la derecha. Ahí ocupa la pantalla completa.
+              width: esMovil ? '100%' : 384, background: 'var(--surface)',
               borderLeft: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
               display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.2s ease-out',
             }}

@@ -9,6 +9,7 @@ import {
   IconSyringe, IconActivity, IconAlert, IconCheckCircle, IconChevronRight, IconCalendar,
   SpeciesAvatar, especieCfg,
 } from '../components/icons';
+import { useEsMovil } from '../lib/useEsMovil';
 
 const TIPO_REGISTRO = {
   Vacunación:  { Icon: IconSyringe,      color: 'var(--info)',      soft: 'var(--info-soft)',          ring: 'var(--info-ring)' },
@@ -28,6 +29,7 @@ const styleInput = {
 
 function BuscarMascota() {
   const navigate = useNavigate();
+  const esMovil = useEsMovil();
   const [mascotas, setMascotas] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -57,7 +59,7 @@ function BuscarMascota() {
       />
       <Page>
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
           {[
             { label: 'Total pacientes', value: mascotas.length, Icon: IconFile,     color: 'var(--text-muted)', bg: 'var(--stone-50)' },
             { label: 'Este mes',        value: '—',             Icon: IconCalendar, color: 'var(--info)',       bg: 'var(--info-soft)' },
@@ -163,6 +165,7 @@ function badgeProxDosis(proxima_dosis) {
 function HistorialMascota() {
   const { mascotaId } = useParams();
   const navigate = useNavigate();
+  const esMovil = useEsMovil();
 
   const [mascota, setMascota]     = useState(null);
   const [consultas, setConsultas] = useState([]);
@@ -394,7 +397,9 @@ function HistorialMascota() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 14, alignItems: 'start' }}>
+        {/* Es la pantalla de la consulta: en celular la ficha del paciente va
+            arriba y el historial debajo, no lado a lado. */}
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '300px 1fr', gap: 14, alignItems: 'start' }}>
           {/* Columna izquierda */}
           <div>
             {/* Hero compact */}
@@ -656,7 +661,9 @@ function HistorialMascota() {
 
       {/* Panel lateral */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, height: '100%', width: 420,
+        // 420px fijos se salían de la pantalla en un celular de 390: el
+        // panel quedaba cortado por la derecha y el botón de guardar afuera.
+        position: 'fixed', top: 0, right: 0, height: '100%', width: esMovil ? '100%' : 420,
         background: 'var(--surface)', boxShadow: 'var(--shadow-xl)', zIndex: 40,
         display: 'flex', flexDirection: 'column',
         transform: panelAbierto ? 'translateX(0)' : 'translateX(100%)',

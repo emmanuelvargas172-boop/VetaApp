@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
+import Sidebar, { BarraInferior } from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Mascotas from './pages/Mascotas';
 import Historias from './pages/Historias';
@@ -19,6 +19,7 @@ import AuthScreen from './components/AuthScreen';
 import PantallaBloqueo from './components/PantallaBloqueo';
 import ModuloNoIncluido from './components/ModuloNoIncluido';
 import AvisoPrueba from './components/AvisoPrueba';
+import { useEsMovil } from './lib/useEsMovil';
 
 function Splash() {
   return (
@@ -43,12 +44,28 @@ function ConPlan({ modulo, titulo, descripcion, children }) {
   return <ModuloNoIncluido titulo={titulo} descripcion={descripcion} />;
 }
 
-/** La app privada: sidebar + páginas. Vive bajo /app. */
+/**
+ * La app privada: navegación + páginas. Vive bajo /app.
+ *
+ * En escritorio la navegación va al lado; en celular va abajo y cambia el
+ * eje del flex. `h-screen` (100vh) se reemplazó por la clase `.app-shell`
+ * porque en Safari de iPhone 100vh cuenta la barra de direcciones y deja la
+ * última fila de la app tapada.
+ */
 function AppShell() {
+  const esMovil = useEsMovil();
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+    <div
+      className="app-shell"
+      style={{
+        display: 'flex',
+        flexDirection: esMovil ? 'column' : 'row',
+        overflow: 'hidden',
+        background: 'var(--bg)',
+      }}
+    >
+      {!esMovil && <Sidebar />}
+      <main style={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto' }}>
         <AvisoPrueba />
         <Routes>
           <Route path="/" element={<Dashboard />} />
@@ -80,6 +97,7 @@ function AppShell() {
           <Route path="/configuracion" element={<Configuracion />} />
         </Routes>
       </main>
+      {esMovil && <BarraInferior />}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
+import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Button, Badge, Topbar, Page, EmptyState, iconBtnStyle,
 } from '../components/ui';
@@ -148,6 +149,7 @@ const FORM_VACIO = { mascota_id: '', mascota_label: '', tipo: 'vacunacion', fech
 export default function Calendario() {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
+  const esMovil = useEsMovil();
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [viewMode, setViewMode] = useState('mes');
@@ -298,8 +300,10 @@ export default function Calendario() {
           ))}
         </div>
 
+        {/* En celular el panel del día no cabe al lado de la grilla de siete
+            columnas: se pone debajo del mes. */}
         {viewMode === 'mes' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: selectedDay ? '1fr 340px' : '1fr', gap: 14, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: (selectedDay && !esMovil) ? '1fr 340px' : '1fr', gap: 14, alignItems: 'start' }}>
             {/* Calendario */}
             <Card padding={0}>
               {/* Nav mes */}
@@ -331,8 +335,13 @@ export default function Calendario() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--border)', background: 'var(--stone-50)' }}>
                 {DIA_NOMBRES.map((d, i) => (
                   <div key={i} style={{
-                    padding: '8px 10px', fontSize: 10.5, fontWeight: 700,
-                    color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase',
+                    padding: esMovil ? '7px 0' : '8px 10px',
+                    textAlign: esMovil ? 'center' : 'left',
+                    fontSize: 10.5, fontWeight: 700,
+                    color: 'var(--text-faint)',
+                    // El interletrado ancho parte "Mié" en dos en 51px.
+                    letterSpacing: esMovil ? '0.02em' : '0.08em',
+                    textTransform: 'uppercase',
                     borderRight: i < 6 ? '1px solid var(--divider)' : 'none',
                   }}>{d}</div>
                 ))}
@@ -348,7 +357,7 @@ export default function Calendario() {
                   {grid.map((d, i) => {
                     if (!d) return (
                       <div key={i} style={{
-                        minHeight: 96, background: 'var(--stone-50)',
+                        minHeight: esMovil ? 54 : 96, background: 'var(--stone-50)',
                         borderRight: (i % 7) < 6 ? '1px solid var(--divider)' : 'none',
                         borderBottom: '1px solid var(--divider)',
                       }}/>
@@ -362,7 +371,7 @@ export default function Calendario() {
                       <div key={i}
                         onClick={() => setSelectedDay(isSel ? null : dStr)}
                         style={{
-                          minHeight: 96, padding: '6px 8px',
+                          minHeight: esMovil ? 54 : 96, padding: esMovil ? '4px 2px' : '6px 8px',
                           borderRight: (i % 7) < 6 ? '1px solid var(--divider)' : 'none',
                           borderBottom: '1px solid var(--divider)',
                           background: isSel ? 'var(--verde-50)' : isFinde ? 'var(--stone-50)' : 'var(--surface)',
@@ -370,7 +379,11 @@ export default function Calendario() {
                         }}
                         onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = 'var(--stone-100)'; }}
                         onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = isFinde ? 'var(--stone-50)' : 'var(--surface)'; }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center',
+                          justifyContent: esMovil ? 'center' : 'space-between',
+                          marginBottom: 4,
+                        }}>
                           <span className="tabular" style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             width: 22, height: 22, borderRadius: '50%',
@@ -378,12 +391,23 @@ export default function Calendario() {
                             background: isToday ? 'var(--verde-600)' : 'transparent',
                             color: isToday ? '#fff' : (isFinde ? 'var(--text-faint)' : 'var(--text)'),
                           }}>{d}</span>
-                          {eventos.length > 0 && (
+                          {eventos.length > 0 && !esMovil && (
                             <span className="tabular" style={{ fontSize: 10, color: 'var(--text-faint)', fontWeight: 600 }}>
                               {eventos.length}
                             </span>
                           )}
                         </div>
+
+                        {/* La celda mide ~51px de ancho en un celular: no cabe
+                            "09:00 Michi". Se marcan puntos de color y el día
+                            se toca para ver la lista completa abajo. */}
+                        {esMovil ? (
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: 3, minHeight: 6 }}>
+                            {eventos.slice(0, 3).map((ev, j) => (
+                              <span key={j} style={{ width: 5, height: 5, borderRadius: '50%', background: tipoConfig(ev.tipo).color }}/>
+                            ))}
+                          </div>
+                        ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           {eventos.slice(0, 3).map((ev, j) => {
                             const tc = tipoConfig(ev.tipo);
@@ -407,6 +431,7 @@ export default function Calendario() {
                             <span style={{ fontSize: 9.5, color: 'var(--text-faint)', fontWeight: 600, padding: '0 5px' }}>+{eventos.length - 3} más</span>
                           )}
                         </div>
+                        )}
                       </div>
                     );
                   })}
@@ -416,7 +441,7 @@ export default function Calendario() {
 
             {/* Side panel */}
             {selectedDay && (
-              <Card padding={0} style={{ position: 'sticky', top: 16 }}>
+              <Card padding={0} style={esMovil ? undefined : { position: 'sticky', top: 16 }}>
                 <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div>
                     <p style={{ margin: 0, fontSize: 11, color: 'var(--text-faint)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>

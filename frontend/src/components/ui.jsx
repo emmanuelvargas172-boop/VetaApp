@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useEsMovil } from '../lib/useEsMovil';
 
 export const Button = ({ variant = 'primary', size = 'md', icon, iconRight, children, onClick, style, title, disabled }) => {
   const variants = {
@@ -268,37 +269,59 @@ export const KPI = ({ label, value, delta, deltaTone = 'success', deltaLabel = '
   </Card>
 );
 
-export const Topbar = ({ title, subtitle, breadcrumb, actions }) => (
-  <header style={{
-    padding: '20px 28px 16px',
-    borderBottom: '1px solid var(--border)',
-    background: 'var(--bg)',
-    display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16,
-  }}>
-    <div style={{ minWidth: 0 }}>
-      {breadcrumb && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--text-faint)', marginBottom: 4 }}>
-          {breadcrumb.map((b, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {i > 0 && <span style={{ fontSize: 10 }}>›</span>}
-              <span style={{ color: i === breadcrumb.length - 1 ? 'var(--text-muted)' : 'var(--text-faint)', fontWeight: i === breadcrumb.length - 1 ? 600 : 500 }}>{b}</span>
-            </span>
-          ))}
-        </div>
+// Topbar y Page ponen el margen lateral de TODAS las páginas. Por eso el
+// arreglo de celular empieza aquí: cambiar estos dos deja de desperdiciar
+// 56px de ancho en cada pantalla, sin tocar página por página.
+export const Topbar = ({ title, subtitle, breadcrumb, actions }) => {
+  const esMovil = useEsMovil();
+  return (
+    <header style={{
+      padding: esMovil ? '14px 16px 12px' : '20px 28px 16px',
+      borderBottom: '1px solid var(--border)',
+      background: 'var(--bg)',
+      display: 'flex',
+      // En celular el título y los botones no caben en la misma línea: los
+      // botones se apilan debajo en vez de aplastar el título.
+      flexDirection: esMovil ? 'column' : 'row',
+      alignItems: esMovil ? 'stretch' : 'flex-end',
+      justifyContent: 'space-between',
+      gap: esMovil ? 10 : 16,
+    }}>
+      <div style={{ minWidth: 0 }}>
+        {breadcrumb && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--text-faint)', marginBottom: 4 }}>
+            {breadcrumb.map((b, i) => (
+              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {i > 0 && <span style={{ fontSize: 10 }}>›</span>}
+                <span style={{ color: i === breadcrumb.length - 1 ? 'var(--text-muted)' : 'var(--text-faint)', fontWeight: i === breadcrumb.length - 1 ? 600 : 500 }}>{b}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <h1 style={{ margin: 0, fontSize: esMovil ? 19 : 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{title}</h1>
+        {subtitle && <p style={{ margin: '4px 0 0', fontSize: esMovil ? 12.5 : 13, color: 'var(--text-faint)' }}>{subtitle}</p>}
+      </div>
+      {actions && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          flexShrink: 0,
+          // Se dejan envolver: varias páginas mandan tres o cuatro botones.
+          flexWrap: esMovil ? 'wrap' : 'nowrap',
+        }}>{actions}</div>
       )}
-      <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{title}</h1>
-      {subtitle && <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-faint)' }}>{subtitle}</p>}
-    </div>
-    {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}</div>}
-  </header>
-);
+    </header>
+  );
+};
 
-export const Page = ({ children, padded = true }) => (
-  <div className="scroll-thin" style={{
-    flex: 1, overflow: 'auto', background: 'var(--bg)',
-    padding: padded ? '20px 28px 32px' : 0,
-  }}>{children}</div>
-);
+export const Page = ({ children, padded = true }) => {
+  const esMovil = useEsMovil();
+  return (
+    <div className="scroll-thin" style={{
+      flex: 1, overflow: 'auto', background: 'var(--bg)',
+      padding: padded ? (esMovil ? '14px 14px 24px' : '20px 28px 32px') : 0,
+    }}>{children}</div>
+  );
+};
 
 export const EmptyState = ({ icon, title, subtitle, action }) => (
   <div style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>

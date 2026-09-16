@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ModalMascota from '../components/ModalMascota';
+import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle, Sparkline,
 } from '../components/ui';
@@ -81,8 +82,52 @@ function FilterChip({ active, onClick, children, count }) {
 function MascotaRow({ m, onClick, onEdit, onEliminar }) {
   const cfg = especieCfg(m.especie);
   const [hover, setHover] = useState(false);
+  const esMovil = useEsMovil();
   const edad = formatEdad(m.edad_anios, m.edad_meses);
   const waLink = `https://wa.me/57${(m.dueno_telefono || '').replace(/\D/g, '')}`;
+
+  // En celular seis columnas dan ~55px cada una: el nombre del dueño y la
+  // raza salen cortados. La misma información se apila en tres renglones.
+  // Los botones de editar/borrar no se muestran: aquí no hay hover que los
+  // revele y de todos modos se llega a ellos abriendo la ficha.
+  if (esMovil) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 14px', minHeight: 64,
+          borderBottom: '1px solid var(--divider)',
+          cursor: 'pointer',
+        }}>
+        <SpeciesAvatar especie={m.especie} size={40}/>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.nombre}
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {[cfg.label, m.raza, edad, m.peso ? `${m.peso} kg` : null].filter(Boolean).join(' · ')}
+          </p>
+          <p style={{ margin: '1px 0 0', fontSize: 12, color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.dueno_nombre || 'Sin dueño'}{m.dueno_telefono ? ` · ${m.dueno_telefono}` : ''}
+          </p>
+        </div>
+        {m.dueno_telefono && (
+          <a
+            href={waLink} target="_blank" rel="noopener noreferrer" title="WhatsApp"
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 40, height: 40, flexShrink: 0, borderRadius: 10,
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              color: '#25D366', textDecoration: 'none',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          ><IconWhatsApp size={16}/></a>
+        )}
+        <IconChevronRight size={16} color="var(--text-disabled)"/>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -141,6 +186,7 @@ function MascotaRow({ m, onClick, onEdit, onEliminar }) {
 
 function MascotaPerfil({ mascota, onBack, onEdit }) {
   const cfg = especieCfg(mascota.especie);
+  const esMovil = useEsMovil();
   const [tab, setTab] = useState('resumen');
   const edad = formatEdad(mascota.edad_anios, mascota.edad_meses);
   const waLink = `https://wa.me/57${(mascota.dueno_telefono || '').replace(/\D/g, '')}`;
@@ -184,31 +230,33 @@ function MascotaPerfil({ mascota, onBack, onEdit }) {
       <Page>
         {/* Hero */}
         <div style={{
-          position: 'relative', padding: '20px 24px',
+          position: 'relative', padding: esMovil ? '16px' : '20px 24px',
           background: `linear-gradient(135deg, ${cfg.soft}, transparent 80%)`,
           border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', marginBottom: 14, overflow: 'hidden',
         }}>
           <div style={{ position: 'absolute', right: 10, top: -10, opacity: 0.08, fontSize: 170, lineHeight: 1 }}>
             {cfg.emoji}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, position: 'relative' }}>
-            <div style={{ width: 72, height: 72, borderRadius: 18, background: cfg.soft, border: `2px solid ${cfg.color}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-sm)', fontSize: 40 }}>
+          {/* En celular el nombre y las dos cifras no caben en una línea:
+              edad y peso bajan al renglón siguiente en vez de aplastarse. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: esMovil ? 12 : 18, position: 'relative', flexWrap: esMovil ? 'wrap' : 'nowrap' }}>
+            <div style={{ width: esMovil ? 56 : 72, height: esMovil ? 56 : 72, borderRadius: 18, background: cfg.soft, border: `2px solid ${cfg.color}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-sm)', fontSize: esMovil ? 30 : 40 }}>
               {cfg.emoji}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text)' }}>{mascota.nombre}</h2>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: esMovil ? 21 : 26, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--text)' }}>{mascota.nombre}</h2>
                 <Badge tone="verde" dot>Activa</Badge>
               </div>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>{cfg.label} · {mascota.raza || '—'}</p>
             </div>
-            <div style={{ display: 'flex', gap: 18 }}>
+            <div style={{ display: 'flex', gap: 18, width: esMovil ? '100%' : 'auto' }}>
               {[
                 { label: 'Edad',  value: edad,                   Icon: IconClock },
                 { label: 'Peso',  value: mascota.peso ? `${mascota.peso} kg` : '—', Icon: IconWeight },
               ].map((v, i) => (
-                <div key={i} style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                <div key={i} style={{ textAlign: esMovil ? 'left' : 'right', flex: esMovil ? 1 : undefined }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: esMovil ? 'flex-start' : 'flex-end' }}>
                     <v.Icon size={11} color="var(--text-faint)"/>
                     <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-faint)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{v.label}</span>
                   </div>
@@ -226,7 +274,7 @@ function MascotaPerfil({ mascota, onBack, onEdit }) {
           <Tab id="citas">Próximas citas</Tab>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1fr 320px', gap: 14 }}>
           <div>
             {tab === 'resumen' && (
               <Card padding={0}>
@@ -342,6 +390,7 @@ export default function Mascotas() {
   const [perfilActivo, setPerfilActivo] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState(null);
+  const esMovil = useEsMovil();
 
   const cargar = () => {
     api.get('/mascotas')
@@ -430,7 +479,7 @@ export default function Mascotas() {
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             icon={<IconSearch size={14}/>}
-            style={{ width: 340 }}
+            style={{ width: esMovil ? '100%' : 340 }}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             {FILTROS.map(f => (
@@ -472,16 +521,21 @@ export default function Mascotas() {
 
         {/* Table */}
         <Card padding={0}>
-          <div style={{
-            display: 'grid', gridTemplateColumns: '2fr 1.4fr 0.9fr 1.8fr 1fr auto',
-            gap: 16, padding: '10px 16px',
-            background: 'var(--stone-50)', borderBottom: '1px solid var(--border)',
-            fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)',
-            letterSpacing: '0.06em', textTransform: 'uppercase',
-          }}>
-            <span>Mascota</span><span>Especie / Raza</span><span>Edad / Peso</span>
-            <span>Dueño</span><span>Estado</span><span style={{ minWidth: 110 }}></span>
-          </div>
+          {/* El encabezado de columnas no se pinta en celular: allá las filas
+              no son columnas sino tarjetas apiladas, y unos títulos sueltos
+              arriba no corresponderían a nada. */}
+          {!esMovil && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: '2fr 1.4fr 0.9fr 1.8fr 1fr auto',
+              gap: 16, padding: '10px 16px',
+              background: 'var(--stone-50)', borderBottom: '1px solid var(--border)',
+              fontSize: 10.5, fontWeight: 700, color: 'var(--text-faint)',
+              letterSpacing: '0.06em', textTransform: 'uppercase',
+            }}>
+              <span>Mascota</span><span>Especie / Raza</span><span>Edad / Peso</span>
+              <span>Dueño</span><span>Estado</span><span style={{ minWidth: 110 }}></span>
+            </div>
+          )}
 
           {cargando ? (
             <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
