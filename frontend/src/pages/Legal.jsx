@@ -165,7 +165,7 @@ function Terminos() {
 
       <H>3. Prueba, precios y pago</H>
       <Lista items={[
-        'La prueba gratuita dura catorce días y no requiere tarjeta.',
+        'La prueba gratuita dura ocho días y no requiere tarjeta.',
         'Los precios se publican en pesos colombianos en la página de planes y se cobran por mes anticipado.',
         'El pago se acuerda y se confirma de forma directa, por fuera de la plataforma. VetaApp no procesa pagos ni almacena datos de tarjetas.',
         'Podemos ajustar los precios avisando con treinta días de anticipación.',

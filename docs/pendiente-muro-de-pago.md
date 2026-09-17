@@ -6,7 +6,7 @@ clientes antes de construir esto. No está bloqueado por nada técnico.
 ## Qué hay hoy
 
 Cualquiera entra a la landing, se registra con correo o Google, y queda
-adentro con 14 días de prueba y el plan Avanzado completo
+adentro con 8 días de prueba y el plan Avanzado completo
 (`004_planes.sql:28` — `perfiles.plan` nace `default 'completo'`).
 Ni un dato de contacto más allá del correo, ni una decisión de compra.
 
@@ -23,7 +23,7 @@ desde la pantalla de registro:
 1. **Pagar de una vez.** Se piden los datos de la clínica (nombre
    completo del responsable, documento, dirección, teléfono, NIT si
    factura) y se sale al checkout. Vuelve pagada y entra.
-2. **Iniciar prueba de 14 días.** Un botón aparte, no el camino por
+2. **Iniciar prueba de 8 días.** Un botón aparte, no el camino por
    defecto. Que se lea como una decisión y no como el atajo.
 
 El motivo es de negocio, no técnico: hoy la prueba es lo que pasa cuando

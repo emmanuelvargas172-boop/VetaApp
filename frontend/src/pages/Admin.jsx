@@ -441,11 +441,11 @@ export default function Admin() {
                                 <Button
                                   variant="secondary"
                                   size="sm"
-                                  onClick={() => extenderPrueba(f, 14)}
+                                  onClick={() => extenderPrueba(f, 8)}
                                   disabled={ocupada === f.id}
-                                  title="Le da 14 días más de prueba (desde hoy si ya venció)"
+                                  title="Le da 8 días más de prueba (desde hoy si ya venció)"
                                 >
-                                  +14 días
+                                  +8 días
                                 </Button>
                               )}
                               <Button

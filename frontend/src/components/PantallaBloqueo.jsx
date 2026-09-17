@@ -10,7 +10,7 @@ const SOPORTE = WHATSAPP;
 
 /**
  * Lo que ve una veterinaria bloqueada: suspendida a mano (inactivo), con la
- * prueba de 14 días vencida, o con la suscripción paga ya expirada. Los datos
+ * prueba de 8 días vencida, o con la suscripción paga ya expirada. Los datos
  * no se borran en ninguno de los tres casos, solo dejan de ser accesibles
  * (RLS, ver 005_prueba.sql y 007_pagos.sql).
  *
@@ -34,13 +34,13 @@ export default function PantallaBloqueo() {
 
   const abrirWhatsApp = () => {
     const msg = pruebaVencida
-      ? `Hola, se me acabaron los 14 días de prueba de VetaApp (${user?.email || ''}). Quiero activar mi plan.`
+      ? `Hola, se me acabaron los 8 días de prueba de VetaApp (${user?.email || ''}). Quiero activar mi plan.`
       : `Hola, mi cuenta de VetaApp (${user?.email || ''}) está suspendida. Quiero reactivarla.`;
     window.open(linkWhatsApp(msg), '_blank', 'noopener');
   };
 
   const titulo = pruebaVencida
-    ? 'Se acabaron tus 14 días de prueba'
+    ? 'Se acabaron tus 8 días de prueba'
     : suscripcionVencida
       ? 'Se venció tu plan'
       : 'Tu acceso está suspendido';

@@ -316,7 +316,7 @@ export default function Landing() {
                 <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={irAlPanel}>Ir a mi panel</button>
               ) : (
                 <button className="lp-btn lp-btn-primary lp-btn-lg" onClick={irARegistro}>
-                  Empieza gratis 14 días
+                  Empieza gratis 8 días
                 </button>
               )}
             </div>
@@ -439,7 +439,7 @@ export default function Landing() {
           </div>
 
           <p className="lp-planes-nota lp-reveal">
-            Esencial y Avanzado incluyen 14 días de prueba gratis, sin tarjeta. El plan Facturación
+            Esencial y Avanzado incluyen 8 días de prueba gratis, sin tarjeta. El plan Facturación
             todavía está en construcción: déjanos tu contacto y te avisamos apenas esté listo.
           </p>
         </div>
@@ -531,13 +531,13 @@ export default function Landing() {
 
           {/* Verificado antes de prometerlo:
               · 004_planes.sql:28 — perfiles.plan nace `default 'completo'`,
-                así que la prueba de 14 días sí trae todo.
+                así que la prueba de 8 días sí trae todo.
               · bajar a Esencial no borra: las filas de inventario y caja se
                 quedan en la base, RLS solo deja de mostrarlas. Al volver a
                 Avanzado reaparecen. Por eso se dice "vuelven a aparecer" y
                 no "se guardan", que sonaría a respaldo. */}
           <p className="lp-planes-nota lp-reveal">
-            ¿No sabes cuál? Empieza con los 14 días gratis: traen todo el plan Avanzado,
+            ¿No sabes cuál? Empieza con los 8 días gratis: traen todo el plan Avanzado,
             sin tarjeta. Si al final no usaste caja ni inventario, te pasas a Esencial y pagas
             menos. Y si algún día vuelves a Avanzado, tu inventario y tus cobros vuelven a
             aparecer: bajarse de plan no borra nada.
@@ -551,7 +551,7 @@ export default function Landing() {
       <section className="lp-cta">
         <div className="lp-container lp-cta-inner lp-reveal">
           <h2 className="lp-cta-title">Empieza a gestionar tu veterinaria hoy</h2>
-          <p className="lp-cta-sub">14 días gratis. Sin tarjeta de crédito.</p>
+          <p className="lp-cta-sub">8 días gratis. Sin tarjeta de crédito.</p>
           <button className="lp-btn lp-btn-white lp-btn-lg" onClick={irARegistro}>
             Crear mi cuenta gratis
           </button>

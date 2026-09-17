@@ -1,7 +1,7 @@
 # Guion de venta · visita en frío con portátil
 
 Escrito el 2026-09-03, para clínicas veterinarias en Colombia, cobrando a
-mano y con prueba de 14 días.
+mano y con prueba de 8 días.
 
 La estrategia sale de la primera visita real: la clínica **ya tenía**
 software de inventario conectado a la DIAN, pero **las citas en un
@@ -117,7 +117,7 @@ ofrezcas es ruido.
 Esto es lo más fuerte que puedes hacer y casi nadie lo hace.
 
 > "¿Me presta el cuaderno un momento? Le meto las citas de esta semana y
-> mañana lo abre y ve si le sirve. Son catorce días de prueba, no pide
+> mañana lo abre y ve si le sirve. Son ocho días de prueba, no pide
 > tarjeta y no queda comprometida a nada."
 
 Entonces, ahí parado en el mostrador:
@@ -211,7 +211,7 @@ Averigua cuál:
 
 Y si no hay respuesta clara, no empujes — deja la prueba andando:
 
-> "No tiene que decidir nada hoy. Déjelo prendido los catorce días y si no
+> "No tiene que decidir nada hoy. Déjelo prendido los ocho días y si no
 > lo usó, no pasó nada."
 
 **"¿Y esto quién lo respalda? ¿Usted es una empresa?"**
@@ -239,12 +239,16 @@ landing.
 
 **Seguimiento** (solo si quedó registrada):
 
-- **Día 3** — *"¿Alcanzó a meter alguna cita? Si quiere le ayudo a montar
+- **Día 2** — *"¿Alcanzó a meter alguna cita? Si quiere le ayudo a montar
   las de la semana."* No preguntes qué le pareció: pregunta si la usó.
-- **Día 12** — *"Se le acaban los catorce días el viernes. ¿Seguimos?"*
+- **Día 6** — *"Se le acaban los ocho días el viernes. ¿Seguimos?"*
   Aquí sí se pide la decisión.
 
-Si en el día 3 no ha metido nada, no se va a quedar. Sirve más para
+Con ocho días los dos toques quedan pegados, y eso es a propósito: la
+prueba corta obliga a que el seguimiento sea el mismo día que la clínica
+todavía se acuerda de ti.
+
+Si en el día 2 no ha metido nada, no se va a quedar. Sirve más para
 aprender por qué que para insistir.
 
 ---

@@ -15,7 +15,7 @@ const DIAS_AVISO = 7;
  * la app muestra la pantalla de bloqueo — así que el aviso tiene que estar
  * a la vista desde antes.
  *
- * Cubre los dos vencimientos, que antes no era así: la prueba de 14 días y
+ * Cubre los dos vencimientos, que antes no era así: la prueba de 8 días y
  * la suscripción paga. Faltaba el segundo, y era el peor de los dos: a la
  * veterinaria que ya pagó una vez se le acababa el plan sin ningún aviso.
  *
