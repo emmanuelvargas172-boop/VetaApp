@@ -122,39 +122,46 @@ begin
   get diagnostics v_trat = row_count;
 
   -- ---------- 3. VACUNAS (Recordatorios) ----------
-  -- No se borran: la vacuna aplicada es historia de la mascota y borrarla
-  -- sería perder un dato real. Lo único que se mueve es la próxima dosis.
-  --
   -- Recordatorios.jsx pinta por días restantes: 0 = "Hoy" en rojo y con el
   -- botón de WhatsApp, hasta 7 rojo, hasta 15 amarillo, el resto verde. El
   -- filtro abre en 30 días, así que todo lo que pase de 30 no se ve de una.
   -- Por eso hay una en 0: sin ella la demo no puede mostrar el WhatsApp.
   --
-  -- La fecha de aplicación se recalcula un año antes de la próxima: si se
-  -- dejara quieta, quedaría una vacuna "aplicada" después de su refuerzo.
-  update public.vacunas v
-     set proxima_dosis    = to_char(v_hoy + x.dias, 'YYYY-MM-DD'),
-         fecha_aplicacion = to_char(v_hoy + x.dias - 365, 'YYYY-MM-DD')
-    from (values
-      ('Simón',  'Triple Felina',     0),   -- hoy → rojo + WhatsApp
-      ('Max',    'Polivalente',       2),
-      ('Luna',   'Antirrábica',       4),
-      ('Nala',   'Antirrábica',       6),
-      ('Rocky',  'Polivalente',       9),
-      ('Toby',   'Antirrábica',      12),
-      ('Zeus',   'Antirrábica',      15),
-      ('Nube',   'Triple Felina',    20),
-      ('Pelusa', 'Leucemia Felina',  26),
+  -- Esto borra y vuelve a insertar en vez de hacer UPDATE sobre las que ya
+  -- están. La primera versión actualizaba emparejando (mascota, vacuna), y
+  -- eso falla en silencio: si un nombre no coincide exacto, esa fila se
+  -- queda con la fecha vieja, el UPDATE no se queja, y Recordatorios sigue
+  -- vacío sin ninguna pista de por qué. Insertar de cero no puede fallar a
+  -- medias. Los avisos ya enviados no se pierden: avisos.vacuna_id es
+  -- `on delete set null` (006_avisos.sql:23) y guarda copia del nombre y el
+  -- teléfono.
+  --
+  -- La fecha de aplicación va un año antes de la próxima, porque una vacuna
+  -- "aplicada" después de su propio refuerzo se ve mal en la ficha.
+  delete from public.vacunas where user_id = v_user;
+
+  insert into public.vacunas (user_id, mascota_id, nombre, fecha_aplicacion, proxima_dosis, veterinario)
+  select v_user, ms.id, x.vacuna,
+         to_char(v_hoy + x.dias - 365, 'YYYY-MM-DD'),
+         to_char(v_hoy + x.dias,       'YYYY-MM-DD'),
+         x.vet
+  from (values
+      ('Simón',  'Triple Felina',    'Dra. Ana Salazar',   0),  -- hoy → rojo + WhatsApp
+      ('Max',    'Polivalente',      'Dr. Camilo Vega',    2),
+      ('Luna',   'Antirrábica',      'Dr. Camilo Vega',    4),
+      ('Nala',   'Antirrábica',      'Dra. Ana Salazar',   6),
+      ('Rocky',  'Polivalente',      'Dra. Ana Salazar',   9),
+      ('Toby',   'Antirrábica',      'Dr. Camilo Vega',   12),
+      ('Zeus',   'Antirrábica',      'Dr. Camilo Vega',   15),
+      ('Nube',   'Triple Felina',    'Dra. Ana Salazar',  20),
+      ('Pelusa', 'Leucemia Felina',  'Dr. Camilo Vega',   26),
       -- Estas tres quedan lejos a propósito: si todas estuvieran vencidas
       -- la pantalla parecería una clínica en crisis, no una al día.
-      ('Kira',   'Antirrábica',     165),
-      ('Zeus',   'Polivalente',     245),
-      ('Luna',   'Polivalente',     363)
-    ) as x(mascota, vacuna, dias)
-   join public.mascotas ms on ms.user_id = v_user and ms.nombre = x.mascota
-  where v.user_id = v_user
-    and v.mascota_id = ms.id
-    and v.nombre = x.vacuna;
+      ('Kira',   'Antirrábica',      'Dra. Ana Salazar', 165),
+      ('Zeus',   'Polivalente',      'Dra. Ana Salazar', 245),
+      ('Luna',   'Polivalente',      'Dr. Camilo Vega',  363)
+    ) as x(mascota, vacuna, vet, dias)
+  join public.mascotas ms on ms.user_id = v_user and ms.nombre = x.mascota;
 
   get diagnostics v_vac = row_count;
 
@@ -164,22 +171,39 @@ end $$;
 
 
 -- ============================================================
--- COMPROBAR
+-- COMPROBAR — sale solo, no hay que correr nada aparte
 -- ============================================================
--- Que hay algo hoy en las tres pantallas:
---   select 'citas' t, count(*) from public.citas
---     where fecha = to_char((now() at time zone 'America/Bogota')::date, 'YYYY-MM-DD')
---   union all
---   select 'calendario', count(*) from public.tratamientos
---     where fecha = to_char((now() at time zone 'America/Bogota')::date, 'YYYY-MM-DD')
---   union all
---   select 'vacunas hoy', count(*) from public.vacunas
---     where proxima_dosis = to_char((now() at time zone 'America/Bogota')::date, 'YYYY-MM-DD');
+-- El `raise notice` de arriba no se ve en el SQL Editor de Supabase: la
+-- pantalla solo dice "Success. No rows returned" y uno se queda sin saber
+-- si quedó bien. Este select sí se ve, y es lo que hay que mirar antes de
+-- salir a la clínica.
 --
--- Si 'vacunas hoy' da 0, la de Simón no se encontró: revisa que la mascota
--- se llame exactamente 'Simón' y la vacuna 'Triple Felina'. El UPDATE solo
--- mueve filas que ya existen — no crea la vacuna que falte.
---
--- Las 12 parejas (mascota, vacuna) de arriba son exactamente las que siembra
--- seed_demo.sql:156-170. Si se cambia una allá, hay que cambiarla aquí o esa
--- vacuna se queda con la fecha vieja y el conteo baja de 12.
+-- Lo que debe salir:
+--   citas hoy        3
+--   calendario hoy   2
+--   calendario mes   depende del día, nunca 0
+--   vacunas hoy      1     ← la de Simón, la roja con botón de WhatsApp
+--   vacunas en 30    9
+-- Un 0 donde no debería, es que ese bloque no encontró las mascotas por
+-- nombre: corre seed_demo.sql primero.
+with u as (
+  select id from public.perfiles where lower(email) = 'emmanuelvargas1772@gmail.com'
+), h as (
+  select (now() at time zone 'America/Bogota')::date as d
+)
+select 'citas hoy'      as pantalla, count(*) from public.citas c, u, h
+  where c.user_id = u.id and c.fecha = to_char(h.d, 'YYYY-MM-DD')
+union all
+select 'calendario hoy', count(*) from public.tratamientos t, u, h
+  where t.user_id = u.id and t.fecha = to_char(h.d, 'YYYY-MM-DD')
+union all
+select 'calendario mes', count(*) from public.tratamientos t, u, h
+  where t.user_id = u.id and t.fecha like to_char(h.d, 'YYYY-MM') || '%'
+union all
+select 'vacunas hoy',    count(*) from public.vacunas v, u, h
+  where v.user_id = u.id and v.proxima_dosis = to_char(h.d, 'YYYY-MM-DD')
+union all
+select 'vacunas en 30',  count(*) from public.vacunas v, u, h
+  where v.user_id = u.id
+    and v.proxima_dosis >= to_char(h.d,      'YYYY-MM-DD')
+    and v.proxima_dosis <= to_char(h.d + 30, 'YYYY-MM-DD');
