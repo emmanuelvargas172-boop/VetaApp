@@ -34,6 +34,11 @@ function BuscarMascota() {
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
+  // Una consulta siempre cuelga de una mascota: no existe "historia suelta".
+  // Por eso el botón de arriba no abre un formulario — manda a escoger el
+  // paciente, que es el paso que de verdad falta.
+  const [pidiendoPaciente, setPidiendoPaciente] = useState(false);
+  const refBusqueda = useRef(null);
 
   useEffect(() => {
     api.get('/mascotas')
@@ -54,7 +59,18 @@ function BuscarMascota() {
         title="Historias clínicas"
         subtitle={`${mascotas.length} pacientes registrados`}
         actions={
-          <Button variant="primary" size="md" icon={<IconPlus size={14}/>}>Nuevo registro</Button>
+          <Button
+            variant="primary"
+            size="md"
+            icon={<IconPlus size={14}/>}
+            onClick={() => {
+              setPidiendoPaciente(true);
+              refBusqueda.current?.focus();
+              refBusqueda.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }}
+          >
+            Nuevo registro
+          </Button>
         }
       />
       <Page>
@@ -86,11 +102,28 @@ function BuscarMascota() {
             <IconSearch size={14}/>
           </div>
           <input
-            style={{ ...styleInput, paddingLeft: 32 }}
+            ref={refBusqueda}
+            style={{
+              ...styleInput, paddingLeft: 32,
+              // Resaltar el campo mientras el usuario viene del botón: sin esto
+              // el foco es invisible y el clic parece no haber hecho nada.
+              ...(pidiendoPaciente ? { borderColor: 'var(--verde-600)', boxShadow: '0 0 0 3px var(--verde-50)' } : null),
+            }}
             placeholder="Buscar paciente por nombre o dueño..."
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
           />
+          {pidiendoPaciente && (
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--verde-600)', fontWeight: 600 }}>
+              Escoge la mascota a la que le vas a registrar la consulta. Si todavía no existe,{' '}
+              <span
+                onClick={() => navigate('/app/mascotas')}
+                style={{ textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                regístrala en Mascotas
+              </span>.
+            </p>
+          )}
         </div>
 
         {cargando ? (
