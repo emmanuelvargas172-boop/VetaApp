@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react';
 import api from '../api/axios';
 
@@ -120,6 +120,37 @@ export default function Operaciones() {
     ? productos
     : productos.filter(p => p.categoria === filtroCategoria);
 
+  // Cuánta plata hay parada en la bodega.
+  //
+  // Se calcula sobre lo filtrado, no sobre todo el inventario: el total vive
+  // encima de los filtros de categoría, y un número que ignora el filtro que
+  // el usuario acaba de tocar se lee como un error de la app.
+  //
+  // Lo agotado no entra: cero unidades es cero plata, y contarlo solo
+  // ensuciaría el conteo de productos.
+  const totales = useMemo(() => {
+    let costo = 0, venta = 0, ganancia = 0, contados = 0, sinPrecio = 0;
+
+    for (const p of productosFiltrados) {
+      const cant = Number(p.cantidad) || 0;
+      if (cant <= 0) continue;
+
+      const pc = Number(p.precio_compra) || 0;
+      const pv = Number(p.precio_venta)  || 0;
+
+      // Un producto sin precio aportaría cero en silencio y dejaría el total
+      // corto sin explicación. Se cuenta aparte para poder avisarlo abajo.
+      if (!pc || !pv) { sinPrecio++; continue; }
+
+      costo    += pc * cant;
+      venta    += pv * cant;
+      ganancia += (pv - pc) * cant;
+      contados++;
+    }
+
+    return { costo, venta, ganancia, contados, sinPrecio };
+  }, [productosFiltrados]);
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -139,6 +170,48 @@ export default function Operaciones() {
         <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="text-sm">No se pudo cargar el inventario. Verifica la conexión.</span>
+        </div>
+      )}
+
+      {/* Plata en bodega */}
+      {!cargando && (totales.contados > 0 || totales.sinPrecio > 0) && (
+        <div className="card mb-4">
+          <p className="text-[10.5px] font-semibold uppercase tracking-wider text-gray-400">
+            Plata en bodega{filtroCategoria !== 'Todos' && ` · ${filtroCategoria}`}
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <div>
+              <span className="text-xs text-gray-500">Costo </span>
+              <span className="text-2xl font-bold text-gray-900 tabular-nums">
+                {formatCOP(totales.costo)}
+              </span>
+            </div>
+            <span className="text-gray-300">→</span>
+            <div>
+              <span className="text-xs text-gray-500">Si se vende todo </span>
+              <span className="text-2xl font-bold text-verde-oscuro tabular-nums">
+                {formatCOP(totales.venta)}
+              </span>
+            </div>
+          </div>
+
+          {/* "Potencial" no es adorno: es mercancía sin vender, no utilidad.
+              Sin esa palabra el número se lee como plata que ya se ganó. */}
+          <p className="mt-2 text-xs text-gray-500">
+            {totales.contados} {totales.contados === 1 ? 'producto' : 'productos'} con existencias
+            {' · '}ganancia potencial <strong className="text-gray-700">{formatCOP(totales.ganancia)}</strong>
+          </p>
+
+          {totales.sinPrecio > 0 && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-amber-700">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              {totales.sinPrecio}{' '}
+              {totales.sinPrecio === 1
+                ? 'producto no está contado: le falta precio de compra o de venta'
+                : 'productos no están contados: les falta precio de compra o de venta'}
+            </p>
+          )}
         </div>
       )}
 
