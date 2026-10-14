@@ -90,15 +90,17 @@ export const Cierre = () => {
         color: VERDE.claro,
       })}
 
-      {linea('Escríbeme por WhatsApp', w, {
+      {/* El número separado en tres grupos: el que lo ve sin sonido tiene que
+          poder copiarlo de un vistazo, y diez dígitos seguidos no se retienen. */}
+      {linea('WhatsApp 320 338 3837', w, {
         marginTop: 54,
-        fontSize: 40,
-        fontWeight: 600,
+        fontSize: 44,
+        fontWeight: 700,
         color: '#FFFFFF',
         background: 'rgba(82,183,136,0.16)',
         border: `2px solid ${VERDE.claro}`,
         borderRadius: 999,
-        padding: '18px 44px',
+        padding: '20px 48px',
       })}
     </AbsoluteFill>
   );
