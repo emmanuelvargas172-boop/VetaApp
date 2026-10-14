@@ -9,3 +9,8 @@ dist/
 
 # Caché del CLI de Supabase, no es del proyecto
 supabase/.temp/
+
+# El mp4 del video se vuelve a armar con `npm run render` desde las capturas y
+# el guion, que sí están versionados. Son 5,6 MB por render y cada cambio de
+# texto generaría otro: no tiene por qué vivir en la historia del repo.
+video/out/
