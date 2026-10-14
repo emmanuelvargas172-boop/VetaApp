@@ -11,6 +11,7 @@ import {
   IconCheck, IconAlert, IconClock, IconCheckCircle, IconWhatsApp, IconBell,
   SpeciesAvatar, IconSyringe,
 } from '../components/icons';
+import { useEsMovil } from '../lib/useEsMovil';
 
 function calcDias(proxima_dosis) {
   const hoy = new Date().toISOString().split('T')[0];
@@ -36,13 +37,92 @@ function urgencia(dias) {
   return             { tone: 'success', label: `${dias}d`, color: 'var(--verde-600)', bg: 'var(--verde-50)',     ring: 'var(--verde-200)',    group: 'enplazo' };
 }
 
-function RecordatorioRow({ item, seleccion, onToggle, onEnviar }) {
+function RecordatorioRow({ item, seleccion, onToggle, onEnviar, esMovil }) {
   const dias = calcDias(item.proxima_dosis);
   const u = urgencia(dias);
   const checked = seleccion.has(item.id);
   const fechaFmt = new Date(item.proxima_dosis + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
   const telOk = !!normalizarTelefonoCO(item.dueno_telefono);
   const avisado = haceCuanto(item.avisado_at);
+
+  // En celular las cinco columnas (`28px 1fr 1.4fr 1fr auto`) le dejaban
+  // unos 70px a cada dato y los dos botones quedaban aplastados contra el
+  // borde. La fila se desarma en tres renglones y los botones se van abajo,
+  // anchos, que es donde alcanza el pulgar.
+  if (esMovil) {
+    return (
+      <div
+        onClick={() => onToggle(item.id)}
+        style={{
+          padding: '12px 14px',
+          background: checked ? 'var(--verde-50)' : 'transparent',
+          borderBottom: '1px solid var(--divider)',
+          cursor: 'pointer',
+        }}>
+        {/* Renglón 1: selección, mascota y cuánto falta */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: 5,
+            border: `1.5px solid ${checked ? 'var(--verde-600)' : 'var(--border-strong)'}`,
+            background: checked ? 'var(--verde-600)' : 'var(--surface)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            {checked && <IconCheck size={12} color="#fff" stroke={2.5}/>}
+          </div>
+          <SpeciesAvatar especie={item.especie} size={34}/>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.mascota_nombre}
+            </p>
+            <p style={{ margin: '1px 0 0', fontSize: 11.5, color: 'var(--text-faint)' }}>{item.raza || item.especie}</p>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <Badge tone={u.tone} dot>{u.label === 'Hoy' ? 'Hoy' : `En ${u.label.replace('d', ' días')}`}</Badge>
+            <p style={{ margin: '3px 0 0', fontSize: 10.5, color: 'var(--text-faint)' }}>{fechaFmt}</p>
+          </div>
+        </div>
+
+        {/* Renglón 2: qué vacuna y a quién se le escribe */}
+        <div style={{ marginTop: 9, paddingLeft: 30 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconSyringe size={12} color="var(--info)"/>
+            <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{item.nombre}</p>
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.dueno_nombre}
+          </p>
+          <p className="mono" style={{ margin: '1px 0 0', fontSize: 11.5, color: telOk ? 'var(--text-faint)' : 'var(--warn)' }}>
+            {item.dueno_telefono || 'Sin teléfono'}{item.dueno_telefono && !telOk ? ' · no sirve para WhatsApp' : ''}
+          </p>
+          {avisado && (
+            <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'var(--verde-600)', fontWeight: 600 }}>
+              Avisado {avisado}
+            </p>
+          )}
+        </div>
+
+        {/* Renglón 3: acciones */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 11, paddingLeft: 30 }} onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="wa" size="md" icon={<IconWhatsApp size={13}/>}
+            style={{ flex: 1 }}
+            disabled={!telOk}
+            title={telOk ? 'Abre WhatsApp con el mensaje escrito' : 'El teléfono del dueño no sirve para WhatsApp'}
+            onClick={() => onEnviar(item)}>
+            {avisado ? 'Reenviar' : 'Enviar'}
+          </Button>
+          {dias <= 7 && (
+            <Button variant="secondary" size="md" icon={<IconBell size={13}/>}
+              style={{ flex: 1 }}
+              onClick={() => openAdminWhatsApp(msgVacunaUrgente({ mascota: item.mascota_nombre, dueno: item.dueno_nombre, dias }))}>
+              Admin
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -132,7 +212,7 @@ function RecordatorioRow({ item, seleccion, onToggle, onEnviar }) {
   );
 }
 
-function Group({ titulo, items, tone, descripcion, seleccion, onToggle, onEnviar }) {
+function Group({ titulo, items, tone, descripcion, seleccion, onToggle, onEnviar, esMovil }) {
   if (items.length === 0) return null;
   const toneColors = {
     danger:  { color: 'var(--danger)',   bg: 'var(--danger-soft)', ring: 'var(--danger-ring)',  Icon: IconAlert },
@@ -164,7 +244,7 @@ function Group({ titulo, items, tone, descripcion, seleccion, onToggle, onEnviar
         </div>
         <Badge tone={tone}>{items.length}</Badge>
       </div>
-      {items.map(item => <RecordatorioRow key={item.id} item={item} seleccion={seleccion} onToggle={onToggle} onEnviar={onEnviar}/>)}
+      {items.map(item => <RecordatorioRow key={item.id} item={item} seleccion={seleccion} onToggle={onToggle} onEnviar={onEnviar} esMovil={esMovil}/>)}
     </Card>
   );
 }
@@ -274,6 +354,10 @@ function PanelEnvio({ cola, indice, enviados, onEnviar, onSaltar, onCerrar }) {
 }
 
 export default function Recordatorios() {
+  // Se lee una sola vez acá y baja por props hasta la fila: el hook abre un
+  // listener de matchMedia, y llamarlo dentro de RecordatorioRow abriría uno
+  // por cada vacuna de la lista.
+  const esMovil = useEsMovil();
   const [recordatorios, setRecordatorios] = useState([]);
   const [filtroDias, setFiltroDias] = useState(30);
   const [cargando, setCargando] = useState(true);
@@ -382,8 +466,9 @@ export default function Recordatorios() {
         }
       />
       <Page>
-        {/* Stats + filtros */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 14, marginBottom: 14 }}>
+        {/* Stats + filtros. En celular se apilan: el anillo de 72px más el
+            título no caben en la mitad de una pantalla de 390px. */}
+        <div style={{ display: 'grid', gridTemplateColumns: esMovil ? '1fr' : '1.5fr 1fr', gap: 14, marginBottom: 14 }}>
           <Card padding={0}>
             <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 18 }}>
               <ProgressRing
@@ -397,7 +482,7 @@ export default function Recordatorios() {
                   {data.length} recordatorios{' '}
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-faint)' }}>en {filtroDias} días</span>
                 </h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
                   <Badge tone="danger" dot>{urgentes.length} urgentes</Badge>
                   <Badge tone="warn" dot>{proximas.length} próximas</Badge>
                   <Badge tone="success" dot>{enplazo.length} en plazo</Badge>
@@ -463,9 +548,12 @@ export default function Recordatorios() {
             borderRadius: 'var(--r-lg)',
             marginBottom: 12,
             animation: 'fadeIn 0.2s ease-out',
+            // El botón "Enviar mensajes (12)" no cabe al lado del contador en
+            // celular: se baja al siguiente renglón en vez de desbordar.
+            flexWrap: esMovil ? 'wrap' : 'nowrap',
           }}>
             <Badge tone="verde">{seleccion.size} seleccionados</Badge>
-            <span style={{ flex: 1 }}/>
+            <span style={{ flex: esMovil ? undefined : 1 }}/>
             <Button variant="ghost" size="sm" onClick={() => setSeleccion(new Set())}>Limpiar</Button>
             <Button
               variant="wa" size="sm" icon={<IconWhatsApp size={13}/>}
@@ -523,9 +611,9 @@ export default function Recordatorios() {
           </Card>
         ) : (
           <>
-            <Group titulo="Urgentes" items={urgentes} tone="danger"  descripcion="Hoy y dentro de 7 días"    seleccion={seleccion} onToggle={toggle} onEnviar={enviarUno}/>
-            <Group titulo="Próximas" items={proximas}  tone="warn"   descripcion="Entre 8 y 15 días"         seleccion={seleccion} onToggle={toggle} onEnviar={enviarUno}/>
-            <Group titulo="En plazo" items={enplazo}   tone="success" descripcion="Entre 16 y 30 días"       seleccion={seleccion} onToggle={toggle} onEnviar={enviarUno}/>
+            <Group titulo="Urgentes" items={urgentes} tone="danger"  descripcion="Hoy y dentro de 7 días"    seleccion={seleccion} onToggle={toggle} onEnviar={enviarUno} esMovil={esMovil}/>
+            <Group titulo="Próximas" items={proximas}  tone="warn"   descripcion="Entre 8 y 15 días"         seleccion={seleccion} onToggle={toggle} onEnviar={enviarUno} esMovil={esMovil}/>
+            <Group titulo="En plazo" items={enplazo}   tone="success" descripcion="Entre 16 y 30 días"       seleccion={seleccion} onToggle={toggle} onEnviar={enviarUno} esMovil={esMovil}/>
           </>
         )}
       </Page>

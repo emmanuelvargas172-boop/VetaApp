@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-react';
 import api from '../api/axios';
+import { Topbar, Page, Button } from '../components/ui';
+import { useEsMovil } from '../lib/useEsMovil';
 
 const CATEGORIAS = ['Medicamentos', 'Vacunas', 'Antiparasitarios', 'Accesorios', 'Alimentos', 'Otros'];
 const UNIDADES   = ['unidad', 'caja', 'frasco', 'ampolla'];
@@ -22,6 +24,7 @@ function formatCOP(val) {
 }
 
 export default function Operaciones() {
+  const esMovil = useEsMovil();
   const [productos,        setProductos]        = useState([]);
   const [filtroCategoria,  setFiltroCategoria]  = useState('Todos');
   const [cargando,         setCargando]         = useState(true);
@@ -151,20 +154,31 @@ export default function Operaciones() {
     return { costo, venta, ganancia, contados, sinPrecio };
   }, [productosFiltrados]);
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Package className="w-7 h-7 text-verde-oscuro" />
-          <h1 className="text-2xl font-bold text-gray-900">Inventario</h1>
-        </div>
-        <button onClick={abrirNuevo} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Agregar producto
-        </button>
-      </div>
+  // Lo que urge, dicho en el encabezado: en celular la tabla queda debajo
+  // del resumen y de los filtros, así que sin esto hay que desplazar para
+  // enterarse de que algo se acabó.
+  const agotados = productos.filter(p => (Number(p.cantidad) || 0) <= 0).length;
+  const porAgotarse = productos.filter(p => {
+    const c = Number(p.cantidad) || 0;
+    return c > 0 && c <= (Number(p.cantidad_minima) || 0);
+  }).length;
 
+  return (
+    <>
+      <Topbar
+        title="Inventario"
+        subtitle={
+          cargando
+            ? 'Cargando...'
+            : `${productos.length} producto${productos.length === 1 ? '' : 's'} · ${agotados} agotado${agotados === 1 ? '' : 's'} · ${porAgotarse} por agotarse`
+        }
+        actions={
+          <Button variant="primary" size="md" icon={<Plus className="w-4 h-4" />} onClick={abrirNuevo}>
+            Agregar producto
+          </Button>
+        }
+      />
+      <Page>
       {/* Error banner */}
       {error && (
         <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3">
@@ -245,6 +259,71 @@ export default function Operaciones() {
             Agregar producto
           </button>
         </div>
+      ) : esMovil ? (
+        /* En celular la tabla de ocho columnas no cabe, y como vivía dentro
+           de una tarjeta con overflow-hidden no se recortaba con scroll: se
+           recortaba y punto, dejando Estado y los botones fuera de la
+           pantalla. Cada producto pasa a ser una tarjeta.
+
+           Editar y Eliminar van abajo, anchos y separados: en la tabla
+           aparecían solo con el mouse encima (group-hover), que en una
+           pantalla táctil es un botón que no existe. */
+        <div className="space-y-2.5">
+          {productosFiltrados.map(p => {
+            const badge = estadoBadge(p.cantidad, p.cantidad_minima);
+            return (
+              <div key={p.id} className="card p-0 overflow-hidden">
+                <div className="px-4 pt-3.5 pb-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 leading-snug">{p.nombre}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{p.categoria} · {p.unidad}</p>
+                    </div>
+                    <span className={`flex-shrink-0 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${badge.cls}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <div>
+                      <span className="text-xs text-gray-500">Stock</span>
+                      <p className="m-0 font-mono text-gray-900">
+                        {p.cantidad}
+                        <span className="ml-1 text-xs font-sans text-gray-400">mín. {p.cantidad_minima}</span>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Compra</span>
+                      <p className="m-0 text-gray-700">{formatCOP(p.precio_compra)}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Venta</span>
+                      <p className="m-0 text-gray-700">{formatCOP(p.precio_venta)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex border-t border-gray-100">
+                  <button
+                    onClick={() => abrirEditar(p)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium text-gray-600 active:bg-gray-50"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Editar
+                  </button>
+                  <span className="w-px bg-gray-100" />
+                  <button
+                    onClick={() => eliminarProducto(p)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium text-red-600 active:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="card overflow-hidden p-0">
           <table className="w-full text-sm">
@@ -308,16 +387,20 @@ export default function Operaciones() {
         </div>
       )}
 
+      </Page>
+
       {/* Overlay */}
       {panelAbierto && (
         <div className="fixed inset-0 bg-black/20 z-30" onClick={cerrarPanel} />
       )}
 
-      {/* Panel lateral */}
+      {/* Panel lateral. En celular va a ancho completo: 384px fijos se salen
+          de pantalla en cualquier teléfono de 360px, y el formulario quedaba
+          con los campos cortados por el borde derecho. */}
       <aside
-        className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${
-          panelAbierto ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-0 right-0 h-full bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${
+          esMovil ? 'w-full' : 'w-96'
+        } ${panelAbierto ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header panel */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -442,6 +525,6 @@ export default function Operaciones() {
           </button>
         </div>
       </aside>
-    </div>
+    </>
   );
 }
