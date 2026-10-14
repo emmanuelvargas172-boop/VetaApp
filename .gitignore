@@ -14,3 +14,10 @@ supabase/.temp/
 # el guion, que sí están versionados. Son 5,6 MB por render y cada cambio de
 # texto generaría otro: no tiene por qué vivir en la historia del repo.
 video/out/
+
+# El audio se vuelve a generar con `npm run audio` desde los dos scripts de
+# herramientas/, que sí están versionados. La música usa una semilla fija, así
+# que sale idéntica siempre. Son 11 MB de wav que no tienen por qué pesar en
+# cada clon del repo.
+video/public/audio/
+video/muestras/

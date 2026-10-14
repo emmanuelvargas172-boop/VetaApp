@@ -1,7 +1,7 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, staticFile, interpolate, useCurrentFrame } from 'remotion';
 import { loadFont } from '@remotion/google-fonts/Geist';
-import { TIEMPOS, DUR_PORTADA, DUR_CIERRE, DURACION_TOTAL, VERDE } from './datos';
+import { LINEA, DURACION_TOTAL, RETARDO_VOZ, FPS, VERDE } from './datos';
 import { Marco } from './Marco';
 import { Titulo } from './Titulo';
 import { Portada, Cierre } from './Portada';
@@ -29,6 +29,38 @@ const Desvanece = ({ duracion, children, salida = 9 }) => {
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
   return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
+};
+
+/* Ventanas en las que está hablando la voz, en frames. Se arman desde la misma
+   LINEA que dibuja el video para que no puedan desfasarse. */
+const VENTANAS_VOZ = LINEA.filter((b) => b.audio).map((b) => [
+  b.desde + RETARDO_VOZ,
+  b.desde + RETARDO_VOZ + b.audio.segundos * FPS,
+]);
+
+const MUSICA_SOLA = 0.3;
+const MUSICA_BAJO_VOZ = 0.1;
+const RAMPA = 14; // frames que tarda en bajar o subir
+
+/**
+ * La música baja cuando alguien habla y vuelve a subir en los silencios.
+ *
+ * Dejarla a volumen fijo obliga a elegir entre que tape la voz o que no se
+ * oiga nunca. Bajarla solo mientras hay narración deja las dos cosas: se
+ * entiende lo que dicen y el video no queda mudo entre frase y frase.
+ */
+const volumenMusica = (frame) => {
+  for (const [inicio, fin] of VENTANAS_VOZ) {
+    if (frame >= inicio - RAMPA && frame <= fin + RAMPA) {
+      return interpolate(
+        frame,
+        [inicio - RAMPA, inicio, fin, fin + RAMPA],
+        [MUSICA_SOLA, MUSICA_BAJO_VOZ, MUSICA_BAJO_VOZ, MUSICA_SOLA],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
+    }
+  }
+  return MUSICA_SOLA;
 };
 
 /* Barra de avance abajo. En un video que se manda por WhatsApp y se ve sin
@@ -60,52 +92,50 @@ const Avance = () => {
   );
 };
 
-export const Veta = () => {
-  // Cada tiempo arranca donde terminó el anterior. Se acumula acá y no en
-  // datos.js para que cambiar una duración no obligue a recalcular a mano.
-  let cursor = DUR_PORTADA;
+/** Un tiempo del guion: el título arriba y una o dos tomas abajo. */
+const Bloque = ({ bloque }) => {
+  if (bloque.tipo === 'portada') return <Portada />;
+  if (bloque.tipo === 'cierre') return <Cierre />;
+
+  const t = bloque.tiempo;
+  const durToma = Math.floor(bloque.duracion / t.tomas.length);
 
   return (
-    <AbsoluteFill
-      style={{
-        fontFamily,
-        background: `radial-gradient(120% 80% at 50% 0%, ${VERDE.fondo2} 0%, ${VERDE.fondo} 62%)`,
-      }}
-    >
-      <Sequence durationInFrames={DUR_PORTADA}>
-        <Desvanece duracion={DUR_PORTADA}>
-          <Portada />
-        </Desvanece>
-      </Sequence>
-
-      {TIEMPOS.map((t, i) => {
-        const desde = cursor;
-        cursor += t.duracion;
-        const durToma = Math.floor(t.duracion / t.tomas.length);
-
-        return (
-          <Sequence key={i} from={desde} durationInFrames={t.duracion}>
-            <Desvanece duracion={t.duracion}>
-              <Titulo etiqueta={t.etiqueta} texto={t.texto} />
-              {t.tomas.map((toma, j) => (
-                <Sequence key={j} from={j * durToma} durationInFrames={durToma}>
-                  <Desvanece duracion={durToma} salida={7}>
-                    <Marco toma={toma} duracion={durToma} />
-                  </Desvanece>
-                </Sequence>
-              ))}
-            </Desvanece>
-          </Sequence>
-        );
-      })}
-
-      <Sequence from={cursor} durationInFrames={DUR_CIERRE}>
-        <Desvanece duracion={DUR_CIERRE}>
-          <Cierre />
-        </Desvanece>
-      </Sequence>
-
-      <Avance />
-    </AbsoluteFill>
+    <>
+      <Titulo etiqueta={t.etiqueta} texto={t.texto} />
+      {t.tomas.map((toma, j) => (
+        <Sequence key={j} from={j * durToma} durationInFrames={durToma}>
+          <Desvanece duracion={durToma} salida={7}>
+            <Marco toma={toma} duracion={durToma} />
+          </Desvanece>
+        </Sequence>
+      ))}
+    </>
   );
 };
+
+export const Veta = () => (
+  <AbsoluteFill
+    style={{
+      fontFamily,
+      background: `radial-gradient(120% 80% at 50% 0%, ${VERDE.fondo2} 0%, ${VERDE.fondo} 62%)`,
+    }}
+  >
+    <Audio src={staticFile('audio/musica.wav')} volume={volumenMusica} />
+
+    {LINEA.map((bloque) => (
+      <Sequence key={bloque.id} from={bloque.desde} durationInFrames={bloque.duracion}>
+        <Desvanece duracion={bloque.duracion}>
+          <Bloque bloque={bloque} />
+        </Desvanece>
+        {bloque.audio && (
+          <Sequence from={RETARDO_VOZ}>
+            <Audio src={staticFile(bloque.audio.archivo)} />
+          </Sequence>
+        )}
+      </Sequence>
+    ))}
+
+    <Avance />
+  </AbsoluteFill>
+);

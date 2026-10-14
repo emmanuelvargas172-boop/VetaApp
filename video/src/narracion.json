@@ -1,0 +1,54 @@
+{
+  "voz": "Paulina",
+  "ritmo": 165,
+  "clips": [
+    {
+      "id": "portada",
+      "texto": "El cuaderno de citas, en el celular.",
+      "archivo": "audio/portada.wav",
+      "segundos": 2.575
+    },
+    {
+      "id": "resumen",
+      "texto": "Abres la app y ves las citas de hoy y las vacunas que urgen.",
+      "archivo": "audio/resumen.wav",
+      "segundos": 3.376
+    },
+    {
+      "id": "pacientes",
+      "texto": "Cada mascota con su dueño y su teléfono, a un toque.",
+      "archivo": "audio/pacientes.wav",
+      "segundos": 3.426
+    },
+    {
+      "id": "historias",
+      "texto": "La historia clínica completa: qué le diagnosticó, qué le recetó y cuánto pesaba.",
+      "archivo": "audio/historias.wav",
+      "segundos": 5.407
+    },
+    {
+      "id": "citas",
+      "texto": "Las citas del cuaderno, en un calendario que no se pierde ni se moja.",
+      "archivo": "audio/citas.wav",
+      "segundos": 4.2
+    },
+    {
+      "id": "inventario",
+      "texto": "Qué se acabó, qué está por acabarse, y cuánta plata tiene parada en bodega.",
+      "archivo": "audio/inventario.wav",
+      "segundos": 5.068
+    },
+    {
+      "id": "recordatorios",
+      "texto": "La app arma la lista de a quién le toca vacuna y escribe el mensaje. Usted da un clic y sale por WhatsApp.",
+      "archivo": "audio/recordatorios.wav",
+      "segundos": 6.672
+    },
+    {
+      "id": "cierre",
+      "texto": "Esencial, sesenta y nueve mil al mes. Avanzado, noventa y nueve mil. Ocho días de prueba, sin tarjeta. Escríbeme al WhatsApp.",
+      "archivo": "audio/cierre.wav",
+      "segundos": 9.286
+    }
+  ]
+}

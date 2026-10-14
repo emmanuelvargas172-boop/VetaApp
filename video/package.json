@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "audio": "python3 herramientas/narracion.py && ./herramientas/musica.sh",
     "studio": "remotion studio src/index.jsx",
     "render": "remotion render src/index.jsx Veta out/veta.mp4"
   },
