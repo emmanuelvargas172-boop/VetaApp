@@ -118,17 +118,20 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
       fd.append('dueno_id', dueno_id);
       if (form.foto) fd.append('foto', form.foto);
 
-      if (editando) {
-        await api.put(`/mascotas/${mascotaEditar.id}`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-      } else {
-        await api.post('/mascotas', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-      }
+      const { data } = editando
+        ? await api.put(`/mascotas/${mascotaEditar.id}`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+        : await api.post('/mascotas', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
 
-      onSuccess();
+      // Se devuelve la mascota guardada para que quien abrió el modal pueda
+      // usarla de una. Citas la necesita para dejarla ya elegida en la cita
+      // que se estaba creando: obligar a buscarla otra vez, parado frente al
+      // cliente, es justo donde se pierde el hilo. Mascotas pasa `cargar` y
+      // no recibe nada, que es compatible: un argumento de más se ignora.
+      onSuccess(data);
       onClose();
     } catch (err) {
       setError(err.response?.data?.error || 'Ocurrió un error. Intenta de nuevo.');

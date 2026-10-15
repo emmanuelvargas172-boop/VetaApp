@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import ModalMascota from '../components/ModalMascota';
+import { linkWhatsApp, msgRecordatorioCita } from '../utils/whatsapp';
 import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle,
@@ -55,6 +58,8 @@ export default function Citas() {
   const [mascotasEstado, setMascotasEstado] = useState('pendiente'); // pendiente|cargando|listo|error
   const [busqMascota, setBusqMascota] = useState('');
   const [mascotaFoco, setMascotaFoco] = useState(false);
+  const [modalMascota, setModalMascota] = useState(false);
+  const navigate = useNavigate();
   const [guardando, setGuardando] = useState(false);
   const [formError, setFormError] = useState('');
   const esMovil = useEsMovil();
@@ -133,6 +138,30 @@ export default function Citas() {
     setPanelAbierto(true);
   };
 
+  /**
+   * Una mascota acabada de registrar desde el panel de la cita.
+   *
+   * Se mete en la lista que ya está en memoria en vez de volver a pedir
+   * `/mascotas`: la respuesta del POST trae la fila completa (`flattenMascota`
+   * en axios.js), así que pedirla otra vez es un viaje de red para traer lo
+   * mismo. Se ordena por nombre para que la lista quede como la devuelve el
+   * servidor y no haya una mascota suelta al final.
+   */
+  const mascotaRegistrada = (m) => {
+    if (!m?.id) {
+      // Si algún día el modal deja de devolver la mascota, se marca la lista
+      // como no cargada y la siguiente apertura la pide de nuevo. Peor es
+      // quedarse con una lista a la que le falta la que acaban de crear.
+      setMascotasEstado('pendiente');
+      return;
+    }
+    setMascotas(prev => [...prev, m].sort((a, b) =>
+      (a.nombre || '').localeCompare(b.nombre || '', 'es')));
+    setForm(f => ({ ...f, mascota_id: m.id }));
+    setBusqMascota(etiquetaMascota(m));
+    setMascotaFoco(false);
+  };
+
   // Se corta en 8: la lista va dentro de un panel de 384px y más de ocho
   // obligan a desplazar, que con el dedo es peor que volver a escribir.
   const mascotasFiltradas = useMemo(() => {
@@ -183,7 +212,7 @@ export default function Citas() {
         subtitle={`${citasFiltradas.length} citas · ${stats.atendidas} completadas · ${stats.pendientes + stats.confirmadas} restantes`}
         actions={
           <>
-            <Button variant="secondary" size="md" icon={<IconCalDays size={13}/>}>Ver calendario</Button>
+            <Button variant="secondary" size="md" icon={<IconCalDays size={13}/>} onClick={() => navigate('/app/calendario')}>Ver calendario</Button>
             <Button variant="primary" size="md" icon={<IconPlus size={14}/>} onClick={() => abrirPanel()}>
               Nueva cita
             </Button>
@@ -269,6 +298,11 @@ export default function Citas() {
               const estado = ESTADO_CITA[c.estado] || ESTADO_CITA.pendiente;
               const atendida = c.estado === 'atendida';
               const hora = c.hora || c.hora_inicio || '';
+              // null cuando el dueño no tiene un celular con el que WhatsApp
+              // sirva —un fijo, por ejemplo—. En ese caso el botón queda
+              // apagado y dice por qué, en vez de abrir una pestaña con un
+              // error de WhatsApp que parece culpa de la app.
+              const waUrl = linkWhatsApp(c.dueno_telefono, msgRecordatorioCita(c));
               const transiciones = TRANSICIONES[c.estado] || [];
               return (
                 <div key={c.id} style={{
@@ -340,7 +374,17 @@ export default function Citas() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <button style={iconBtnStyle} title="WhatsApp"><IconWhatsApp size={12}/></button>
+                    <button
+                      style={{ ...iconBtnStyle, cursor: waUrl ? 'pointer' : 'not-allowed', opacity: waUrl ? 1 : 0.35 }}
+                      disabled={!waUrl}
+                      title={waUrl
+                        ? `Recordarle la cita a ${c.dueno_nombre || 'el dueño'} por WhatsApp`
+                        : 'El dueño no tiene un celular registrado'}
+                      // stopPropagation porque el renglón entero también
+                      // responde al clic y abriría el detalle de la cita.
+                      onClick={(e) => { e.stopPropagation(); window.open(waUrl, '_blank', 'noopener'); }}>
+                      <IconWhatsApp size={12}/>
+                    </button>
                     <button style={iconBtnStyle} title="Editar" onClick={(e) => { e.stopPropagation(); abrirPanel(c); }}><IconEdit size={13} color="var(--text-muted)"/></button>
                     <button style={iconBtnStyle} title="Más"><IconMore size={14} color="var(--text-muted)"/></button>
                   </div>
@@ -421,7 +465,7 @@ export default function Citas() {
                           <p style={{ margin: 0, padding: '10px 12px', fontSize: 12.5, color: 'var(--text-faint)' }}>
                             {mascotasEstado === 'cargando' ? 'Cargando las mascotas...'
                               : mascotasEstado === 'error' ? 'No se pudo cargar la lista. Cierre y vuelva a abrir.'
-                              : mascotas.length === 0 ? 'Todavía no hay mascotas registradas. Regístrela en Pacientes.'
+                              : mascotas.length === 0 ? 'Todavía no hay ninguna mascota registrada.'
                               : 'Ninguna mascota se llama así.'}
                           </p>
                         ) : mascotasFiltradas.map(m => (
@@ -444,6 +488,30 @@ export default function Citas() {
                             </div>
                           </button>
                         ))}
+
+                        {/* Pegado abajo con `sticky` para que no se vaya
+                            desplazando con la lista: cuando hace falta es
+                            justo porque ninguna de las ocho era la buena.
+
+                            Está acá y no solo en Pacientes por el cierre de
+                            venta: la clínica dicta del cuaderno una mascota
+                            que todavía no existe, y salirse a crearla pierde
+                            la cita a medio llenar. */}
+                        <button type="button"
+                          onClick={() => setModalMascota(true)}
+                          style={{
+                            position: 'sticky', bottom: 0, width: '100%',
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '9px 12px', fontSize: 12.5, fontWeight: 600,
+                            color: 'var(--verde-600)', textAlign: 'left',
+                            background: 'var(--surface)', cursor: 'pointer',
+                            border: 'none', borderTop: '1px solid var(--divider)',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--verde-50)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}>
+                          <IconPlus size={12}/>
+                          Registrar una mascota nueva
+                        </button>
                       </div>
                     )}
                   </div>
@@ -480,6 +548,16 @@ export default function Citas() {
             </div>
           </div>
         )}
+
+        {/* Fuera del panel a propósito, no anidado dentro: el panel se cierra
+            al hacer clic en su fondo, y desde adentro un clic del modal podría
+            cerrarle el formulario por debajo. Como hermano, el z-50 del modal
+            queda por encima del z-40 del panel sin pelearse con nada. */}
+        <ModalMascota
+          isOpen={modalMascota}
+          onClose={() => setModalMascota(false)}
+          onSuccess={mascotaRegistrada}
+        />
 
         {dropdownEstadoId && <div style={{ position: 'fixed', inset: 0, zIndex: 30 }} onClick={() => setDropdownEstadoId(null)}/>}
       </div>

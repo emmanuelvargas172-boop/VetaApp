@@ -46,6 +46,27 @@ export const msgRecordatorioVacuna = (item) => {
   return `Hola ${item.dueno_nombre}, le recordamos que ${item.mascota_nombre} tiene pendiente su vacuna de ${item.nombre} el ${fecha}. Por favor comuníquese con nosotros para agendar su cita. 🐾`;
 };
 
+// Mensaje que recibe el dueño para recordarle la cita. Vive acá y no suelto
+// en la página de Citas porque es el mismo caso que la vacuna: texto que sale
+// a nombre de la clínica y que, si algún día cambia, tiene que cambiar en un
+// solo lugar.
+//
+// La fecha se escribe con día y mes en letras: "15 de octubre" no se confunde
+// con nada, mientras que 15/10 y 10/15 sí. El mediodía en el `new Date` evita
+// que la zona horaria corra la fecha un día para atrás.
+export const msgRecordatorioCita = (cita) => {
+  // Sin fecha se omite en vez de escribir "Invalid Date". La columna está en
+  // NOT NULL, así que no debería pasar, pero este texto sale a un cliente de
+  // la clínica y no es donde se quiere averiguar que la hipótesis era falsa.
+  const d = cita.fecha ? new Date(cita.fecha + 'T12:00:00') : null;
+  const fecha = d && !isNaN(d)
+    ? ` el ${d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}`
+    : '';
+  const hora = cita.hora ? ` a las ${cita.hora}` : '';
+  const motivo = cita.motivo ? ` para ${cita.motivo.toLowerCase()}` : '';
+  return `Hola ${cita.dueno_nombre}, le recordamos la cita de ${cita.mascota_nombre}${motivo}${fecha}${hora}. 🐾`;
+};
+
 // null si el teléfono no sirve, para que la UI pueda deshabilitar el botón
 // en vez de abrir una pestaña con un error de WhatsApp.
 export const linkWhatsApp = (telefono, mensaje) => {
