@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle,
 } from '../components/ui';
 import {
-  SpeciesAvatar,
+  SpeciesAvatar, especieCfg,
   IconCalendar, IconCalDays, IconPlus, IconSearch, IconClock, IconCheck,
   IconCheckCircle, IconWhatsApp, IconEdit, IconMore, IconX, IconChevronDown,
   IconAlert, IconPaw, IconSyringe,
@@ -25,6 +25,18 @@ const TRANSICIONES = {
   cancelada:  [],
 };
 
+// La tabla `citas` tiene mascota_id, veterinario, fecha, hora y motivo en NOT
+// NULL (001_init.sql), así que los cinco se validan antes de enviar: si falta
+// uno, Postgres rechaza la fila y el mensaje que vuelve no le dice nada a la
+// veterinaria. `notas` es la única opcional.
+const FORM_VACIO = { mascota_id: '', veterinario: '', fecha: '', hora: '09:00', motivo: '', notas: '' };
+
+// Lo que se ve en el campo de búsqueda cuando ya hay una mascota elegida. El
+// dueño va al lado del nombre porque en una clínica hay tres Michis y el
+// nombre solo no distingue cuál.
+const etiquetaMascota = (m) =>
+  `${especieCfg(m.especie).emoji} ${m.nombre}${m.dueno_nombre ? ` — ${m.dueno_nombre}` : ''}`;
+
 export default function Citas() {
   const [citas, setCitas]             = useState([]);
   const [cargando, setCargando]       = useState(true);
@@ -35,6 +47,16 @@ export default function Citas() {
   const [citaEditando, setCitaEditando] = useState(null);
   const [dropdownEstadoId, setDropdownEstadoId] = useState(null);
   const [busqueda, setBusqueda] = useState('');
+  const [form, setForm] = useState(FORM_VACIO);
+  const [mascotas, setMascotas] = useState([]);
+  // Hace falta además de la lista: con solo `mascotas.length === 0` no se
+  // distingue "todavía no cargó" de "la clínica no tiene ninguna", y el panel
+  // terminaba diciendo que la mascota no existe mientras aún iba en camino.
+  const [mascotasEstado, setMascotasEstado] = useState('pendiente'); // pendiente|cargando|listo|error
+  const [busqMascota, setBusqMascota] = useState('');
+  const [mascotaFoco, setMascotaFoco] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [formError, setFormError] = useState('');
   const esMovil = useEsMovil();
 
   const hoy = new Date().toISOString().split('T')[0];
@@ -77,6 +99,83 @@ export default function Citas() {
     } catch { alert('No se pudo actualizar el estado'); }
   };
 
+  /**
+   * Abre el panel, ya sea para crear o para editar.
+   *
+   * Las mascotas se piden acá y no en el `useEffect` de la página porque la
+   * lista completa solo hace falta cuando se va a agendar. Quien entra a ver
+   * las citas del día no paga esa consulta. Se cachea: una vez cargada, abrir
+   * el panel otra vez no vuelve a pedirla.
+   */
+  const abrirPanel = (cita = null) => {
+    setCitaEditando(cita);
+    setForm(cita ? {
+      mascota_id:  cita.mascota_id,
+      veterinario: cita.veterinario || '',
+      fecha:       cita.fecha || hoy,
+      hora:        cita.hora || '09:00',
+      motivo:      cita.motivo || '',
+      notas:       cita.notas || '',
+    } : { ...FORM_VACIO, fecha: hoy });
+    // Al editar, el campo arranca con la mascota escrita para que no parezca
+    // que se perdió. La lista no se abre porque mascota_id ya viene puesto.
+    setBusqMascota(cita ? etiquetaMascota({
+      especie: cita.especie, nombre: cita.mascota_nombre, dueno_nombre: cita.dueno_nombre,
+    }) : '');
+    setMascotaFoco(false);
+    setFormError('');
+    if (mascotasEstado !== 'listo') {
+      setMascotasEstado('cargando');
+      api.get('/mascotas')
+        .then(r => { setMascotas(r.data); setMascotasEstado('listo'); })
+        .catch(() => setMascotasEstado('error'));
+    }
+    setPanelAbierto(true);
+  };
+
+  // Se corta en 8: la lista va dentro de un panel de 384px y más de ocho
+  // obligan a desplazar, que con el dedo es peor que volver a escribir.
+  const mascotasFiltradas = useMemo(() => {
+    if (!busqMascota.trim()) return mascotas.slice(0, 8);
+    const q = busqMascota.toLowerCase();
+    return mascotas.filter(m =>
+      (m.nombre || '').toLowerCase().includes(q) ||
+      (m.dueno_nombre || '').toLowerCase().includes(q),
+    ).slice(0, 8);
+  }, [mascotas, busqMascota]);
+
+  const guardar = async () => {
+    // Se valida mascota_id y no el texto del campo: la veterinaria puede
+    // haber escrito "Michi" sin elegir de la lista, y una cita necesita el id.
+    if (!form.mascota_id)         return setFormError('Elija la mascota de la lista.');
+    if (!form.fecha || !form.hora) return setFormError('Falta la fecha o la hora.');
+    if (!form.motivo.trim())      return setFormError('Escriba el motivo de la cita.');
+    if (!form.veterinario.trim()) return setFormError('Escriba quién la atiende.');
+
+    setGuardando(true); setFormError('');
+    try {
+      const cuerpo = {
+        mascota_id:  form.mascota_id,
+        veterinario: form.veterinario.trim(),
+        fecha:       form.fecha,
+        hora:        form.hora,
+        motivo:      form.motivo.trim(),
+        notas:       form.notas.trim() || null,
+      };
+      // El estado se manda tal cual estaba: el PUT lo sobrescribe, y sin esto
+      // una cita ya confirmada volvería a quedar pendiente al corregirle la
+      // hora. El cambio de estado tiene su propio camino (`cambiarEstado`).
+      if (citaEditando) await api.put(`/citas/${citaEditando.id}`, { ...cuerpo, estado: citaEditando.estado });
+      else              await api.post('/citas', cuerpo);
+      setPanelAbierto(false);
+      cargar();
+    } catch {
+      setFormError('No se pudo guardar. Intente de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   return (
     <>
       <Topbar
@@ -85,7 +184,7 @@ export default function Citas() {
         actions={
           <>
             <Button variant="secondary" size="md" icon={<IconCalDays size={13}/>}>Ver calendario</Button>
-            <Button variant="primary" size="md" icon={<IconPlus size={14}/>} onClick={() => { setCitaEditando(null); setPanelAbierto(true); }}>
+            <Button variant="primary" size="md" icon={<IconPlus size={14}/>} onClick={() => abrirPanel()}>
               Nueva cita
             </Button>
           </>
@@ -164,7 +263,7 @@ export default function Citas() {
               <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><div className="vp-spinner"/></div>
             ) : citasFiltradas.length === 0 ? (
               <EmptyState icon={<IconCalendar size={24}/>} title="Sin citas" subtitle="No hay citas que coincidan con los filtros aplicados"
-                action={<Button variant="primary" size="sm" icon={<IconPlus size={12}/>} onClick={() => setPanelAbierto(true)}>Nueva cita</Button>}/>
+                action={<Button variant="primary" size="sm" icon={<IconPlus size={12}/>} onClick={() => abrirPanel()}>Nueva cita</Button>}/>
             ) : citasFiltradas.map((c, i) => {
               const especie = c.especie || 'otro';
               const estado = ESTADO_CITA[c.estado] || ESTADO_CITA.pendiente;
@@ -242,7 +341,7 @@ export default function Citas() {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <button style={iconBtnStyle} title="WhatsApp"><IconWhatsApp size={12}/></button>
-                    <button style={iconBtnStyle} title="Editar" onClick={(e) => { e.stopPropagation(); setCitaEditando(c); setPanelAbierto(true); }}><IconEdit size={13} color="var(--text-muted)"/></button>
+                    <button style={iconBtnStyle} title="Editar" onClick={(e) => { e.stopPropagation(); abrirPanel(c); }}><IconEdit size={13} color="var(--text-muted)"/></button>
                     <button style={iconBtnStyle} title="Más"><IconMore size={14} color="var(--text-muted)"/></button>
                   </div>
                 </div>
@@ -278,30 +377,105 @@ export default function Citas() {
                 <button onClick={() => setPanelAbierto(false)} style={iconBtnStyle}><IconX size={14} color="var(--text-muted)"/></button>
               </div>
               <div style={{ flex: 1, padding: 22, overflow: 'auto' }} className="scroll-thin">
+                {formError && (
+                  <div style={{
+                    marginBottom: 14, padding: '9px 12px', fontSize: 12.5,
+                    background: 'var(--danger-soft)', border: '1px solid var(--danger-ring)',
+                    borderRadius: 'var(--r-md)', color: 'var(--danger)',
+                  }}>
+                    {formError}
+                  </div>
+                )}
+
                 <FormField label="Mascota" required>
-                  <UIInput placeholder="Buscar mascota..." defaultValue={citaEditando?.mascota_nombre || ''}/>
+                  {/* onFocus/onBlur van en el contenedor y no en el input
+                      porque FormInput ya usa los suyos para el borde verde y
+                      los pisa. En React estos dos eventos burbujean, así que
+                      desde acá se entera igual.
+
+                      El onMouseDown evita que el clic en una opción saque el
+                      foco antes de que corra el onClick: sin eso la lista se
+                      cierra y la mascota nunca queda elegida. */}
+                  <div style={{ position: 'relative' }}
+                    onFocus={() => setMascotaFoco(true)}
+                    onBlur={() => setMascotaFoco(false)}
+                    onMouseDown={e => { if (e.target.closest?.('button')) e.preventDefault(); }}>
+                    <FormInput
+                      placeholder="Buscar por mascota o por dueño..."
+                      value={busqMascota}
+                      // Escribir borra la mascota elegida: si no, se podría
+                      // dejar el nombre de una y guardar el id de otra.
+                      onChange={e => { setBusqMascota(e.target.value); setForm(f => ({ ...f, mascota_id: '' })); }}
+                    />
+                    {/* Con el campo vacío también se abre: al entrar a agendar
+                        lo primero que se quiere ver es a quién se puede citar,
+                        no tener que adivinar el nombre para que aparezca. */}
+                    {(mascotaFoco || busqMascota) && !form.mascota_id && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-md)',
+                        zIndex: 10, maxHeight: 180, overflow: 'auto',
+                      }}>
+                        {mascotasFiltradas.length === 0 ? (
+                          <p style={{ margin: 0, padding: '10px 12px', fontSize: 12.5, color: 'var(--text-faint)' }}>
+                            {mascotasEstado === 'cargando' ? 'Cargando las mascotas...'
+                              : mascotasEstado === 'error' ? 'No se pudo cargar la lista. Cierre y vuelva a abrir.'
+                              : mascotas.length === 0 ? 'Todavía no hay mascotas registradas. Regístrela en Pacientes.'
+                              : 'Ninguna mascota se llama así.'}
+                          </p>
+                        ) : mascotasFiltradas.map(m => (
+                          <button key={m.id} type="button"
+                            onClick={() => {
+                              setForm(f => ({ ...f, mascota_id: m.id }));
+                              setBusqMascota(etiquetaMascota(m));
+                            }}
+                            style={{
+                              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '8px 12px', border: 'none', background: 'transparent',
+                              cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--stone-50)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <SpeciesAvatar especie={m.especie} size={28}/>
+                            <div>
+                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{m.nombre}</p>
+                              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-faint)' }}>{m.dueno_nombre}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </FormField>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <FormField label="Fecha" required>
-                    <FormInput type="date" defaultValue={citaEditando?.fecha || hoy}/>
+                    <FormInput type="date" value={form.fecha}
+                      onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}/>
                   </FormField>
                   <FormField label="Hora" required>
-                    <FormInput type="time" defaultValue={citaEditando?.hora || '09:00'} mono/>
+                    <FormInput type="time" value={form.hora} mono
+                      onChange={e => setForm(f => ({ ...f, hora: e.target.value }))}/>
                   </FormField>
                 </div>
-                <FormField label="Veterinario">
-                  <FormInput placeholder="Dr. Vega" defaultValue={citaEditando?.veterinario || ''}/>
+                <FormField label="Veterinario" required>
+                  <FormInput placeholder="Dr. Vega" value={form.veterinario}
+                    onChange={e => setForm(f => ({ ...f, veterinario: e.target.value }))}/>
                 </FormField>
                 <FormField label="Motivo" required>
-                  <FormInput placeholder="Vacunación, control general..." defaultValue={citaEditando?.motivo || ''}/>
+                  <FormInput placeholder="Vacunación, control general..." value={form.motivo}
+                    onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}/>
                 </FormField>
                 <FormField label="Notas adicionales">
-                  <FormInput textarea placeholder="Información relevante para el veterinario..." defaultValue={citaEditando?.notas || ''}/>
+                  <FormInput textarea placeholder="Información relevante para el veterinario..." value={form.notas}
+                    onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}/>
                 </FormField>
               </div>
               <div style={{ padding: '14px 22px', borderTop: '1px solid var(--divider)', background: 'var(--stone-50)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                <Button variant="ghost" onClick={() => setPanelAbierto(false)}>Cancelar</Button>
-                <Button variant="primary">{citaEditando ? 'Guardar cambios' : 'Crear cita'}</Button>
+                <Button variant="ghost" onClick={() => setPanelAbierto(false)} disabled={guardando}>Cancelar</Button>
+                <Button variant="primary" onClick={guardar} disabled={guardando}>
+                  {guardando ? 'Guardando...' : citaEditando ? 'Guardar cambios' : 'Crear cita'}
+                </Button>
               </div>
             </div>
           </div>
