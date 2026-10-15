@@ -21,3 +21,8 @@ video/out/
 # cada clon del repo.
 video/public/audio/
 video/muestras/
+
+# Piper: el entorno de Python y los modelos de voz pesan 250 MB y se vuelven a
+# bajar con pip y con curl. No son del proyecto.
+video/herramientas/.venv/
+video/herramientas/voces/
