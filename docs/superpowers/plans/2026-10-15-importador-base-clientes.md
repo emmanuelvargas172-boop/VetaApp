@@ -48,7 +48,7 @@
 
 ---
 
-## Tarea 1: Vitest y el núcleo de normalizaciones
+## Task 1: Vitest y el núcleo de normalizaciones
 
 Mover las funciones puras de `armar-sql.mjs` a un módulo compartido, **sin estado global**. Hoy `avisos`, `fechasVistas`, `fechasRotas` y `razasDesconocidas` son variables sueltas del módulo (líneas 125, 140, 279): en un script que corre una vez da igual, en el navegador la segunda importación arranca con los avisos de la primera adentro.
 
@@ -411,7 +411,7 @@ bugs, uno que abortaba el import completo. Eso no se ve leyendo el código."
 
 ---
 
-## Tarea 2: La especie deja de adivinarse
+## Task 2: La especie deja de adivinarse
 
 `clasificar()` hoy tiene una suposición que es cierta para La Huella y falsa para cualquier otra clínica. Línea 257 de `armar-sql.mjs`:
 
@@ -562,7 +562,7 @@ Ahora devuelve null —no sé— y decide quien llama."
 
 ---
 
-## Tarea 3: Adivinar las columnas de cualquier clínica
+## Task 3: Adivinar las columnas de cualquier clínica
 
 `COLUMNAS` en `armar-sql.mjs` (líneas 91–107) reconoce los encabezados **de una hoja**: `'nombre y apellidos del tutor'`, `'contacto telefonos'`, `'costo final del servicio'`. Otra clínica va a escribir "Propietario", "Celular", "Valor" — y no se reconocería nada.
 
@@ -827,7 +827,7 @@ mapeo de La Huella, que es la única importación verificada que existe."
 
 ---
 
-## Tarea 4: De la grilla a tutores, mascotas y eventos
+## Task 4: De la grilla a tutores, mascotas y eventos
 
 Dos pasos que van juntos: leer cada fila con el mapeo de la tarea 3, y agrupar las filas repetidas. Son los bloques 3 y 4 de `armar-sql.mjs` (líneas 272–479), sin terminal.
 
@@ -1224,7 +1224,7 @@ dosis."
 
 ---
 
-## Tarea 5: El script de terminal pasa a usar el núcleo
+## Task 5: El script de terminal pasa a usar el núcleo
 
 Sin esto quedan dos copias de la misma lógica, y el día que se arregle el teléfono `"0"` se arregla en un lado y queda roto en el otro, sin que nadie se entere hasta que a una clínica le quede el WhatsApp apagado.
 
@@ -1358,7 +1358,7 @@ con el que ya se ejecutó: idéntico, 53/54/74/13."
 
 ---
 
-## Tarea 6: Migración 012 — de dónde salió cada fila
+## Task 6: Migración 012 — de dónde salió cada fila
 
 **Files:**
 - Create: `supabase/migrations/012_importaciones.sql`
@@ -1484,7 +1484,7 @@ la clínica cree que volvió todo atrás."
 
 ---
 
-## Tarea 7: Las dos funciones de Postgres — escribir y deshacer
+## Task 7: Las dos funciones de Postgres — escribir y deshacer
 
 La tarea más delicada del plan. Dos funciones, una migración cada una, y las pruebas se corren contra Postgres de verdad porque es lo único que prueba que una transacción es una transacción.
 
@@ -2322,7 +2322,7 @@ restaure un valor que ya no era el que estaba."
 
 ---
 
-## Tarea 8: Leer el `.xlsx` en el navegador
+## Task 8: Leer el `.xlsx` en el navegador
 
 La capa que no se comparte con el script de terminal. Es el gemelo en navegador de `importar/xlsx-a-csv.py`, y existe por el mismo motivo que ese archivo: **el `.xlsx` guarda los TIPOS de cada celda y el CSV los pierde**.
 
@@ -2783,7 +2783,7 @@ importador donde entra algo que no controlamos."
 
 ---
 
-## Tarea 9: Emparejar contra lo que ya existe
+## Task 9: Emparejar contra lo que ya existe
 
 El cerebro del importador. Entra lo agrupado de la tarea 4 más lo que la cuenta ya tiene, y sale el JSON que consume la función de la tarea 7 — más la lista de dudas que el paso 3 le pone adelante.
 
@@ -3691,7 +3691,7 @@ en el paso 3 y lo que se escribe en el paso 4 no se pueden separar."
 
 ---
 
-## Tarea 10: Hablar con la base
+## Task 10: Hablar con la base
 
 La otra capa que no se comparte con el script de terminal. Cuatro cosas: traer lo que ya existe, abrir el registro de la importación, llamar a la función, y cerrarla si algo falló.
 
@@ -4110,7 +4110,7 @@ pantalla tiene que mostrar."
 
 ---
 
-## Tarea 11: La pantalla, pasos 1 y 2 — el archivo y las columnas
+## Task 11: La pantalla, pasos 1 y 2 — el archivo y las columnas
 
 **Files:**
 - Create: `frontend/src/importador/Importar.jsx`
@@ -4789,7 +4789,7 @@ incluye clientes y mascotas, que es todo lo que esto escribe."
 
 ---
 
-## Tarea 12: La pantalla, paso 3 — qué va a pasar
+## Task 12: La pantalla, paso 3 — qué va a pasar
 
 **Files:**
 - Create: `frontend/src/importador/paso3Revisar.jsx`
@@ -5375,7 +5375,7 @@ mascotas de dos familias."
 
 ---
 
-## Tarea 13: La pantalla, paso 4 — escribir y poder deshacer
+## Task 13: La pantalla, paso 4 — escribir y poder deshacer
 
 **Files:**
 - Create: `frontend/src/importador/paso4Escribir.jsx`
@@ -5994,7 +5994,7 @@ app; adentro del JSX no se puede probar."
 
 ---
 
-## Tarea 14: El historial — qué se importó y cuándo, con deshacer
+## Task 14: El historial — qué se importó y cuándo, con deshacer
 
 **Files:**
 - Create: `frontend/src/importador/Importaciones.jsx`
@@ -6393,7 +6393,7 @@ está en una lista donde el botón de al lado es de otro archivo."
 
 ---
 
-## Tarea 15: Verificar todo junto y desplegar
+## Task 15: Verificar todo junto y desplegar
 
 **Files:**
 - Modify: `.gitignore` (asegurar que ni el `.xlsx` ni el `.csv` de La Huella puedan entrar)
