@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   nuevoEstado, sinTildes, fechaISO, horaDe, pesos, telefonos, tipoBano, riqueza,
+  clasificar,
 } from './normalizar.js';
 
 const ctx = { fila: 2, hoja: 'Hoja1', campo: 'fecha' };
@@ -129,5 +130,40 @@ describe('estado por corrida', () => {
     expect(b.avisos).toHaveLength(0);
     expect(b.fechasVistas).toBe(0);
     expect(b.fechasRotas).toBe(0);
+  });
+});
+
+describe('clasificar', () => {
+  it('reconoce una raza de perro', () => {
+    expect(clasificar(nuevoEstado(), 'Poodle')).toEqual({ especie: 'perro', raza: 'Poodle' });
+  });
+
+  it('reconoce una raza de gato', () => {
+    expect(clasificar(nuevoEstado(), 'Siames')).toEqual({ especie: 'gato', raza: 'Siames' });
+  });
+
+  // Dato real: la celda de "Raza" dice "Gato". Dice lo más importante,
+  // pero "Gato" no es una raza: guardarlo como tal dejaría la ficha con
+  // "Raza: Gato".
+  it('lee la especie cuando la escribieron en la columna de raza', () => {
+    expect(clasificar(nuevoEstado(), 'Gato')).toEqual({ especie: 'gato', raza: null });
+  });
+
+  // El cambio de esta tarea. Antes devolvía 'perro'.
+  it('la raza vacía NO es perro: es no sé', () => {
+    const e = nuevoEstado();
+    expect(clasificar(e, '')).toEqual({ especie: null, raza: null });
+    expect(e.sinRaza).toBe(1);
+  });
+
+  it('la raza desconocida NO es perro: es no sé, y queda anotada', () => {
+    const e = nuevoEstado();
+    expect(clasificar(e, 'Criollito')).toEqual({ especie: null, raza: 'Criollito' });
+    expect([...e.razasDesconocidas]).toEqual(['Criollito']);
+  });
+
+  it('nunca inventa la raza, solo la especie', () => {
+    const { raza } = clasificar(nuevoEstado(), 'Spa de barro');
+    expect(raza).toBe('Spa de barro');
   });
 });

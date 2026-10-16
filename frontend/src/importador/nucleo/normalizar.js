@@ -126,6 +126,51 @@ export function tipoBano(valor) {
   return String(valor).trim(); // forma nueva: se respeta tal cual
 }
 
+// Razas que sabemos que son de perro: las que aparecieron en hojas reales
+// más las comunes en Colombia.
+export const RAZAS_PERRO = new Set([
+  'mestizo', 'mestiza', 'criollo', 'criolla', 'shitzu', 'shih tzu', 'schnauzer',
+  'tequel', 'teckel', 'salchicha', 'pug', 'pinscher', 'poodle', 'french poodle',
+  'cocker', 'westhly', 'west highland', 'golden', 'golden retriever', 'yorkie',
+  'yorkshire', 'pomerania', 'pomeranian', 'husky', 'labrador', 'beagle',
+  'bulldog', 'chihuahua', 'maltes', 'bichon', 'boxer', 'pastor aleman',
+  'pastor', 'border collie', 'dalmata', 'rottweiler', 'pitbull', 'pit bull',
+  'basset', 'san bernardo', 'gran danes', 'doberman', 'akita', 'chow chow',
+]);
+
+export const RAZAS_GATO = new Set([
+  'persa', 'siames', 'angora', 'criollo gato', 'mestizo gato', 'bengali',
+  'maine coon', 'esfinge', 'sphynx',
+]);
+
+// Algunas celdas de "Raza" traen la ESPECIE y no la raza. No es un dato
+// malo —dice lo más importante— pero "Gato" no es una raza. Se lee como
+// especie y la raza queda vacía, que es la verdad: no la dijeron.
+export const ESPECIE_ESCRITA = {
+  gato: 'gato', gata: 'gato', felino: 'gato', felina: 'gato',
+  perro: 'perro', perra: 'perro', canino: 'perro', canina: 'perro',
+};
+
+// Devuelve las dos cosas juntas porque se deciden juntas: qué especie es y
+// qué queda escrito en `raza`.
+//
+// `especie: null` quiere decir NO SÉ, y nunca "probablemente perro". La
+// versión anterior devolvía 'perro' cuando la celda venía vacía, porque la
+// primera hoja que importamos era de una peluquería canina. En una
+// veterinaria con gatos eso mete cada gato sin raza anotada como perro, y
+// la especie es lo que decide la dosis. Quien llama decide: el script de
+// terminal se detiene, la app lo pregunta antes de escribir nada.
+export function clasificar(estado, razaCruda) {
+  const r = sinTildes(razaCruda);
+  const raza = String(razaCruda ?? '').trim() || null;
+  if (!r) { estado.sinRaza++; return { especie: null, raza: null }; }
+  if (ESPECIE_ESCRITA[r]) return { especie: ESPECIE_ESCRITA[r], raza: null };
+  for (const p of RAZAS_PERRO) if (r.startsWith(p) || p.startsWith(r)) return { especie: 'perro', raza };
+  for (const g of RAZAS_GATO)  if (r.startsWith(g) || g.startsWith(r)) return { especie: 'gato',  raza };
+  estado.razasDesconocidas.add(raza);
+  return { especie: null, raza };
+}
+
 // Cuántos campos útiles trae una fila. Es el criterio para decidir cuál
 // gana cuando la misma mascota aparece dos veces.
 export const riqueza = (r) => [
