@@ -100,7 +100,10 @@ export function agrupar(estado, filas) {
       // fecha. vacunas.nombre es NOT NULL en Postgres, así que algo tiene
       // que ir; 'Anual' es lo que la clínica registra para la polivalente
       // anual, que es el 95 % de los casos reales.
-      eventos.push({ tipo: 'vacuna', mascota: km, nombre: 'Anual', fecha: r.ultima_vacuna, proxima: prox });
+      // notas: null — la fila del formulario no lleva texto anotado, así
+      // que no se inventa un campo que no existe. null en JSON serializa
+      // correctamente para Postgres, undefined quedaría ausente.
+      eventos.push({ tipo: 'vacuna', mascota: km, nombre: 'Anual', fecha: r.ultima_vacuna, proxima: prox, notas: null });
     }
   }
 

@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { X, PawPrint, Upload, Loader2 } from 'lucide-react';
 import api from '../api/axios';
 import { normalizarEspecie } from './icons';
+import { edadDesde, textoEdad } from '../utils/edad';
 
 const INICIAL = {
   nombre: '', especie: 'perro', especieOtro: '', raza: '',
-  edad_anios: '', edad_meses: '', peso: '',
-  dueno_nombre: '', dueno_telefono: '', dueno_direccion: '',
+  fecha_nacimiento: '', edad_anios: '', edad_meses: '', peso: '',
+  dueno_cedula: '', dueno_nombre: '', dueno_telefono: '', dueno_telefono2: '', dueno_direccion: '',
   foto: null,
 };
 
@@ -20,6 +21,19 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
 
   const editando = !!mascotaEditar;
 
+  // Tope del calendario. Se arma con getFullYear/getMonth/getDate y no con
+  // toISOString, que convierte a UTC: en Colombia (UTC-5), de 7pm en
+  // adelante toISOString ya devuelve la fecha de mañana y el input dejaría
+  // elegir un nacimiento futuro. Se calcula en el render, no en el módulo,
+  // para que no se quede en ayer si la pestaña pasa la medianoche abierta.
+  const n = new Date();
+  const hoyISO = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+
+  // null cuando no hay fecha, o cuando la que hay es imposible o futura
+  // (el `max` del input se puede saltar escribiendo a mano). En ese caso
+  // vuelven los dos campos de edad escribibles.
+  const edadDerivada = edadDesde(form.fecha_nacimiento);
+
   useEffect(() => {
     if (!isOpen) return;
     if (mascotaEditar) {
@@ -30,11 +44,14 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
         especie: esBase ? esp : 'otro',
         especieOtro: esBase || esp === 'otro' ? '' : esp,
         raza: mascotaEditar.raza || '',
+        fecha_nacimiento: mascotaEditar.fecha_nacimiento || '',
         edad_anios: mascotaEditar.edad_anios ?? '',
         edad_meses: mascotaEditar.edad_meses ?? '',
         peso: mascotaEditar.peso ?? '',
+        dueno_cedula: mascotaEditar.dueno_cedula || '',
         dueno_nombre: mascotaEditar.dueno_nombre || '',
         dueno_telefono: mascotaEditar.dueno_telefono || '',
+        dueno_telefono2: mascotaEditar.dueno_telefono2 || '',
         dueno_direccion: mascotaEditar.dueno_direccion || '',
         foto: null,
       });
@@ -66,6 +83,11 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
           ...f,
           dueno_nombre: data.nombre,
           dueno_direccion: data.direccion || '',
+          // Si no se autocompletaran, el formulario los mandaría vacíos y
+          // el PUT de más abajo le borraría al tutor la cédula y el
+          // segundo teléfono que ya tenía guardados.
+          dueno_cedula: data.cedula || '',
+          dueno_telefono2: data.telefono2 || '',
         }));
       }
     } catch (_) {}
@@ -87,23 +109,26 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
     try {
       let dueno_id;
 
+      // Los cinco campos viajan juntos en los dos caminos. `parseDuenoBody`
+      // en axios.js solo escribe las llaves que recibe, así que mandar las
+      // cinco es también lo que evita borrar lo que no se tocó.
+      const dueno = {
+        nombre: form.dueno_nombre,
+        telefono: form.dueno_telefono,
+        telefono2: form.dueno_telefono2,
+        direccion: form.dueno_direccion,
+        cedula: form.dueno_cedula,
+      };
+
       if (editando) {
-        await api.put(`/duenos/${mascotaEditar.dueno_id}`, {
-          nombre: form.dueno_nombre,
-          telefono: form.dueno_telefono,
-          direccion: form.dueno_direccion,
-        });
+        await api.put(`/duenos/${mascotaEditar.dueno_id}`, dueno);
         dueno_id = mascotaEditar.dueno_id;
       } else {
         const { data: existente } = await api.get(`/duenos/buscar?telefono=${form.dueno_telefono.trim()}`);
         if (existente) {
           dueno_id = existente.id;
         } else {
-          const { data: nuevo } = await api.post('/duenos', {
-            nombre: form.dueno_nombre,
-            telefono: form.dueno_telefono,
-            direccion: form.dueno_direccion,
-          });
+          const { data: nuevo } = await api.post('/duenos', dueno);
           dueno_id = nuevo.id;
         }
       }
@@ -112,6 +137,7 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
       fd.append('nombre', form.nombre.trim());
       fd.append('especie', especieFinal);
       fd.append('raza', form.raza.trim());
+      fd.append('fecha_nacimiento', form.fecha_nacimiento || '');
       fd.append('edad_anios', form.edad_anios || 0);
       fd.append('edad_meses', form.edad_meses || 0);
       fd.append('peso', form.peso || '');
@@ -226,14 +252,46 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
                 <label className="label">Raza</label>
                 <input className="input" placeholder="Ej: Golden Retriever" value={form.raza} onChange={set('raza')} />
               </div>
-              <div>
-                <label className="label">Edad — Años</label>
-                <input className="input" type="number" min="0" max="30" placeholder="0" value={form.edad_anios} onChange={set('edad_anios')} />
+              <div className="col-span-2 sm:col-span-1">
+                <label className="label">Fecha de nacimiento</label>
+                <input
+                  className="input"
+                  type="date"
+                  max={hoyISO}
+                  value={form.fecha_nacimiento}
+                  onChange={set('fecha_nacimiento')}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  {edadDerivada
+                    ? 'La edad se calcula sola desde esta fecha.'
+                    : 'Si la sabe, la edad no se vuelve a desactualizar.'}
+                </p>
               </div>
-              <div>
-                <label className="label">Edad — Meses</label>
-                <input className="input" type="number" min="0" max="11" placeholder="0" value={form.edad_meses} onChange={set('edad_meses')} />
-              </div>
+
+              {/* Con fecha de nacimiento la edad se muestra, no se escribe:
+                  dos campos editables que dicen cosas distintas de la misma
+                  mascota es peor que un campo menos. Sin fecha —que es el
+                  caso de todo lo registrado antes de la migración 011— los
+                  dos campos de edad siguen ahí tal como estaban. */}
+              {edadDerivada ? (
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="label">Edad</label>
+                  <div className="input bg-gray-50 text-gray-600 flex items-center">
+                    {textoEdad(edadDerivada)}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="label">Edad — Años</label>
+                    <input className="input" type="number" min="0" max="30" placeholder="0" value={form.edad_anios} onChange={set('edad_anios')} />
+                  </div>
+                  <div>
+                    <label className="label">Edad — Meses</label>
+                    <input className="input" type="number" min="0" max="11" placeholder="0" value={form.edad_meses} onChange={set('edad_meses')} />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="label">Peso (kg)</label>
                 <input className="input" type="number" step="0.1" min="0" placeholder="Ej: 12.5" value={form.peso} onChange={set('peso')} />
@@ -266,9 +324,21 @@ export default function ModalMascota({ isOpen, onClose, onSuccess, mascotaEditar
                   <p className="text-xs text-gray-400 mt-1">Si el dueño ya existe, sus datos se autocompletarán.</p>
                 )}
               </div>
+              {/* Un solo campo con dos números pegados ("3181111111-3182222222")
+                  rompe el enlace de WhatsApp: normalizarTelefonoCO decide por
+                  el largo del número y 20 dígitos no son un celular, así que
+                  devuelve null y el botón queda apagado sin decir por qué. */}
+              <div className="col-span-2">
+                <label className="label">Segundo teléfono</label>
+                <input className="input" placeholder="Opcional" value={form.dueno_telefono2} onChange={set('dueno_telefono2')} />
+              </div>
               <div className="col-span-2">
                 <label className="label">Nombre del dueño *</label>
                 <input className="input" placeholder="Ej: Carlos Martínez" value={form.dueno_nombre} onChange={set('dueno_nombre')} required />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Cédula</label>
+                <input className="input" placeholder="Opcional · solo números" value={form.dueno_cedula} onChange={set('dueno_cedula')} />
               </div>
               <div className="col-span-2">
                 <label className="label">Dirección</label>

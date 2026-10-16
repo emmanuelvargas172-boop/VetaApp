@@ -127,6 +127,6 @@ describe('agrupar', () => {
   it('la vacuna queda con la próxima dosis un año después', () => {
     const { estado, filas } = leer([['Ana', 'Max', '3000000200', '', '', '', '', '14/07/2026']]);
     const v = agrupar(estado, filas).eventos.find((e) => e.tipo === 'vacuna');
-    expect(v).toMatchObject({ fecha: '2026-07-14', proxima: '2027-07-14' });
+    expect(v).toMatchObject({ nombre: 'Anual', fecha: '2026-07-14', proxima: '2027-07-14', notas: null });
   });
 });

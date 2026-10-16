@@ -26,3 +26,14 @@ video/muestras/
 # bajar con pip y con curl. No son del proyecto.
 video/herramientas/.venv/
 video/herramientas/voces/
+
+# Bases de clientes de las clínicas. El CSV que exporta la veterinaria y el SQL
+# que sale de armar-sql.mjs traen cédulas, teléfonos y direcciones de casa de
+# personas reales: no son clientes nuestros, son clientes de ella. Eso no entra
+# a la historia de un repo, y de git no se saca fácil una vez entró.
+#
+# Se listan extensiones y no la carpeta entera porque el script sí se versiona
+# (es código); los datos que entran y salen de él, no.
+importar/*.csv
+importar/*.sql
+importar/revisar.md

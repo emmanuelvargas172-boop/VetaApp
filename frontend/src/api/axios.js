@@ -3,6 +3,7 @@
 // RLS + `user_id default auth.uid()` aíslan los datos por veterinaria automáticamente:
 // no hace falta pasar user_id en inserts ni filtrar por él en selects.
 import { supabase } from '../lib/supabase';
+import { edadDesde } from '../utils/edad';
 
 // ---------- helpers ----------
 
@@ -70,10 +71,18 @@ function flattenMascota(m) {
   if (!m) return m;
   const d = m.duenos || {};
   const { duenos, ...rest } = m;
-  return { ...rest, dueno_nombre: d.nombre ?? null, dueno_telefono: d.telefono ?? null, dueno_direccion: d.direccion ?? null };
+  return {
+    ...rest,
+    dueno_nombre: d.nombre ?? null, dueno_telefono: d.telefono ?? null, dueno_direccion: d.direccion ?? null,
+    // Migración 011. Van acá y no solo en /duenos porque ModalMascota edita
+    // la mascota y su dueño en el mismo formulario: si no viajan con la
+    // mascota, al abrir "editar" los dos campos salen vacíos y guardar los
+    // borra.
+    dueno_cedula: d.cedula ?? null, dueno_telefono2: d.telefono2 ?? null,
+  };
 }
 
-const SEL_MASCOTA = '*, duenos(nombre,telefono,direccion)';
+const SEL_MASCOTA = '*, duenos(nombre,telefono,direccion,cedula,telefono2)';
 
 // cita → mascota(nombre,especie) + dueño(nombre,telefono)
 function flattenCita(c) {
@@ -107,6 +116,34 @@ async function subirFoto(file) {
   return supabase.storage.from('mascotas').getPublicUrl(path).data.publicUrl;
 }
 
+// Campos que acepta la tabla `duenos`, y nada más. Lo que no esté acá se
+// descarta: antes se desestructuraba a mano en POST y en PUT por separado,
+// y cuando la migración 011 agregó cedula y telefono2 los dos sitios los
+// botaban en silencio — el formulario los mandaba, la base no los veía y
+// no había error en ninguna parte.
+// Solo se incluye la llave que venga en el body, no las cinco siempre. Es
+// la diferencia entre "poné la dirección en vacío" y "no te estoy hablando
+// de la dirección": si se devolvieran las cinco, un PUT que solo corrige el
+// teléfono le borraría la cédula al tutor sin que nadie lo pidiera.
+function parseDuenoBody(body = {}) {
+  const t = (v) => (typeof v === 'string' ? v.trim() : v);
+  const out = {};
+  if ('nombre'    in body) out.nombre    = t(body.nombre);
+  if ('telefono'  in body) out.telefono  = t(body.telefono);
+  if ('direccion' in body) out.direccion = t(body.direccion) || null;
+  // Solo dígitos: el índice único de 011 compara el texto tal cual, así que
+  // "1.095.826.077" y "1000000200" serían dos tutores distintos para la
+  // base aunque sean la misma persona.
+  if ('cedula'    in body) out.cedula    = String(body.cedula ?? '').replace(/\D/g, '') || null;
+  if ('telefono2' in body) {
+    // Un segundo teléfono igual al primero no es un segundo teléfono. Pasa
+    // cuando alguien copia y pega la celda del formulario.
+    const tel2 = String(body.telefono2 ?? '').trim();
+    out.telefono2 = tel2 && tel2 !== t(body.telefono) ? tel2 : null;
+  }
+  return out;
+}
+
 // Convierte FormData de ModalMascota a objeto + sube foto si viene archivo
 async function parseMascotaBody(body, fotoActual = null) {
   const isFD = typeof FormData !== 'undefined' && body instanceof FormData;
@@ -117,12 +154,26 @@ async function parseMascotaBody(body, fotoActual = null) {
     foto = await subirFoto(file);
   }
   const num = (v, f = null) => (v === '' || v == null ? f : Number(v));
+
+  // Migración 011. Cuando hay fecha de nacimiento, la edad se DERIVA de
+  // ella y se ignora lo que venga en los dos campos de edad. Si no se
+  // hiciera, quedarían dos verdades en la misma fila: la fecha diciendo
+  // una edad y las columnas diciendo otra, y nadie sabría cuál creer.
+  // Las columnas se siguen guardando —no se vuelven null— porque las lee
+  // media app (Mascotas, Historias, Calendario) y porque las mascotas
+  // viejas solo tienen eso.
+  const nacimiento = String(g('fecha_nacimiento') ?? '').trim() || null;
+  const derivada = nacimiento ? edadDesde(nacimiento) : null;
+
   return {
     nombre: g('nombre'),
     especie: g('especie'),
     raza: g('raza') || null,
-    edad_anios: num(g('edad_anios'), 0),
-    edad_meses: num(g('edad_meses'), 0),
+    // `edadDesde` devuelve null si la fecha es imposible o está en el
+    // futuro. En ese caso se respeta lo escrito a mano en vez de poner 0.
+    edad_anios: derivada ? derivada.anios : num(g('edad_anios'), 0),
+    edad_meses: derivada ? derivada.meses : num(g('edad_meses'), 0),
+    fecha_nacimiento: nacimiento,
     peso: num(g('peso'), null),
     dueno_id: num(g('dueno_id'), null),
     foto,
@@ -184,12 +235,10 @@ const routes = [
   { m: 'GET', re: /^\/duenos$/, fn: async () => unwrap(await supabase.from('duenos').select('*').order('nombre')) },
   { m: 'GET', re: /^\/duenos\/(\d+)$/, fn: async ({ id }) => unwrap(await supabase.from('duenos').select('*').eq('id', id).single()) },
   { m: 'POST', re: /^\/duenos$/, fn: async ({ body }) => {
-    const { nombre, telefono, direccion } = body;
-    return unwrap(await supabase.from('duenos').insert({ nombre: nombre?.trim(), telefono: telefono?.trim(), direccion: direccion || null }).select('*').single());
+    return unwrap(await supabase.from('duenos').insert(parseDuenoBody(body)).select('*').single());
   }},
   { m: 'PUT', re: /^\/duenos\/(\d+)$/, fn: async ({ id, body }) => {
-    const { nombre, telefono, direccion } = body;
-    return unwrap(await supabase.from('duenos').update({ nombre, telefono, direccion }).eq('id', id).select('*').single());
+    return unwrap(await supabase.from('duenos').update(parseDuenoBody(body)).eq('id', id).select('*').single());
   }},
   { m: 'DELETE', re: /^\/duenos\/(\d+)$/, fn: async ({ id }) => {
     unwrap(await supabase.from('duenos').delete().eq('id', id));
