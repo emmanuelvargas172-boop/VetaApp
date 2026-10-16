@@ -25,7 +25,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { edadDesde } from '../frontend/src/utils/edad.js';
 import { nuevoEstado, sinTildes } from '../frontend/src/importador/nucleo/normalizar.js';
-import { mapearEncabezados } from '../frontend/src/importador/nucleo/mapear.js';
+import { mapearEncabezados, faltanRequeridos } from '../frontend/src/importador/nucleo/mapear.js';
 import { leerFilas, formatoDeFechasRoto } from '../frontend/src/importador/nucleo/filas.js';
 import { agrupar } from '../frontend/src/importador/nucleo/agrupar.js';
 
@@ -102,7 +102,21 @@ const todas = [];
 for (const archivo of archivos) {
   const hoja = basename(archivo);
   const [encabezados, ...grilla] = leerCSV(readFileSync(archivo, 'utf8'));
-  todas.push(...leerFilas(estado, { grilla, mapa: mapearEncabezados(encabezados), hoja }));
+  const mapa = mapearEncabezados(encabezados);
+
+  // Sin tutor o sin mascota no hay nada que hacer: cada fila perdería su
+  // dueño o su animal y el import entero quedaría vacío sin decirle nada
+  // al operador. Se detiene acá, con nombre de la hoja, las columnas que
+  // faltaron y los encabezados que SÍ se leyeron, para que la corrección
+  // sea renombrar la columna en la hoja y volver a exportar.
+  const faltan = faltanRequeridos(mapa);
+  if (faltan.length) {
+    console.error(`${hoja}: no encontré las columnas ${faltan.join(', ')}.`);
+    console.error(`  Encabezados leídos: ${encabezados.join(' | ')}`);
+    process.exit(1);
+  }
+
+  todas.push(...leerFilas(estado, { grilla, mapa, hoja }));
 }
 
 // En la terminal el que decide es Emmanuel, no una pantalla: si el
@@ -110,10 +124,19 @@ for (const archivo of archivos) {
 // gato como perro.
 if (estado.razasDesconocidas.size || estado.sinRaza) {
   console.error('\nNo sé si esto es perro o gato:\n');
-  for (const r of [...estado.razasDesconocidas].sort()) console.error(`  · ${r}`);
-  if (estado.sinRaza) console.error(`  · ${estado.sinRaza} fila(s) sin raza anotada`);
-  console.error('\nAgregá cada una a RAZAS_PERRO o RAZAS_GATO en');
-  console.error('frontend/src/importador/nucleo/normalizar.js y volvé a correr esto.');
+  if (estado.razasDesconocidas.size) {
+    for (const r of [...estado.razasDesconocidas].sort()) console.error(`  · ${r}`);
+    console.error('\nAgregá cada raza a RAZAS_PERRO o RAZAS_GATO en');
+    console.error('frontend/src/importador/nucleo/normalizar.js y volvé a correr esto.');
+  }
+  // Para filas sin raza no hay nada que agregar al diccionario: la especie
+  // tiene que venir de la hoja. El operador escribe la raza en el CSV y
+  // vuelve a correr.
+  if (estado.sinRaza) {
+    console.error(`\n  · ${estado.sinRaza} fila(s) sin raza anotada`);
+    console.error('\nEsa(s) fila(s) no tienen raza escrita en la hoja. Abrí el CSV,');
+    console.error('completá la columna de raza y volvé a correr esto.');
+  }
   process.exit(1);
 }
 
