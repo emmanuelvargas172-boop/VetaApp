@@ -229,6 +229,20 @@ const todasLasFilas = (hoja) => {
  *
  * El número es para que la clínica elija hoja sabiendo. Si dijera 155
  * porque Google estiró el rango, elegiría a ciegas.
+ *
+ * TIRA si CUALQUIER hoja del libro pasa el tope de extensionReal, incluso
+ * cuando la hoja que la clínica quería importar es chica. Quien llame a
+ * esto tiene que envolverlo y mostrar el mensaje: sin eso la pantalla de
+ * elegir hoja queda en blanco y no dice por qué.
+ *
+ * Es a propósito, y es la menos mala de tres. Reportar la hoja grande como
+ * "0 filas" la dejaría apagada y las otras elegibles, pero le mentiría a la
+ * clínica sobre una hoja que sí tiene datos, y acá el dato que miente en
+ * silencio es lo que más caro sale. Devolver un campo nuevo tipo
+ * `demasiado_grande` cambia la interfaz que consume la pantalla de elegir
+ * hoja. Tirar con el mensaje que ya dice "partilo en archivos más chicos"
+ * es accionable: borra esa hoja en Google Sheets y vuelve a bajar el
+ * archivo. (Revisión 2026-10-17)
  */
 export function hojas(libro) {
   return libro.SheetNames.map((nombre) => {
