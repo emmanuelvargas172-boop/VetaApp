@@ -129,6 +129,18 @@ begin
     v_id   := (v_item->>'id')::bigint;
     v_toco := false;
 
+    -- Que el tutor exista y sea de esta cuenta se comprueba ACÁ, una vez por
+    -- tutor, y no con `found` después del select de abajo: la lista de
+    -- sentencias que actualizan `found` no incluye `execute`, y acá no hay
+    -- forma de ejecutar nada para comprobar lo contrario. Sin esta guarda un
+    -- id ajeno o inexistente hace que el update de abajo afecte 0 filas sin
+    -- error, el contador se infle, y el comentario "los números salen de la
+    -- base" deje de ser cierto. Mismo idioma que usan los ids que vienen en
+    -- el plan, más abajo.
+    if not exists (select 1 from duenos where id = v_id and user_id = v_user) then
+      raise exception 'El tutor % no existe o no es de esta cuenta', v_id;
+    end if;
+
     for v_campo, v_valor in select key, value from jsonb_each_text(v_item->'campos') loop
       -- Lista blanca y no "lo que venga": el nombre del campo entra en un
       -- format() y de ahí a SQL. Y telefono NO está — es NOT NULL, siempre
@@ -140,13 +152,6 @@ begin
 
       execute format('select %I from duenos where id = $1 and user_id = $2', v_campo)
         into v_antes using v_id, v_user;
-      -- not found: el id no existe o no es de esta cuenta. El update que sigue
-      -- afectaría 0 filas sin error, el contador se inflaría y el comentario
-      -- "los números salen de la base" dejaría de ser cierto. Fallar aquí
-      -- valida pertenencia igual que F3 lo hace para los ids del plan.
-      if not found then
-        raise exception 'El tutor % no existe o no es de esta cuenta', v_id;
-      end if;
 
       -- Solo donde haya vacío. Entre la vista previa y este momento alguien
       -- pudo llenarlo desde otra pestaña, y pisarlo sería exactamente lo
@@ -222,6 +227,12 @@ begin
     v_id   := (v_item->>'id')::bigint;
     v_toco := false;
 
+    -- Misma razón que en completar_tutores: una vez por mascota y con
+    -- `not exists`, no con `found` después de un `execute`.
+    if not exists (select 1 from mascotas where id = v_id and user_id = v_user) then
+      raise exception 'La mascota % no existe o no es de esta cuenta', v_id;
+    end if;
+
     for v_campo, v_valor in select key, value from jsonb_each_text(v_item->'campos') loop
       -- especie NO está: es NOT NULL, una mascota que ya existe siempre
       -- tiene especie, no hay vacío que llenar. (El spec la lista por
@@ -232,11 +243,6 @@ begin
 
       execute format('select %I::text from mascotas where id = $1 and user_id = $2', v_campo)
         into v_antes using v_id, v_user;
-      -- Misma razón que en completar_tutores: 0 filas → update silencioso
-      -- que infla el contador sin tocar nada. Valida pertenencia a la vez.
-      if not found then
-        raise exception 'La mascota % no existe o no es de esta cuenta', v_id;
-      end if;
 
       -- edad_anios y edad_meses son NOT NULL default 0, así que nunca
       -- están "vacías": el 0 cuenta como vacío porque es lo que deja un
