@@ -446,12 +446,6 @@ describe('armarPlan · misma persona con dos claves en el archivo (hallazgo 4)',
     ],
   };
 
-  // Agrupado igual pero el tutor no existe en la base (perro nuevo para tutor nuevo).
-  const agrupadoDosClavesConTutor = {
-    ...agrupadoDosClavesNuevoPerro,
-    // Misma estructura pero los tutores apuntan a la base existenteCon7 por cédula.
-  };
-
   // Agrupado con dos claves y la mascota existente, cada una trayendo un
   // campo distinto para completar.
   const existenteCon7yMax = {
@@ -467,7 +461,12 @@ describe('armarPlan · misma persona con dos claves en el archivo (hallazgo 4)',
       }],
       ['n:ana gomez|573000000011', {
         clave: 'n:ana gomez|573000000011', nombre: 'Ana Gómez', cedula: null,
-        tel1: '573000000011', tel2: null, direccion: null, origen: ['Hoja1:5'],
+        // El segundo número lo trae ESTA clave y no la otra, a propósito: es
+        // lo único que hace que el test distinga el arreglo del código viejo.
+        // Si las dos claves aportaran el mismo campo —o si una no aportara
+        // nada— el push directo también daría una sola entrada y el test
+        // pasaría igual sin el Map.
+        tel1: '573000000011', tel2: '573000000055', direccion: null, origen: ['Hoja1:5'],
       }],
     ]),
     mascotas: new Map(),
@@ -517,11 +516,29 @@ describe('armarPlan · misma persona con dos claves en el archivo (hallazgo 4)',
   // Test 3: dos claves del mismo tutor existente, cada una trayendo un campo
   // distinto → completar_tutores con una sola entrada que tiene los dos campos
   it('misma persona existente con dos claves: una sola entrada en completar_tutores con los dos campos', () => {
-    // c:1000000001 trae dirección; n:... no trae nada nuevo → 1 entrada, campos: { direccion }
+    // c:1000000001 trae la dirección; n:... trae el segundo teléfono. Con el
+    // push directo serían dos entradas con el mismo id y el paso 3 diría
+    // "2 tutores para completar" cuando es uno.
     const p = armarPlan(nuevoEstado(), agrupadoDosClavesCompletarTutor, existenteCon7, sinDecidir, HOY);
     expect(p.envio.completar_tutores).toHaveLength(1);
     expect(p.envio.completar_tutores[0].id).toBe(7);
-    expect(p.envio.completar_tutores[0].campos).toHaveProperty('direccion');
+    expect(p.envio.completar_tutores[0].campos).toEqual({
+      direccion: 'Calle 5', telefono2: '573000000055',
+    });
+  });
+
+  // Test 4: lo mismo para completar_mascotas. Max ya existe (id=70) sin raza
+  // ni fecha; una clave trae la raza y la otra la fecha de nacimiento.
+  it('misma persona existente con dos claves: una sola entrada en completar_mascotas con los dos campos', () => {
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesCompletarMascota, existenteCon7yMax, sinDecidir, HOY);
+    expect(p.envio.completar_mascotas).toHaveLength(1);
+    expect(p.envio.completar_mascotas[0].id).toBe(70);
+    // La fecha llega de una clave y la raza de la otra; las edades salen de
+    // la fecha, no del archivo, porque el registro las tenía en 0.
+    expect(p.envio.completar_mascotas[0].campos).toMatchObject({
+      raza: 'Poodle', fecha_nacimiento: '2018-07-26',
+    });
+    expect(p.envio.completar_mascotas[0].campos.edad_anios).toBe(8);
   });
 });
 
