@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../lib/AuthContext';
 import { getAdminPhone, saveAdminPhone } from '../utils/whatsapp';
@@ -554,6 +554,29 @@ export default function Configuracion() {
                         Para tener una copia tuya, descárgala aquí abajo.
                       </p>
                     </div>
+                  </div>
+                </ConfigSection>
+
+                <ConfigSection
+                  title="Importar base de clientes"
+                  subtitle="Pasá tu Excel o tu CSV a VetaApp, sin escribir nada a mano"
+                >
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 12px', background: 'var(--surface)',
+                    border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                    flexWrap: 'wrap',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 190 }}>
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        Te muestro qué entendí del archivo y cuántos clientes,
+                        mascotas y baños voy a crear. No escribo nada hasta que
+                        lo confirmes, y después se puede deshacer.
+                      </p>
+                    </div>
+                    <Link to="/app/importar">
+                      <Button variant="secondary" size="sm">Importar un archivo</Button>
+                    </Link>
                   </div>
                 </ConfigSection>
 

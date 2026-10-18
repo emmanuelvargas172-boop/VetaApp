@@ -9,6 +9,7 @@ import Recordatorios from './pages/Recordatorios';
 import Operaciones from './pages/Operaciones';
 import Caja from './pages/Caja';
 import Configuracion from './pages/Configuracion';
+import Importar from './importador/Importar';
 import Landing from './pages/Landing';
 import Legal from './pages/Legal';
 import NuevaClave from './pages/NuevaClave';
@@ -95,6 +96,7 @@ function AppShell() {
             ><Caja /></ConPlan>
           } />
           <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/importar" element={<Importar />} />
         </Routes>
       </main>
       {esMovil && <BarraInferior />}

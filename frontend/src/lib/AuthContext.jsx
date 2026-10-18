@@ -125,6 +125,18 @@ export function AuthProvider({ children }) {
     [esAdmin, plan],
   );
 
+  // Estable, por el mismo motivo que `tieneModulo`: la pantalla de importar
+  // la llama desde un `useEffect` para releer la suscripción antes de dejar
+  // mapear columnas, y si cambiara de identidad en cada render ese efecto
+  // entraría en bucle — relee el perfil, el perfil cambia el estado, el
+  // render rearma la función, el efecto se dispara de nuevo.
+  // `cargarPerfil` ya es estable (useCallback con []) y `uidActual` es un
+  // ref, así que esto queda estable para siempre.
+  const recargarPerfil = useCallback(
+    () => cargarPerfil(uidActual.current),
+    [cargarPerfil],
+  );
+
   const value = {
     session,
     user: session?.user ?? null,
@@ -142,7 +154,7 @@ export function AuthProvider({ children }) {
     tieneModulo,
     loading: loading || !perfilListo,
     signOut: () => supabase.auth.signOut(),
-    recargarPerfil: () => cargarPerfil(uidActual.current),
+    recargarPerfil,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
