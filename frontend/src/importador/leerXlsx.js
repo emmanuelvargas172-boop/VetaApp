@@ -49,12 +49,32 @@ export function celda(c) {
     // llega porque leerLibro pide cellNF). SSF.parse_date_code lo convierte
     // sin pasar por Date, así que no hay huso horario que corra un día.
     if (c.z && XLSX.SSF.is_date(c.z)) {
+      // Arreglo 3 (Minor): si v es null o undefined, parse_date_code falla
+      // o devuelve basura. En un archivo bien formado SheetJS no produce
+      // esto, pero el archivo viene de afuera: mejor cadena vacía que
+      // "null" guardado como cédula o como costo.
+      if (c.v == null) return '';
+
       const d = XLSX.SSF.parse_date_code(c.v);
       if (!d) return '';
+
+      // Arreglo 4 (Minor): parse_date_code devuelve d === 0 cuando el
+      // número no tiene parte de fecha (es solo una hora, como 0.42921 con
+      // formato 'hh:mm'). En ese caso armar "1900-01-00 HH:MM:SS" sería
+      // una fecha que no existe en ningún calendario. El día 0 es la señal
+      // de que el dato es puramente horario: se devuelve solo la hora.
+      if (d.d === 0) return `${dos(d.H)}:${dos(d.M)}:${dos(d.S)}`;
+
       const fecha = `${d.y}-${dos(d.m)}-${dos(d.d)}`;
       if (!d.H && !d.M && !d.S) return fecha;
       return `${fecha} ${dos(d.H)}:${dos(d.M)}:${dos(d.S)}`;
     }
+
+    // Arreglo 3 (Minor): null con tipo 'n' y sin formato de fecha cae acá.
+    // String(null) produce la cadena literal "null", que se guardaría como
+    // cédula o costo. Con == se atrapa también undefined por si cambia la
+    // librería.
+    if (c.v == null) return '';
 
     // toFixed(0) y no String(): String(1e21) devuelve "1e+21". Ninguna
     // cédula llega a eso, pero el día que una celda traiga un número
@@ -75,8 +95,11 @@ export function celda(c) {
  * @param {ArrayBuffer|Uint8Array} bytes
  */
 export function leerLibro(bytes) {
-  // XLSX.read 0.20.3 no lanza con datos inválidos: los parsea silenciosamente
-  // como un libro vacío. Verificamos la firma antes de parsear.
+  // XLSX.read 0.20.3 no lanza con datos inválidos: los parsea produciendo
+  // un libro con una hoja "Sheet1" que tiene los bytes como texto en A1.
+  // Eso pasa la pantalla de elegir hoja y llega al mapeo de columnas con
+  // una fila de basura. Verificamos la firma antes de parsear para cortar
+  // ese camino en la entrada.
   // .xlsx es un ZIP (PK\x03\x04 = 50 4B 03 04).
   // .xls es OLE2 (D0 CF 11 E0). Ambas son reconocidas como Excel válido.
   const buf = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -113,11 +136,63 @@ export function leerLibro(bytes) {
   }
 }
 
-/** La última columna que tiene algo en toda la hoja. */
-const ancho = (hoja) => {
-  const ref = hoja?.['!ref'];
-  if (!ref) return 0;
-  return XLSX.utils.decode_range(ref).e.c + 1;
+/**
+ * La extensión real de la hoja: filas y columnas derivadas de las celdas
+ * que efectivamente existen, no del '!ref' que el archivo declara.
+ *
+ * '!ref' es una afirmación — una hoja hostil o una hoja de Google estirada
+ * puede declarar 'A1:XFD1048576' (17 mil millones de iteraciones) con solo
+ * tres filas de datos. Recorriendo las claves reales del objeto se obtiene
+ * la extensión verdadera: las celdas son el hecho, '!ref' es solo la
+ * afirmación. Esto además es más correcto que confiar en '!ref': si el
+ * rango declarado fuera más chico que las celdas reales, se perderían
+ * filas en silencio.
+ *
+ * Después de derivar la extensión real se aplica un tope: el importador no
+ * está diseñado para archivos de ese tamaño y es mejor un mensaje claro
+ * que una pestaña congelada.
+ *
+ * @returns {{ maxR: number, maxC: number }}
+ *   maxR: índice de la última fila con dato (−1 si la hoja está vacía).
+ *   maxC: índice de la última columna con dato (−1 si la hoja está vacía).
+ */
+const extensionReal = (hoja) => {
+  let maxR = -1;
+  let maxC = -1;
+
+  for (const k of Object.keys(hoja)) {
+    // Las claves de metadatos empiezan con '!'; solo las claves de celda
+    // tienen la forma "A1", "B2", etc.
+    if (k.startsWith('!')) continue;
+    const { r, c } = XLSX.utils.decode_cell(k);
+    if (r > maxR) maxR = r;
+    if (c > maxC) maxC = c;
+  }
+
+  if (maxR < 0) return { maxR, maxC };  // hoja vacía, sin tope que aplicar
+
+  const filas = maxR + 1;
+  const celdas = filas * (maxC + 1);
+
+  // 20.000 filas × columnas ilimitadas, o 500.000 celdas totales: topes
+  // generosos a propósito (el archivo real tiene 54 × 15 = 810). El
+  // importador no soporta archivos de ese tamaño por otros motivos de
+  // diseño; un mensaje claro es mejor que una pestaña muerta.
+  if (filas > 20_000) {
+    throw new Error(
+      `El archivo tiene ${filas.toLocaleString('es-CO')} filas. ` +
+      'El importador acepta hasta 20.000. Partilo en archivos más chicos.',
+    );
+  }
+  if (celdas > 500_000) {
+    throw new Error(
+      `El archivo tiene ${celdas.toLocaleString('es-CO')} celdas ` +
+      `(${filas.toLocaleString('es-CO')} filas × ${(maxC + 1).toLocaleString('es-CO')} columnas). ` +
+      'El importador acepta hasta 500.000. Partilo en archivos más chicos.',
+    );
+  }
+
+  return { maxR, maxC };
 };
 
 /**
@@ -129,15 +204,13 @@ const ancho = (hoja) => {
  * cuando un aviso le diga "fila 35".
  */
 const todasLasFilas = (hoja) => {
-  const ref = hoja?.['!ref'];
-  if (!ref) return [];
-  const rango = XLSX.utils.decode_range(ref);
-  const cols = ancho(hoja);
+  const { maxR, maxC } = extensionReal(hoja);
+  if (maxR < 0) return [];  // hoja sin celdas
 
   const filas = [];
-  for (let r = 0; r <= rango.e.r; r++) {
+  for (let r = 0; r <= maxR; r++) {
     const fila = [];
-    for (let c = 0; c < cols; c++) {
+    for (let c = 0; c <= maxC; c++) {
       fila.push(celda(hoja[XLSX.utils.encode_cell({ r, c })]));
     }
     filas.push(fila);

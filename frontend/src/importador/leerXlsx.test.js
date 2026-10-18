@@ -56,6 +56,27 @@ describe('celda', () => {
   it('una celda con error de fórmula queda vacía', () => {
     expect(celda({ t: 'e', v: 0x07, w: '#DIV/0!' })).toBe('');
   });
+
+  // Arreglo 3 (Minor): con t='n' y v=null, Number.isInteger(null) es false
+  // y sin esta guarda caería al String(null) del final, produciendo la
+  // cadena literal "null". Eso se guardaría como cédula o como costo.
+  it('una celda numérica con v=null sale como cadena vacía, no como "null"', () => {
+    expect(celda({ t: 'n', v: null })).toBe('');
+  });
+
+  // Arreglo 3 (Minor): mismo caso pero con formato de fecha. El v=null
+  // antes de parse_date_code produce basura o un error de la librería.
+  it('una celda de fecha con v=null sale como cadena vacía', () => {
+    expect(celda({ t: 'n', v: null, z: 'dd/mm/yyyy' })).toBe('');
+  });
+
+  // Arreglo 4 (Minor): un número de solo-hora (sin parte de fecha) como
+  // 0.42921 con formato 'hh:mm' pasa SSF.is_date y parse_date_code devuelve
+  // d===0: señal de que no hay fecha real. Armar "1900-01-00 10:18:03"
+  // sería un día que no existe. Se devuelve solo la hora.
+  it('una celda de solo-hora devuelve HH:MM:SS sin fecha inventada', () => {
+    expect(celda({ t: 'n', v: 0.42921, z: 'hh:mm' })).toBe('10:18:03');
+  });
 });
 
 // Una hoja armada a mano: es la forma de probar los tipos sin un .xlsx
@@ -129,6 +150,46 @@ describe('leerHoja', () => {
   it('dice en español que la hoja no está', () => {
     expect(() => leerHoja(libroDePrueba(), 'No Existe'))
       .toThrow(/La hoja "No Existe" no está/);
+  });
+
+  // Arreglo 1 (Important): una hoja con '!ref' que dice A1:XFD1048576
+  // (el máximo de Excel) pero con solo 3 filas de datos se lee en tiempo
+  // normal. Antes iteraba el rango declarado: 17 mil millones de celdas.
+  // Ahora deriva la extensión de las claves reales, así que el tamaño
+  // iterado es exactamente el de los datos que existen.
+  it('una hoja con !ref enorme y pocas celdas se lee correctamente', () => {
+    const hojaEstirada = {
+      '!ref': 'A1:XFD1048576',  // máximo de Excel — si se iterara, congela
+      A1: { t: 's', v: 'Tutor' },
+      B1: { t: 's', v: 'Mascota' },
+      A2: { t: 's', v: 'Ana Gómez' },
+      B2: { t: 's', v: 'Max' },
+      A3: { t: 's', v: 'Luis Peña' },
+      B3: { t: 's', v: 'Nube' },
+    };
+    const libro = {
+      SheetNames: ['Hoja1'],
+      Sheets: { Hoja1: hojaEstirada },
+    };
+    const { encabezados, grilla } = leerHoja(libro, 'Hoja1');
+    expect(encabezados).toEqual(['Tutor', 'Mascota']);
+    expect(grilla).toHaveLength(2);
+    expect(grilla[0]).toEqual(['Ana Gómez', 'Max']);
+    expect(grilla[1]).toEqual(['Luis Peña', 'Nube']);
+  });
+
+  // Arreglo 1 (Important): pasado el tope de filas, el error sale en
+  // español con el número concreto para que la clínica sepa qué pasa.
+  it('tira error en español cuando la hoja supera las 20.000 filas', () => {
+    // Armar una hoja con 20.001 filas no copia celda por celda: se
+    // construye dinámicamente para que el test sea rápido.
+    const hojaGigante = { '!ref': 'A1:A1' };
+    for (let r = 0; r < 20_001; r++) {
+      hojaGigante[XLSX.utils.encode_cell({ r, c: 0 })] = { t: 's', v: 'x' };
+    }
+    const libro = { SheetNames: ['Hoja1'], Sheets: { Hoja1: hojaGigante } };
+    expect(() => leerHoja(libro, 'Hoja1'))
+      .toThrow(/20\.001|20001|filas|más chicos/);
   });
 });
 
