@@ -335,7 +335,12 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
   // → dos entradas en crear_mascotas para el mismo perro. 013 no tiene dedup
   // en crear_mascotas ni índice único, así que el perro se crearía dos veces
   // y todos sus eventos se escribirían dos veces.
-  const nuevasPorDestino = new Map(); // claveDestino → ref ya empujado
+  //
+  // Guarda la entrada misma y no su `ref`: volver a buscarla con
+  // crear_mascotas.find() sería recorrer el array entero por cada mascota
+  // repetida —O(n²) en el hilo que dibuja la pantalla— y el tope del lector
+  // son 20.000 filas.
+  const nuevasPorDestino = new Map(); // claveDestino → entrada de crear_mascotas
 
   // (c) Igual que (a) para completar_mascotas: misma persona con dos claves
   // daría dos entradas con el mismo id y el paso 3 contaría el doble.
@@ -390,23 +395,20 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
         // Ya hay una entrada para este perro: no se crea otra, pero sí se
         // enriquece campo por campo (solo donde falte valor), por el mismo
         // criterio que usa agrupar() al fusionar filas del mismo tutor.
-        const refExistente = nuevasPorDestino.get(claveDestino);
-        const entrada = envio.crear_mascotas.find((e) => e.ref === refExistente);
-        if (entrada) {
-          if (!entrada.raza && !vacio(masc.raza)) entrada.raza = masc.raza;
-          if (!entrada.fecha_nacimiento && !vacio(masc.nacimiento)) {
-            entrada.fecha_nacimiento = masc.nacimiento;
-            const edad = edadDesde(masc.nacimiento, hoy);
-            if (edad && !(entrada.edad_anios || entrada.edad_meses)) {
-              entrada.edad_anios = edad.anios;
-              entrada.edad_meses = edad.meses;
-            }
+        const entrada = nuevasPorDestino.get(claveDestino);
+        if (!entrada.raza && !vacio(masc.raza)) entrada.raza = masc.raza;
+        if (!entrada.fecha_nacimiento && !vacio(masc.nacimiento)) {
+          entrada.fecha_nacimiento = masc.nacimiento;
+          const edad = edadDesde(masc.nacimiento, hoy);
+          if (edad && !(entrada.edad_anios || entrada.edad_meses)) {
+            entrada.edad_anios = edad.anios;
+            entrada.edad_meses = edad.meses;
           }
         }
-        destinoMascota.set(masc.clave, { ref: refExistente });
+        destinoMascota.set(masc.clave, { ref: entrada.ref });
       } else {
         const edad = masc.nacimiento ? edadDesde(masc.nacimiento, hoy) : null;
-        envio.crear_mascotas.push({
+        const entrada = {
           ref: masc.clave,
           tutor_ref: tut.ref ?? null,
           tutor_id: tut.id ?? null,
@@ -418,8 +420,9 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
           // las mascotas viejas de la app, y se corrige a mano.
           edad_anios: edad?.anios ?? 0,
           edad_meses: edad?.meses ?? 0,
-        });
-        nuevasPorDestino.set(claveDestino, masc.clave);
+        };
+        envio.crear_mascotas.push(entrada);
+        nuevasPorDestino.set(claveDestino, entrada);
         destinoMascota.set(masc.clave, { ref: masc.clave });
       }
     }
