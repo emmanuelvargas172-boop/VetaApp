@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Topbar, Page } from '../components/ui.jsx';
 import Paso1Archivo from './paso1Archivo.jsx';
 import Paso2Columnas from './paso2Columnas.jsx';
+import Paso3Revisar from './paso3Revisar.jsx';
 
 export default function Importar() {
   // `null` = todavía no pasó por ese paso.
@@ -31,6 +32,7 @@ export default function Importar() {
   const [paso, setPaso] = useState(1);
   const [archivo, setArchivo] = useState(null);  // { libro, archivo, hoja }
   const [columnas, setColumnas] = useState(null); // { hoja, mapa, encabezados, grilla }
+  const [confirmado, setConfirmado] = useState(null); // { envio, resumen, decisiones }
 
   const titulos = {
     1: 'Elegí el archivo',
@@ -60,9 +62,17 @@ export default function Importar() {
             />
           )}
           {paso === 3 && columnas && (
-            // Tarea 12.
+            <Paso3Revisar
+              columnas={columnas}
+              onAtras={() => setPaso(2)}
+              onListo={(c) => { setConfirmado(c); setPaso(4); }}
+            />
+          )}
+          {paso === 4 && confirmado && (
+            // Tarea 13: acá va la escritura. El placeholder existe para que
+            // el paso 4 no sea una pantalla en blanco mientras tanto.
             <pre style={{ fontSize: 12 }}>
-              {JSON.stringify({ hoja: columnas.hoja, mapa: columnas.mapa, filas: columnas.grilla.length }, null, 2)}
+              {JSON.stringify(confirmado.resumen, null, 2)}
             </pre>
           )}
         </div>
