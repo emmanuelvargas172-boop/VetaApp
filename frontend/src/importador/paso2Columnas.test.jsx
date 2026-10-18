@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { columnasConEjemplo } from './paso2Columnas.jsx';
 
-// Los encabezados de la hoja de La Huella, recortados. Los espacios al
-// final están a propósito: así vienen. Los valores son inventados —ver
-// el commit 888a8ce: los datos reales de clientes no van a los tests.
+// Los encabezados de la hoja de La Huella, recortados.
+//
+// El espacio al final de 'Nombre y apellidos del Tutor ' es entrada hostil
+// a propósito y NO lo que llega en producción: `celda()` ya recorta cada
+// celda de texto (leerXlsx.js:90), así que hoy un encabezado nunca llega
+// con espacios. Está acá para que `columnasConEjemplo` no dependa de ese
+// recorte de arriba — el día que se lea un PDF o un Google Sheet por API,
+// el lector nuevo puede no recortar nada, y el encabezado es lo que la
+// clínica compara contra su Excel para corregir el mapeo.
+//
+// Los valores son inventados —ver el commit 888a8ce: los datos reales de
+// clientes no van a los tests.
 const ENCABEZADOS = [
   'Marca temporal',
   'Nombre y apellidos del Tutor ',

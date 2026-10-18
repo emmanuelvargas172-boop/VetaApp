@@ -46,8 +46,14 @@ export function columnasConEjemplo(encabezados, grilla, mapa) {
       i,
       // Un encabezado en blanco se muestra como "Columna 3" y no vacío:
       // hay que poder nombrar la fila para poder cambiarla.
-      // Se conserva tal cual si no está vacío (los espacios al final son
-      // propios del archivo y la clínica los reconoce así).
+      //
+      // El `trim()` decide si está vacío, pero lo que se muestra es el
+      // original sin recortar. Hoy da igual —`celda()` ya recorta cada
+      // celda de texto (leerXlsx.js:90)— y justamente por eso no se
+      // recorta de nuevo acá: esta función no debe depender de un recorte
+      // que hace otro módulo. El día que entre un lector de PDF o de
+      // Google Sheets por API, puede no recortar nada, y el encabezado es
+      // lo que la clínica compara contra su archivo para corregir.
       encabezado: String(enc ?? '').trim() ? String(enc) : `Columna ${i + 1}`,
       clave: porIndice[i] ?? null,
       ejemplo,
@@ -56,8 +62,9 @@ export function columnasConEjemplo(encabezados, grilla, mapa) {
 }
 
 export default function Paso2Columnas({ libro, archivo, hoja, onAtras, onListo }) {
-  // Leer la hoja es lo más caro de la pantalla. `useMemo` para que cambiar
-  // un desplegable no vuelva a parsear 54 filas en cada tecla.
+  // Leer la hoja es lo más caro de la pantalla: parsea todas las filas del
+  // archivo. `useMemo` para que tocar un desplegable —que re-renderiza la
+  // grilla entera— no la vuelva a parsear.
   const { encabezados, grilla } = useMemo(() => leerHoja(libro, hoja), [libro, hoja]);
   const [mapa, setMapa] = useState(() => mapearEncabezados(encabezados));
 
@@ -101,6 +108,10 @@ export default function Paso2Columnas({ libro, archivo, hoja, onAtras, onListo }
           }}>
             <span style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{c.encabezado}</span>
             <select
+              // Sin esto, un lector de pantalla anuncia catorce
+              // desplegables idénticos sin decir a qué columna pertenece
+              // cada uno: el encabezado está al lado, no adentro.
+              aria-label={`Qué campo es la columna ${c.encabezado}`}
               value={c.clave ?? ''}
               onChange={(e) => asignar(c.i, e.target.value || null)}
               style={{ fontSize: 13, padding: '5px 7px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}
@@ -135,8 +146,11 @@ export default function Paso2Columnas({ libro, archivo, hoja, onAtras, onListo }
               <strong>{f}</strong>
             </span>
           ))}.
-          Sin eso no hay nada que crear: son el nombre del dueño y el nombre
-          de la mascota.
+          {/* Antes esta frase decía "son el nombre del dueño y el nombre de
+              la mascota" en plural, y aparecía igual cuando faltaba uno
+              solo. Los dos nombres ya están arriba en negrita: repetirlos
+              acá era lo que forzaba el plural. */}
+          {' '}Sin eso no hay nada que crear.
         </p>
       )}
 

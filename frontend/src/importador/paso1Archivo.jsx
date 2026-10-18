@@ -2,10 +2,13 @@
 // VetaApp · importador/paso1Archivo.jsx
 // El archivo y la hoja.
 //
-// Dos cosas pueden frenar acá, y son las únicas dos de todo el importador
-// que frenan:
+// Dos cosas frenan acá:
 //   · la suscripción no está activa → RLS no la deja escribir
 //   · el archivo no se puede leer   → no hay nada que mapear
+//
+// Son dos de los tres frenos de todo el importador. El tercero está en el
+// paso 2: sin saber cuál columna es el dueño y cuál la mascota no hay nada
+// que crear. No hay ningún otro.
 //
 // Todo lo demás (fechas raras, teléfonos imposibles, razas desconocidas)
 // avisa y sigue. Cincuenta y tres clientes sin fecha de nacimiento siguen
@@ -44,7 +47,14 @@ export default function Paso1Archivo({ onListo }) {
   // efecto corre una sola vez al montar.
   useEffect(() => {
     let vivo = true;
-    recargarPerfil().finally(() => { if (vivo) setVerificando(false); });
+    // El `catch` vacío no es pereza: si la lectura del perfil revienta, la
+    // pantalla sigue con el `bloqueado` que ya tenía, que es el criterio de
+    // todo AuthContext —nunca dejar a nadie afuera por una lectura fallida—
+    // y quien bloquea de verdad es RLS. Sin el catch, una promesa rechazada
+    // quedaría sin manejar y el `Un momento…` no se iría nunca.
+    recargarPerfil()
+      .catch(() => {})
+      .finally(() => { if (vivo) setVerificando(false); });
     return () => { vivo = false; };
   }, [recargarPerfil]);
 
@@ -52,7 +62,11 @@ export default function Paso1Archivo({ onListo }) {
     const f = e.target.files?.[0];
     e.target.value = ''; // para que elegir el mismo archivo otra vez dispare el evento
     if (!f) return;
-    setError(''); setLibro(null); setLista([]); setHoja('');
+    // `archivo` se limpia acá junto con lo demás, y no solo al tener éxito:
+    // si no, elegir un archivo bueno y después uno corrupto muestra el
+    // error del nuevo al lado del nombre del viejo, y la clínica cree que
+    // el que ya le había funcionado se rompió.
+    setError(''); setLibro(null); setLista([]); setHoja(''); setArchivo('');
     try {
       const bytes = await f.arrayBuffer();
       const lib = leerLibro(bytes);

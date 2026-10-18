@@ -557,9 +557,15 @@ export default function Configuracion() {
                   </div>
                 </ConfigSection>
 
+                {/* El subtítulo dice Excel y no "Excel o CSV": el lector
+                    rechaza el CSV a propósito (ver la cabecera de
+                    importador/leerXlsx.js), y ésta es la primera frase que
+                    la clínica lee sobre importar. Prometer acá un formato
+                    que el paso 1 después rechaza es el peor error posible:
+                    el que la propia app provocó. */}
                 <ConfigSection
                   title="Importar base de clientes"
-                  subtitle="Pasá tu Excel o tu CSV a VetaApp, sin escribir nada a mano"
+                  subtitle="Pasá tu Excel a VetaApp, sin escribir nada a mano"
                 >
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 12,

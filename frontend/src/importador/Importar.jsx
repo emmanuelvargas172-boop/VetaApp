@@ -17,9 +17,17 @@ import Paso1Archivo from './paso1Archivo.jsx';
 import Paso2Columnas from './paso2Columnas.jsx';
 
 export default function Importar() {
-  // `null` = todavía no pasó por ese paso. Volver atrás BORRA lo de
-  // adelante: si se guardara, cambiar la hoja en el paso 1 dejaría el
-  // mapeo de la hoja vieja apuntando a columnas que ya no existen.
+  // `null` = todavía no pasó por ese paso.
+  //
+  // Lo de adelante se borra al AVANZAR, no al volver atrás: el `onListo`
+  // del paso 1 limpia `columnas` antes de pasar al 2. Es al avanzar porque
+  // ahí recién se sabe si la hoja cambió, y un mapeo guardado de la hoja
+  // vieja apuntaría a columnas que en la nueva no existen. Volver atrás no
+  // borra nada, y no hace falta: nadie puede saltarse el paso 2.
+  //
+  // El paso 2 además se desmonta cuando `paso` deja de ser 2, así que al
+  // volver a entrar recalcula el mapeo desde cero contra los encabezados
+  // de la hoja que esté elegida ahora.
   const [paso, setPaso] = useState(1);
   const [archivo, setArchivo] = useState(null);  // { libro, archivo, hoja }
   const [columnas, setColumnas] = useState(null); // { hoja, mapa, encabezados, grilla }
