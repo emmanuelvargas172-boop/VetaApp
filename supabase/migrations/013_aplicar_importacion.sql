@@ -47,6 +47,7 @@ declare
   v_campo       text;
   v_valor       text;
   v_antes       text;
+  v_estado      text;
   v_toco        boolean;
   v_id          bigint;
   v_dueno       bigint;
@@ -61,8 +62,19 @@ declare
 begin
   -- La importación tiene que existir y ser de quien llama. RLS ya frenaría
   -- la escritura, pero el error que da no explica nada; este sí.
-  if not exists (select 1 from importaciones where id = v_imp and user_id = v_user) then
+  select estado into v_estado from importaciones where id = v_imp and user_id = v_user;
+  if v_estado is null then
     raise exception 'La importación % no existe o no es de esta cuenta', v_imp;
+  end if;
+  -- El freno es solo contra los dos estados de deshecho, no contra cualquier
+  -- estado distinto de 'en_curso'. El spec parte archivos grandes en varias
+  -- tandas con el mismo importacion_id: cada tanda cierra en 'listo', así que
+  -- una guarda v_estado <> 'en_curso' frenaría la segunda tanda contra sí
+  -- misma. Los estados de deshecho sí son terminales: restaurar v_anteriores
+  -- encima de lo que la clínica escribió después del primer deshacer le
+  -- borraría datos propios sin posibilidad de recuperación.
+  if v_estado in ('deshecho', 'deshecho_parcial') then
+    raise exception 'La importación % ya se deshizo', v_imp;
   end if;
 
   -- ---------- 1. TUTORES NUEVOS ----------
@@ -83,6 +95,19 @@ begin
       )
       returning id into v_id;
     exception when unique_violation then
+      -- HUECO CONOCIDO DE DUPLICACIÓN (no se tapa acá):
+      -- Si la respuesta HTTP de una tanda se pierde después del commit,
+      -- la clínica reenvía el mismo JSON y crear_tutores no tiene dedup:
+      -- el tutor entra otra vez. Peor: este handler inserta el duplicado
+      -- igualmente sin cédula y lo reporta como 'omitidos por cédula
+      -- repetida', no como 'esto ya se hizo', así que el único índice que
+      -- podía frenarlo está neutralizado. No se corrige aquí porque la
+      -- función no puede distinguir un reintento de una tanda nueva: el
+      -- JSON no trae id de tanda y agregarlo cambiaría dos tareas futuras
+      -- en curso. El tapón va en el navegador: contar
+      -- `select count(*) from duenos where importacion_id = X` antes de
+      -- reenviar. (Revisión 2026-10-17)
+      --
       -- idx_duenos_user_cedula (011) es único por cuenta. Si el archivo
       -- trae una cédula que ya es de otro cliente, lo que NO puede pasar
       -- es que se caiga el import entero por una celda: entra sin cédula
@@ -115,6 +140,13 @@ begin
 
       execute format('select %I from duenos where id = $1 and user_id = $2', v_campo)
         into v_antes using v_id, v_user;
+      -- not found: el id no existe o no es de esta cuenta. El update que sigue
+      -- afectaría 0 filas sin error, el contador se inflaría y el comentario
+      -- "los números salen de la base" dejaría de ser cierto. Fallar aquí
+      -- valida pertenencia igual que F3 lo hace para los ids del plan.
+      if not found then
+        raise exception 'El tutor % no existe o no es de esta cuenta', v_id;
+      end if;
 
       -- Solo donde haya vacío. Entre la vista previa y este momento alguien
       -- pudo llenarlo desde otra pestaña, y pisarlo sería exactamente lo
@@ -147,6 +179,14 @@ begin
         v_item->>'nombre', v_item->>'tutor_ref';
     end if;
 
+    -- Las FK comprueban existencia pero no miran RLS. Un tutor_id de otra
+    -- clínica pasa la FK, entra como dueno_id, y deshacer_importacion lo
+    -- borra cuando no encuentra mascotas propias: la cascada se lleva la
+    -- mascota de la otra clínica con toda su historia.
+    if not exists (select 1 from duenos where id = v_dueno and user_id = v_user) then
+      raise exception 'El tutor % no existe o no es de esta cuenta', v_dueno;
+    end if;
+
     -- `codigo` no se escribe. Lo pone el trigger de 008, que es
     -- security definer e ignora lo que le manden; ponerlo acá dejaría a
     -- alguien creyendo que ese campo lo controla el import.
@@ -160,7 +200,12 @@ begin
       -- está mal es el plan y tiene que doler.
       v_item->>'especie',
       v_item->>'raza',
-      v_item->>'fecha_nacimiento',
+      -- 011:74 exige null o YYYY-MM-DD. Una celda vacía en el Excel llega
+      -- como '' y no como null, y '' no pasa el check: revienta el import
+      -- entero en esa fila. nullif convierte '' en null, igual que la
+      -- política de cédulas repetidas: el dato faltante cuesta un campo
+      -- vacío, no el import completo.
+      nullif(v_item->>'fecha_nacimiento', ''),
       coalesce((v_item->>'edad_anios')::int, 0),
       coalesce((v_item->>'edad_meses')::int, 0),
       v_dueno,
@@ -187,6 +232,11 @@ begin
 
       execute format('select %I::text from mascotas where id = $1 and user_id = $2', v_campo)
         into v_antes using v_id, v_user;
+      -- Misma razón que en completar_tutores: 0 filas → update silencioso
+      -- que infla el contador sin tocar nada. Valida pertenencia a la vez.
+      if not found then
+        raise exception 'La mascota % no existe o no es de esta cuenta', v_id;
+      end if;
 
       -- edad_anios y edad_meses son NOT NULL default 0, así que nunca
       -- están "vacías": el 0 cuenta como vacío porque es lo que deja un
@@ -195,7 +245,12 @@ begin
          or (v_campo in ('edad_anios', 'edad_meses') and v_antes = '0') then
         execute format('update mascotas set %I = $1 where id = $2 and user_id = $3', v_campo)
           using (case when v_campo in ('edad_anios', 'edad_meses')
-                      then coalesce(v_valor, '0') else v_valor end), v_id, v_user;
+                          then coalesce(v_valor, '0')
+                      -- fecha_nacimiento: misma razón que en crear_mascotas.
+                      -- '' no pasa el check de 011:74 y revienta el import.
+                      when v_campo = 'fecha_nacimiento'
+                          then nullif(v_valor, '')
+                      else v_valor end), v_id, v_user;
         v_anteriores := v_anteriores || jsonb_build_object(
           'tabla', 'mascotas', 'id', v_id, 'campo', v_campo, 'antes', v_antes);
         v_toco := true;
@@ -214,6 +269,13 @@ begin
     if v_id is null then
       raise exception 'Un tratamiento del % no tiene mascota (ref %)',
         v_item->>'fecha', v_item->>'mascota_ref';
+    end if;
+
+    -- Las FK no miran RLS: un mascota_id de otra clínica pasa la FK y el
+    -- insert entra con user_id de esta cuenta — la fila queda colgada de una
+    -- mascota ajena.
+    if not exists (select 1 from mascotas where id = v_id and user_id = v_user) then
+      raise exception 'La mascota % no existe o no es de esta cuenta', v_id;
     end if;
 
     -- Misma mascota + mismo tipo + misma fecha = ya está. La comprobación
@@ -251,6 +313,11 @@ begin
         v_item->>'fecha_aplicacion', v_item->>'mascota_ref';
     end if;
 
+    -- Misma razón que en tratamientos: las FK no miran RLS.
+    if not exists (select 1 from mascotas where id = v_id and user_id = v_user) then
+      raise exception 'La mascota % no existe o no es de esta cuenta', v_id;
+    end if;
+
     -- Misma regla que los tratamientos, con el nombre adentro: a una
     -- mascota se le pueden aplicar dos vacunas distintas el mismo día.
     if exists (
@@ -271,23 +338,47 @@ begin
   end loop;
 
   -- ---------- 7. CERRAR EL REGISTRO ----------
+  -- `anteriores` se acumula con ||, no se pisa: una segunda tanda tiene que
+  -- AGREGAR sus entradas a las de la primera para que deshacer pueda iterar
+  -- el registro completo. `= v_anteriores` borra lo de las tandas previas.
+  --
+  -- Los contadores del resumen se suman al valor que ya estaba: el || de
+  -- jsonb reemplaza claves repetidas con el valor del lado derecho, así que
+  -- sin la suma el resumen refleja solo la última tanda. Se lee el valor
+  -- acumulado con (resumen->>'clave')::int y se suma lo de esta tanda.
+  -- `omitidos` es un array y también se acumula con ||.
+  --
+  -- El `return` de abajo devuelve los números de ESTA tanda, no el acumulado.
+  -- El navegador lleva su propio total sumando las respuestas de cada tanda:
+  -- devolver el acumulado acá y el parcial allá era la fuente de confusión.
   update importaciones
      set estado     = 'listo',
-         anteriores = v_anteriores,
-         resumen    = resumen || jsonb_build_object(
-                        'tutores_creados',      n_tut_nuevos,
-                        'tutores_completados',  n_tut_compl,
-                        'mascotas_creadas',     n_mas_nuevos,
-                        'mascotas_completadas', n_mas_compl,
-                        'tratamientos',         n_trat,
-                        'vacunas',              n_vac,
-                        'repetidos',            n_repetidos,
-                        'omitidos',             v_omitidos),
+         anteriores = anteriores || v_anteriores,
+         resumen    = jsonb_build_object(
+                        'tutores_creados',
+                          coalesce((resumen->>'tutores_creados')::int, 0)      + n_tut_nuevos,
+                        'tutores_completados',
+                          coalesce((resumen->>'tutores_completados')::int, 0)  + n_tut_compl,
+                        'mascotas_creadas',
+                          coalesce((resumen->>'mascotas_creadas')::int, 0)     + n_mas_nuevos,
+                        'mascotas_completadas',
+                          coalesce((resumen->>'mascotas_completadas')::int, 0) + n_mas_compl,
+                        'tratamientos',
+                          coalesce((resumen->>'tratamientos')::int, 0)         + n_trat,
+                        'vacunas',
+                          coalesce((resumen->>'vacunas')::int, 0)              + n_vac,
+                        'repetidos',
+                          coalesce((resumen->>'repetidos')::int, 0)            + n_repetidos,
+                        'omitidos',
+                          coalesce(resumen->'omitidos', '[]'::jsonb)           || v_omitidos),
          cerrado_en = now()
    where id = v_imp and user_id = v_user;
 
   -- Los números salen de la base, no de la predicción del paso 3. Es la
   -- diferencia entre "esto hice" y "esto creía que iba a hacer".
+  -- Este retorno es el de ESTA tanda, no el acumulado: el navegador suma las
+  -- respuestas de cada tanda por su cuenta; leer el resumen acumulado y este
+  -- retorno como si fueran lo mismo daría el doble en la segunda tanda.
   return jsonb_build_object(
     'importacion_id',       v_imp,
     'tutores_creados',      n_tut_nuevos,
@@ -305,5 +396,5 @@ $fn$;
 -- Una función es ejecutable por PUBLIC por defecto. Sin JWT auth.uid() es
 -- null y la primera comprobación ya la frena, pero dejarlo explícito es
 -- más barato que confiar en eso.
-revoke all on function public.aplicar_importacion(jsonb) from public;
+revoke all on function public.aplicar_importacion(jsonb) from public, anon, authenticated;
 grant execute on function public.aplicar_importacion(jsonb) to authenticated;

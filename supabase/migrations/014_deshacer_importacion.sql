@@ -11,6 +11,15 @@
 --   tratamientos.mascota_id       → mascotas(id)  on delete cascade
 --   historias_clinicas.mascota_id → mascotas(id)  on delete cascade
 --
+-- cobros.mascota_id (003_cobros.sql:18) es la excepción: on delete set null.
+-- El recibo tiene que sobrevivir aunque la mascota se vaya — el cobro ya
+-- ocurrió y tiene que seguir en el historial de ingresos. Por eso el paso 2
+-- cuenta también los cobros antes de decidir si borra la mascota: una
+-- mascota importada a la que se le facturó pero no tiene historia clínica
+-- caería en "no tiene nada encima" con el conteo anterior. No se pierde
+-- plata (003:19-20 guarda mascota_nombre y dueno_nombre como copia), pero
+-- se pierde la trazabilidad del recibo al paciente.
+--
 -- El escenario: la clínica importa en octubre, atiende a "Killer" seis
 -- veces, le escribe la historia clínica, le agenda cita. En marzo entra a
 -- Importaciones, le da Deshacer para limpiar otra cosa, y se va el trabajo
@@ -42,7 +51,7 @@ declare
   n_mas         int := 0;
   n_duenos      int := 0;
   n_restaurados int := 0;
-  v_hist        int; v_citas int; v_vac_m int; v_trat_m int;
+  v_hist        int; v_citas int; v_vac_m int; v_trat_m int; v_cobros int;
 begin
   select estado into v_estado
     from importaciones where id = p_importacion and user_id = v_user;
@@ -75,8 +84,9 @@ begin
     select count(*) into v_citas  from citas              where mascota_id = m.id;
     select count(*) into v_vac_m  from vacunas            where mascota_id = m.id;
     select count(*) into v_trat_m from tratamientos       where mascota_id = m.id;
+    select count(*) into v_cobros from cobros             where mascota_id = m.id;
 
-    if v_hist + v_citas + v_vac_m + v_trat_m = 0 then
+    if v_hist + v_citas + v_vac_m + v_trat_m + v_cobros = 0 then
       delete from mascotas where id = m.id and user_id = v_user;
       n_mas := n_mas + 1;
     else
@@ -87,7 +97,7 @@ begin
       v_conservadas := v_conservadas || jsonb_build_object(
         'id', m.id, 'nombre', m.nombre,
         'historias', v_hist, 'citas', v_citas,
-        'vacunas', v_vac_m, 'tratamientos', v_trat_m);
+        'vacunas', v_vac_m, 'tratamientos', v_trat_m, 'cobros', v_cobros);
     end if;
   end loop;
 
@@ -102,7 +112,13 @@ begin
     delete from duenos
      where importacion_id = p_importacion
        and user_id = v_user
-       and not exists (select 1 from mascotas where mascotas.dueno_id = duenos.id)
+       -- user_id filtra las mascotas: sin él, RLS no ve una mascota ajena
+       -- colgada de este tutor (la subconsulta corre security invoker), lo
+       -- borra creyéndolo sin mascotas, y la cascada se lleva la mascota de
+       -- la otra clínica. Es el otro extremo de la cadena de F3 de 013.
+       and not exists (select 1 from mascotas
+                        where mascotas.dueno_id = duenos.id
+                          and mascotas.user_id = v_user)
      returning 1)
   select count(*) into n_duenos from d;
 
@@ -162,5 +178,5 @@ begin
 end
 $fn$;
 
-revoke all on function public.deshacer_importacion(bigint) from public;
+revoke all on function public.deshacer_importacion(bigint) from public, anon, authenticated;
 grant execute on function public.deshacer_importacion(bigint) to authenticated;

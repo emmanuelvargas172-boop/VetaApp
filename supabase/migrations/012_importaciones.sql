@@ -57,12 +57,21 @@ begin
   end loop;
 end $$;
 
--- Misma política que las otras siete tablas: cada quien solo ve lo suyo.
+-- Misma política que las otras ocho tablas (002_admin.sql:249-254): además
+-- de aislar por user_id, exige esta_activo(). Sin esta cláusula, una cuenta
+-- suspendida puede llamar a deshacer_importacion(), que lee el estado de la
+-- importación (cero filas bloqueadas → sin error), itera cero mascotas
+-- porque RLS las esconde, restaura cero campos sin quejarse, y escribe
+-- estado='deshecho'. El resultado: no borró nada, dice que sí lo hizo, y
+-- cuando la clínica reactive la suscripción el freno de "ya se deshizo"
+-- le impide el deshacer para siempre. Sin esta_activo() el RLS no falla
+-- cerrado — falla devolviendo cero filas, y la función lee cero como "no
+-- hay nada encima".
 alter table public.importaciones enable row level security;
 
 drop policy if exists "own_rows_importaciones" on public.importaciones;
 create policy "own_rows_importaciones" on public.importaciones
   for all
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() = user_id and public.esta_activo())
+  with check (auth.uid() = user_id and public.esta_activo());
