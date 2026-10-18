@@ -44,17 +44,33 @@ const palabras = (nombre) => sinTildes(nombre).split(' ').filter((p) => p.length
 /**
  * Si dos nombres pueden ser de la misma persona.
  *
- * Una palabra compartida alcanza, y a propósito: esto NO se usa para
- * emparejar. Se usa solo cuando la cédula ya dijo que son el mismo, para
- * distinguir "Eulalia Ruth Trujillo" / "Ana Araque" —el mismo cliente escrito
- * de dos formas— de "Ana Araque" / "Pedro Castaño", que con la misma cédula
- * es una cédula mal tecleada y hay que preguntar.
+ * Esto NO se usa para emparejar. Se usa solo cuando la cédula ya dijo que
+ * son el mismo, para distinguir "Eulalia Ruth Trujillo" / "Ana Araque" —el
+ * mismo cliente escrito de dos formas— de "Pedro Gómez" / "Ana Gómez" —el
+ * papá y la hija, no una misma persona con el nombre mal tecleado—.
+ *
+ * Regla: si los dos nombres traen 2 o más palabras significativas se exigen
+ * 2 palabras compartidas; si alguno trae solo una, alcanza con una.
+ * Una sola coincidencia cuando los dos tienen varias palabras casi siempre
+ * es el apellido de familia —"Pedro Gómez" y "Ana Gómez" comparten "Gomez"
+ * pero son personas distintas—. Pedir dos deja pasar "Eulalia Ruth Trujillo" /
+ * "Ana Araque" y manda a la familia al paso 3, que es donde la clínica
+ * puede decidir.
  */
 export function nombresSeParecen(a, b) {
   const pa = palabras(a);
   const pb = palabras(b);
   if (!pa.length || !pb.length) return false;
-  return pa.some((p) => pb.includes(p));
+  const comunes = pa.filter((p) => pb.includes(p)).length;
+  // Una sola palabra compartida alcanza únicamente cuando uno de los dos
+  // nombres no tiene más que ofrecer. Con dos palabras a cada lado, una
+  // coincidencia sola es casi siempre el apellido de familia: "Pedro
+  // Gómez" y "Ana Gómez" con la misma cédula son el papá y la hija, no
+  // un nombre escrito de dos formas. Pedir dos deja pasar "Teofilo Arboleda
+  // Araque" / "Ana Araque" —el mismo cliente— y manda a la familia al
+  // paso 3, que es donde la clínica puede decidir.
+  const exigidas = (pa.length >= 2 && pb.length >= 2) ? 2 : 1;
+  return comunes >= exigidas;
 }
 
 /**
@@ -144,10 +160,19 @@ const ctxDe = (origen) => {
 /**
  * Los campos de `duenos` que este archivo puede completar.
  *
- * `telefono` NO está: es NOT NULL, siempre tiene algo, así que completarlo
- * es imposible por definición. Cuando el archivo trae otro número se avisa
- * y no se cambia — callarlo dejaría a la clínica creyendo que el número
- * nuevo entró, y el recordatorio por WhatsApp saldría al viejo.
+ * `telefono` queda afuera de los campos que se pueden completar porque la
+ * función de Postgres (013_aplicar_importacion.sql:165) solo acepta
+ * ('cedula','direccion','telefono2') y tiraría excepción si `telefono`
+ * llegara en la lista blanca, cayendo la importación entera.
+ *
+ * Aun así `telefono` puede estar vacío: este mismo módulo escribe
+ * `telefono: tutor.tel1 ?? ''` cuando no hay número disponible, así que
+ * una importación anterior pudo dejar tutores con `telefono = ''`. Por eso
+ * hay dos avisos distintos:
+ *  - El número que no coincide: el registro ya tiene uno y el archivo trae
+ *    otro distinto. Se avisa y se deja el que ya estaba.
+ *  - El número que falta: el registro tiene '' y el archivo trae uno. No se
+ *    puede escribir desde acá, hay que actualizarlo a mano en la ficha.
  */
 const completarTutor = (estado, existente, tutor) => {
   const campos = {};
@@ -155,7 +180,12 @@ const completarTutor = (estado, existente, tutor) => {
   if (vacio(existente.direccion) && !vacio(tutor.direccion)) campos.direccion = tutor.direccion;
   if (vacio(existente.telefono2) && !vacio(tutor.tel2))      campos.telefono2 = tutor.tel2;
 
-  if (!vacio(tutor.tel1) && !vacio(existente.telefono)
+  if (!vacio(tutor.tel1) && vacio(existente.telefono)) {
+    aviso(estado, ctxDe(tutor.origen),
+      `${existente.nombre} está guardado sin teléfono y el archivo trae ` +
+      `${tutor.tel1}. No lo escribo desde acá: hay que ponerlo a mano en ` +
+      `la ficha del cliente.`);
+  } else if (!vacio(tutor.tel1) && !vacio(existente.telefono)
       && String(tutor.tel1) !== String(existente.telefono)) {
     aviso(estado, ctxDe(tutor.origen),
       `${existente.nombre} ya tiene el teléfono ${existente.telefono}. ` +
@@ -219,6 +249,9 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
   // clave del tutor en el archivo → { id } si ya existe, { ref } si es
   // nuevo, o nada si quedó colgado de una duda sin contestar.
   const destinoTutor = new Map();
+  // (a) Map para acumular completar_tutores por id del existente: la misma
+  // persona con dos claves en el archivo no debe producir dos entradas.
+  const completarTutoresMap = new Map();
   const mascotasDe = new Map();
   for (const m of agrupado.mascotas.values()) {
     if (!mascotasDe.has(m.tutor)) mascotasDe.set(m.tutor, []);
@@ -258,10 +291,19 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
 
     if (certeza === 'misma') {
       const campos = completarTutor(estado, m.existente, tutor);
-      // Un objeto sin campos adentro haría que el paso 3 diga "1 tutor
-      // para completar" y después no complete nada.
+      // (a) Acumular completar_tutores por id del existente, no por clave del
+      // archivo: la misma persona escrita con cédula en una hoja y sin cédula
+      // en otra sale de agrupar() con dos claves distintas. Si se empujara por
+      // clave, el paso 3 contaría "2 tutores para completar" cuando es uno, y
+      // los campos de cada fila se ignorarían mutuamente. Fusionar los campos
+      // deja los dos: la hoja que trae la dirección y la que trae la cédula.
       if (Object.keys(campos).length) {
-        envio.completar_tutores.push({ id: m.existente.id, campos });
+        if (completarTutoresMap.has(m.existente.id)) {
+          Object.assign(completarTutoresMap.get(m.existente.id).campos, campos);
+        } else {
+          const entrada = { id: m.existente.id, campos };
+          completarTutoresMap.set(m.existente.id, entrada);
+        }
       }
       destinoTutor.set(tutor.clave, { id: m.existente.id });
     } else {
@@ -280,8 +322,24 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
     }
   }
 
+  // Volcar el Map de completar_tutores al array del envío.
+  for (const entrada of completarTutoresMap.values()) {
+    envio.completar_tutores.push(entrada);
+  }
+
   // ---------- MASCOTAS ----------
   const destinoMascota = new Map();
+  // (b) Dedup de mascotas nuevas por destino resuelto del tutor + nombre
+  // normalizado. Sin esto, la misma persona escrita con cédula en unas filas
+  // y sin cédula en otras sale con dos claves de tutor → dos claves de mascota
+  // → dos entradas en crear_mascotas para el mismo perro. 013 no tiene dedup
+  // en crear_mascotas ni índice único, así que el perro se crearía dos veces
+  // y todos sus eventos se escribirían dos veces.
+  const nuevasPorDestino = new Map(); // claveDestino → ref ya empujado
+
+  // (c) Igual que (a) para completar_mascotas: misma persona con dos claves
+  // daría dos entradas con el mismo id y el paso 3 contaría el doble.
+  const completarMascotasMap = new Map(); // id del existente → entrada
 
   for (const masc of agrupado.mascotas.values()) {
     const tut = destinoTutor.get(masc.tutor);
@@ -309,27 +367,67 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
 
     if (yaEsta) {
       const campos = completarMascota(yaEsta, masc, hoy);
+      // (c) Acumular por id igual que completar_tutores.
       if (Object.keys(campos).length) {
-        envio.completar_mascotas.push({ id: yaEsta.id, campos });
+        if (completarMascotasMap.has(yaEsta.id)) {
+          Object.assign(completarMascotasMap.get(yaEsta.id).campos, campos);
+        } else {
+          completarMascotasMap.set(yaEsta.id, { id: yaEsta.id, campos });
+        }
       }
       destinoMascota.set(masc.clave, { id: yaEsta.id });
     } else {
-      const edad = masc.nacimiento ? edadDesde(masc.nacimiento, hoy) : null;
-      envio.crear_mascotas.push({
-        ref: masc.clave,
-        tutor_ref: tut.ref ?? null,
-        tutor_id: tut.id ?? null,
-        nombre: masc.nombre,
-        especie,
-        raza: vacio(masc.raza) ? null : masc.raza,
-        fecha_nacimiento: vacio(masc.nacimiento) ? null : masc.nacimiento,
-        // Sin fecha la edad NO se inventa: queda 0, que es lo que ya tienen
-        // las mascotas viejas de la app, y se corrige a mano.
-        edad_anios: edad?.anios ?? 0,
-        edad_meses: edad?.meses ?? 0,
-      });
-      destinoMascota.set(masc.clave, { ref: masc.clave });
+      // (b) La clave es el destino resuelto, no masc.clave: la misma persona
+      // escrita con cédula en una hoja y sin cédula en otra sale de agrupar()
+      // con dos claves de tutor y por lo tanto dos de mascota. Si se empuja
+      // por clave de archivo, el mismo perro se crea dos veces —013 no
+      // deduplica crear_mascotas ni hay índice único que lo haga— y sus
+      // eventos se escriben dos veces, porque el dedup de eventos usa el ref.
+      const duenoDestino = tut.id ? `id:${tut.id}` : `ref:${tut.ref}`;
+      const claveDestino = `${duenoDestino}|${sinTildes(masc.nombre)}`;
+
+      if (nuevasPorDestino.has(claveDestino)) {
+        // Ya hay una entrada para este perro: no se crea otra, pero sí se
+        // enriquece campo por campo (solo donde falte valor), por el mismo
+        // criterio que usa agrupar() al fusionar filas del mismo tutor.
+        const refExistente = nuevasPorDestino.get(claveDestino);
+        const entrada = envio.crear_mascotas.find((e) => e.ref === refExistente);
+        if (entrada) {
+          if (!entrada.raza && !vacio(masc.raza)) entrada.raza = masc.raza;
+          if (!entrada.fecha_nacimiento && !vacio(masc.nacimiento)) {
+            entrada.fecha_nacimiento = masc.nacimiento;
+            const edad = edadDesde(masc.nacimiento, hoy);
+            if (edad && !(entrada.edad_anios || entrada.edad_meses)) {
+              entrada.edad_anios = edad.anios;
+              entrada.edad_meses = edad.meses;
+            }
+          }
+        }
+        destinoMascota.set(masc.clave, { ref: refExistente });
+      } else {
+        const edad = masc.nacimiento ? edadDesde(masc.nacimiento, hoy) : null;
+        envio.crear_mascotas.push({
+          ref: masc.clave,
+          tutor_ref: tut.ref ?? null,
+          tutor_id: tut.id ?? null,
+          nombre: masc.nombre,
+          especie,
+          raza: vacio(masc.raza) ? null : masc.raza,
+          fecha_nacimiento: vacio(masc.nacimiento) ? null : masc.nacimiento,
+          // Sin fecha la edad NO se inventa: queda 0, que es lo que ya tienen
+          // las mascotas viejas de la app, y se corrige a mano.
+          edad_anios: edad?.anios ?? 0,
+          edad_meses: edad?.meses ?? 0,
+        });
+        nuevasPorDestino.set(claveDestino, masc.clave);
+        destinoMascota.set(masc.clave, { ref: masc.clave });
+      }
     }
+  }
+
+  // Volcar el Map de completar_mascotas al array del envío.
+  for (const entrada of completarMascotasMap.values()) {
+    envio.completar_mascotas.push(entrada);
   }
 
   // ---------- EVENTOS ----------
@@ -341,6 +439,21 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
   for (const ev of agrupado.eventos) {
     const dest = destinoMascota.get(ev.mascota);
     if (!dest) continue; // mascota colgada de una duda o de una especie sin resolver
+
+    // Guarda de tipo inválido ANTES de calcular la clave y de registrarla en
+    // el dedup. Solo aplica a tratamientos; las vacunas no tienen check de tipo.
+    // Si la guarda fuera después de idx.eventos.add(), un tipo inválido dejaría
+    // su clave marcada como vista: si más adelante llegara un evento válido con
+    // la misma identidad (misma mascota, mismo tipo, misma fecha), el dedup lo
+    // contaría como repetido aunque nunca se haya importado.
+    // tratamientos.tipo tiene un check en 001_init.sql:78:
+    //   check (tipo in ('vacunacion','desparasitacion','bano','consulta'))
+    // Un dato malo cuesta un registro, no el archivo.
+    if (ev.tipo !== 'vacuna' && !TIPOS_TRATAMIENTO_VALIDOS.has(ev.t)) {
+      aviso(estado, ctxDe(agrupado.mascotas.get(ev.mascota)?.origen),
+        `Tipo de tratamiento desconocido: "${ev.t}". No se importa este evento.`);
+      continue;
+    }
 
     const quien = dest.id ?? `ref:${dest.ref}`;
     const clave = ev.tipo === 'vacuna'
@@ -365,18 +478,6 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
         notas: vacio(ev.notas) ? null : ev.notas,
       });
     } else {
-      // Guarda antes de empujar: tratamientos.tipo tiene un check en
-      // 001_init.sql:78 que tira excepción con cualquier valor fuera de
-      // ('vacunacion','desparasitacion','bano','consulta'). Hoy agrupar.js
-      // solo produce 'bano' y 'desparasitacion', pero el día que alguien
-      // agregue un tipo nuevo el valor inválido viajaría hasta Postgres y
-      // caería el import entero con un mensaje que la clínica no puede
-      // entender ni accionar. Un dato malo cuesta un registro, no el archivo.
-      if (!TIPOS_TRATAMIENTO_VALIDOS.has(ev.t)) {
-        aviso(estado, ctxDe(/* no hay origen en ev */ []),
-          `Tipo de tratamiento desconocido: "${ev.t}". No se importa este evento.`);
-        continue;
-      }
       envio.tratamientos.push({
         mascota_ref: dest.ref ?? null,
         mascota_id: dest.id ?? null,

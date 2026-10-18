@@ -9,7 +9,7 @@ const HOY = new Date(2026, 9, 15); // 15/10/2026, fijo para que la edad no cambi
 const delArchivo = (over = {}) => ({
   tutores: new Map([['t1', {
     clave: 't1', nombre: 'Ana Gómez', cedula: null, direccion: null,
-    tel1: '573000000200', tel2: null, origen: ['Hoja1:2'], ...over.tutor,
+    tel1: '573000000011', tel2: null, origen: ['Hoja1:2'], ...over.tutor,
   }]]),
   mascotas: new Map([['m1', {
     clave: 'm1', tutor: 't1', nombre: 'Max', especie: 'perro',
@@ -39,13 +39,20 @@ describe('nombresSeParecen', () => {
   it('las palabras de dos letras o menos no alcanzan', () => {
     expect(nombresSeParecen('Maria de la Cruz', 'Pedro de la Torre')).toBe(false);
   });
+
+  // El apellido de familia es compartido por definición. Con una sola
+  // coincidencia y dos palabras a cada lado, "Pedro Gomez" y "Ana Gomez"
+  // parecerían la misma persona y se unirían sin preguntar.
+  it('"Pedro Gomez" y "Ana Gomez" no se parecen: apellido solo no alcanza', () => {
+    expect(nombresSeParecen('Pedro Gomez', 'Ana Gomez')).toBe(false);
+  });
 });
 
 describe('emparejarTutor', () => {
   it('misma cédula, nombre parecido: es la misma persona', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000202', cedula: '1000000200' }] });
-    const r = emparejarTutor(idx, { nombre: 'Ana Araque', cedula: '1000000200', tel1: '573000000000' });
+      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000022', cedula: '1000000001' }] });
+    const r = emparejarTutor(idx, { nombre: 'Ana Araque', cedula: '1000000001', tel1: '573000000000' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 7 } });
   });
 
@@ -54,15 +61,15 @@ describe('emparejarTutor', () => {
   // alguien que no es su dueño.
   it('misma cédula, nombre completamente distinto: pregunta', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000202', cedula: '1000000200' }] });
-    const r = emparejarTutor(idx, { nombre: 'Pedro Castaño', cedula: '1000000200', tel1: null });
+      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000022', cedula: '1000000001' }] });
+    const r = emparejarTutor(idx, { nombre: 'Pedro Castaño', cedula: '1000000001', tel1: null });
     expect(r).toMatchObject({ certeza: 'duda', motivo: 'cedula_otro_nombre' });
   });
 
   it('mismo nombre y mismo teléfono, sin cédulas: es la misma', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 9, nombre: 'Ana Gómez', telefono: '573000000200', cedula: null }] });
-    const r = emparejarTutor(idx, { nombre: 'ana gomez', cedula: null, tel1: '573000000200' });
+      { id: 9, nombre: 'Ana Gómez', telefono: '573000000011', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'ana gomez', cedula: null, tel1: '573000000011' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 9 } });
   });
 
@@ -70,15 +77,26 @@ describe('emparejarTutor', () => {
   // personas distintas (Araque y Casimiro Carvajalino).
   it('mismo nombre con teléfono distinto: pregunta', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 9, nombre: 'Teofilo Arboleda', telefono: '573000000202', cedula: null }] });
-    const r = emparejarTutor(idx, { nombre: 'Teofilo Arboleda', cedula: null, tel1: '573000000203' });
+      { id: 9, nombre: 'Teofilo Arboleda', telefono: '573000000022', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'Teofilo Arboleda', cedula: null, tel1: '573000000033' });
     expect(r).toMatchObject({ certeza: 'duda', motivo: 'nombre_tel_distinto' });
+  });
+
+  // La misma cédula con dos personas de distinto nombre de la misma familia
+  // (padre e hija, hermanos): el apellido compartido no alcanza para unirlos.
+  // Con dos palabras a cada lado se exigen dos coincidencias; el apellido
+  // solo es una. Resultado: pregunta, no unión silenciosa.
+  it('misma cédula, apellido compartido pero primer nombre distinto: pregunta', () => {
+    const idx = indexar({ ...vacia, duenos: [
+      { id: 7, nombre: 'Ana Gomez', telefono: '573000000011', cedula: '1000000001' }] });
+    const r = emparejarTutor(idx, { nombre: 'Pedro Gomez', cedula: '1000000001', tel1: null });
+    expect(r).toMatchObject({ certeza: 'duda', motivo: 'cedula_otro_nombre' });
   });
 
   it('nadie parecido: es alguien nuevo', () => {
     const idx = indexar({ ...vacia, duenos: [
       { id: 9, nombre: 'Otra Persona', telefono: '573100000000', cedula: null }] });
-    expect(emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000200' }))
+    expect(emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000011' }))
       .toMatchObject({ certeza: 'nueva', existente: null });
   });
 
@@ -93,7 +111,7 @@ describe('armarPlan · una cuenta vacía', () => {
     const p = armarPlan(nuevoEstado(), delArchivo(), vacia, sinDecidir, HOY);
 
     expect(p.envio.crear_tutores).toEqual([{
-      ref: 't1', nombre: 'Ana Gómez', telefono: '573000000200',
+      ref: 't1', nombre: 'Ana Gómez', telefono: '573000000011',
       telefono2: null, cedula: null, direccion: null,
     }]);
     expect(p.envio.crear_mascotas).toEqual([{
@@ -158,13 +176,13 @@ describe('armarPlan · completar sin pisar', () => {
 
   it('completa la cédula vacía y deja la dirección que ya estaba', () => {
     const a = delArchivo({
-      tutor: { cedula: '1000000200', direccion: 'LA DEL ARCHIVO', tel1: '573999999999' },
+      tutor: { cedula: '1000000001', direccion: 'LA DEL ARCHIVO', tel1: '573999999999' },
     });
     const p = armarPlan(nuevoEstado(), a, yaExiste, sinDecidir, HOY);
 
     expect(p.envio.crear_tutores).toHaveLength(0);
     expect(p.envio.completar_tutores).toEqual([
-      { id: 7, campos: { cedula: '1000000200' } },
+      { id: 7, campos: { cedula: '1000000001' } },
     ]);
   });
 
@@ -182,8 +200,8 @@ describe('armarPlan · completar sin pisar', () => {
     // Matched vía cédula: mismo nombre, misma cédula, pero teléfono distinto.
     const conCedula = { ...vacia, duenos: [
       { id: 7, nombre: 'Ana Gómez', telefono: '573999999999',
-        telefono2: null, cedula: '1000000200', direccion: null }] };
-    const a = delArchivo({ tutor: { cedula: '1000000200', tel1: '573000000200' } });
+        telefono2: null, cedula: '1000000001', direccion: null }] };
+    const a = delArchivo({ tutor: { cedula: '1000000001', tel1: '573000000011' } });
     const p = armarPlan(e, a, conCedula, sinDecidir, HOY);
 
     expect(JSON.stringify(p.envio.completar_tutores)).not.toContain('telefono"');
@@ -213,11 +231,29 @@ describe('armarPlan · completar sin pisar', () => {
     expect(campos.fecha_nacimiento).toBe('2018-07-26');
   });
 
+  // Un tutor creado por una importación anterior sin número disponible tiene
+  // telefono = ''. Si el archivo nuevo trae el número, no se puede escribir
+  // (013_aplicar_importacion.sql:165 no acepta 'telefono' en la lista blanca
+  // y caería toda la importación). Se avisa para que lo pongan a mano.
+  it('tutor con telefono vacío: avisa el número que trae el archivo y no lo agrega a completar', () => {
+    const conTelVacio = { ...vacia, duenos: [
+      { id: 7, nombre: 'Ana Gómez', telefono: '',
+        telefono2: null, cedula: '1000000001', direccion: null }] };
+    const a = delArchivo({ tutor: { cedula: '1000000001', tel1: '573000000011' } });
+    const e = nuevoEstado();
+    const p = armarPlan(e, a, conTelVacio, sinDecidir, HOY);
+
+    // El aviso menciona el número que trae el archivo.
+    expect(e.avisos.some((x) => x.texto.includes('573000000011'))).toBe(true);
+    // No agrega 'telefono' a completar_tutores (viola la lista blanca de Postgres).
+    expect(JSON.stringify(p.envio.completar_tutores)).not.toContain('"telefono"');
+  });
+
   it('nada que completar es completar_tutores vacío, no un objeto sin campos', () => {
     const lleno = { ...vacia, duenos: [{ id: 7, nombre: 'Ana Gómez',
-      telefono: '573000000200', telefono2: '573000000001',
-      cedula: '1000000200', direccion: 'Ya' }] };
-    const a = delArchivo({ tutor: { cedula: '1000000200' } });
+      telefono: '573000000011', telefono2: '573000000001',
+      cedula: '1000000001', direccion: 'Ya' }] };
+    const a = delArchivo({ tutor: { cedula: '1000000001' } });
     const p = armarPlan(nuevoEstado(), a, lleno, sinDecidir, HOY);
 
     expect(p.envio.completar_tutores).toHaveLength(0);
@@ -227,7 +263,7 @@ describe('armarPlan · completar sin pisar', () => {
 
 describe('armarPlan · los dudosos', () => {
   const dosAnas = { ...vacia, duenos: [
-    { id: 9, nombre: 'Ana Gómez', telefono: '573000000202', cedula: null,
+    { id: 9, nombre: 'Ana Gómez', telefono: '573000000022', cedula: null,
       telefono2: null, direccion: null }] };
 
   it('devuelve la duda y no manda nada de ese tutor hasta que la contesten', () => {
@@ -236,9 +272,9 @@ describe('armarPlan · los dudosos', () => {
     expect(p.dudas).toHaveLength(1);
     expect(p.dudas[0]).toMatchObject({
       clase: 'tutor', motivo: 'nombre_tel_distinto',
-      existente: { id: 9, telefono: '573000000202' },
+      existente: { id: 9, telefono: '573000000022' },
     });
-    expect(p.dudas[0].archivo).toMatchObject({ nombre: 'Ana Gómez', tel1: '573000000200' });
+    expect(p.dudas[0].archivo).toMatchObject({ nombre: 'Ana Gómez', tel1: '573000000011' });
     // La mascota tampoco: no se sabe de quién es.
     expect(p.envio.crear_tutores).toHaveLength(0);
     expect(p.envio.crear_mascotas).toHaveLength(0);
@@ -310,7 +346,7 @@ describe('armarPlan · subir dos veces el mismo archivo', () => {
   // historial duplicado e informe de caja con el doble de servicios.
   it('la segunda vez no entra nada: 0 para crear y 0 para completar', () => {
     const yaTodo = {
-      duenos: [{ id: 7, nombre: 'Ana Gómez', telefono: '573000000200',
+      duenos: [{ id: 7, nombre: 'Ana Gómez', telefono: '573000000011',
                  telefono2: null, cedula: null, direccion: null }],
       mascotas: [{ id: 70, dueno_id: 7, nombre: 'Max', raza: 'Poodle',
                    fecha_nacimiento: '2018-07-26', edad_anios: 8, edad_meses: 2 }],
@@ -354,10 +390,138 @@ describe('armarPlan · subir dos veces el mismo archivo', () => {
   // se sabe a qué mascota pegarlo.
   it('el evento de una mascota sin resolver no se manda', () => {
     const dosAnas = { ...vacia, duenos: [{ id: 9, nombre: 'Ana Gómez',
-      telefono: '573000000202', cedula: null, telefono2: null, direccion: null }] };
+      telefono: '573000000022', cedula: null, telefono2: null, direccion: null }] };
     const a = delArchivo({ eventos: unBano });
     const p = armarPlan(nuevoEstado(), a, dosAnas, sinDecidir, HOY);
     expect(p.envio.tratamientos).toHaveLength(0);
+  });
+});
+
+describe('armarPlan · misma persona con dos claves en el archivo (hallazgo 4)', () => {
+  // La misma persona escrita con cédula en unas filas y sin cédula en otras
+  // sale de agrupar() con dos claves de tutor: una `c:<cédula>` y otra
+  // `n:<nombre>|<tel>`. Las dos pueden resolver al mismo destino en la base.
+  // Si no se colapsa por destino, el mismo perro se crea dos veces, sus
+  // baños se escriben dos veces y el paso 3 muestra el doble de tutores
+  // para completar.
+  //
+  // Fixture: tutorXconCedula (`c:1000000001`) y tutorXsinCedula (`n:...`)
+  // resuelven al mismo existente id=7. La mascota `Max` aparece en ambas claves.
+
+  const existenteCon7 = {
+    ...vacia,
+    duenos: [{ id: 7, nombre: 'Ana Gómez', telefono: '573000000011',
+               telefono2: null, cedula: '1000000001', direccion: null }],
+  };
+
+  // Agrupado con dos claves para la misma persona: una con cédula (como
+  // viene de filas que la traen) y una sin (como viene de filas que no la
+  // traen). El perro Max aparece en las dos.
+  const agrupadoDosClavesNuevoPerro = {
+    tutores: new Map([
+      ['c:1000000001', {
+        clave: 'c:1000000001', nombre: 'Ana Gómez', cedula: '1000000001',
+        tel1: '573000000011', tel2: null, direccion: null, origen: ['Hoja1:2'],
+      }],
+      ['n:ana gomez|573000000011', {
+        clave: 'n:ana gomez|573000000011', nombre: 'Ana Gómez', cedula: null,
+        tel1: '573000000011', tel2: null, direccion: null, origen: ['Hoja1:5'],
+      }],
+    ]),
+    mascotas: new Map([
+      ['c:1000000001|m:max', {
+        clave: 'c:1000000001|m:max', tutor: 'c:1000000001', nombre: 'Max',
+        especie: 'perro', raza: null, nacimiento: null, origen: ['Hoja1:2'],
+      }],
+      ['n:ana gomez|573000000011|m:max', {
+        clave: 'n:ana gomez|573000000011|m:max', tutor: 'n:ana gomez|573000000011',
+        nombre: 'Max', especie: 'perro', raza: null, nacimiento: null, origen: ['Hoja1:5'],
+      }],
+    ]),
+    eventos: [
+      { tipo: 'tratamiento', mascota: 'c:1000000001|m:max',
+        t: 'bano', fecha: '2026-09-12', hora: '10:00', notas: null },
+      { tipo: 'tratamiento', mascota: 'n:ana gomez|573000000011|m:max',
+        t: 'bano', fecha: '2026-09-12', hora: '10:00', notas: null },
+    ],
+  };
+
+  // Agrupado igual pero el tutor no existe en la base (perro nuevo para tutor nuevo).
+  const agrupadoDosClavesConTutor = {
+    ...agrupadoDosClavesNuevoPerro,
+    // Misma estructura pero los tutores apuntan a la base existenteCon7 por cédula.
+  };
+
+  // Agrupado con dos claves y la mascota existente, cada una trayendo un
+  // campo distinto para completar.
+  const existenteCon7yMax = {
+    ...existenteCon7,
+    mascotas: [{ id: 70, dueno_id: 7, nombre: 'Max', raza: null,
+                 fecha_nacimiento: null, edad_anios: 0, edad_meses: 0 }],
+  };
+  const agrupadoDosClavesCompletarTutor = {
+    tutores: new Map([
+      ['c:1000000001', {
+        clave: 'c:1000000001', nombre: 'Ana Gómez', cedula: '1000000001',
+        tel1: '573000000011', tel2: null, direccion: 'Calle 5', origen: ['Hoja1:2'],
+      }],
+      ['n:ana gomez|573000000011', {
+        clave: 'n:ana gomez|573000000011', nombre: 'Ana Gómez', cedula: null,
+        tel1: '573000000011', tel2: null, direccion: null, origen: ['Hoja1:5'],
+      }],
+    ]),
+    mascotas: new Map(),
+    eventos: [],
+  };
+  const agrupadoDosClavesCompletarMascota = {
+    tutores: new Map([
+      ['c:1000000001', {
+        clave: 'c:1000000001', nombre: 'Ana Gómez', cedula: '1000000001',
+        tel1: '573000000011', tel2: null, direccion: null, origen: ['Hoja1:2'],
+      }],
+      ['n:ana gomez|573000000011', {
+        clave: 'n:ana gomez|573000000011', nombre: 'Ana Gómez', cedula: null,
+        tel1: '573000000011', tel2: null, direccion: null, origen: ['Hoja1:5'],
+      }],
+    ]),
+    mascotas: new Map([
+      ['c:1000000001|m:max', {
+        clave: 'c:1000000001|m:max', tutor: 'c:1000000001', nombre: 'Max',
+        especie: 'perro', raza: 'Poodle', nacimiento: null, origen: ['Hoja1:2'],
+      }],
+      ['n:ana gomez|573000000011|m:max', {
+        clave: 'n:ana gomez|573000000011|m:max', tutor: 'n:ana gomez|573000000011',
+        nombre: 'Max', especie: 'perro', raza: null, nacimiento: '2018-07-26',
+        origen: ['Hoja1:5'],
+      }],
+    ]),
+    eventos: [],
+  };
+
+  // Test 1: dos claves del mismo tutor existente con el mismo perro nuevo → 1 mascota.
+  // Escenario: el tutor ya existe en la base (id=7), el archivo lo trae con cédula
+  // en unas filas y sin cédula en otras → dos claves en agrupadoDosClavesNuevoPerro.
+  // Las dos resuelven a id=7, y el mismo Max no debe crearse dos veces.
+  it('misma persona existente con dos claves y el mismo perro: solo se crea una mascota', () => {
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesNuevoPerro, existenteCon7, sinDecidir, HOY);
+    expect(p.envio.crear_mascotas).toHaveLength(1);
+    expect(p.envio.crear_mascotas[0].nombre).toBe('Max');
+  });
+
+  // Test 2: el baño del mismo Max desde las dos claves → una sola entrada en tratamientos.
+  it('misma persona existente con dos claves: el mismo baño del mismo día se escribe una vez', () => {
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesNuevoPerro, existenteCon7, sinDecidir, HOY);
+    expect(p.envio.tratamientos).toHaveLength(1);
+  });
+
+  // Test 3: dos claves del mismo tutor existente, cada una trayendo un campo
+  // distinto → completar_tutores con una sola entrada que tiene los dos campos
+  it('misma persona existente con dos claves: una sola entrada en completar_tutores con los dos campos', () => {
+    // c:1000000001 trae dirección; n:... no trae nada nuevo → 1 entrada, campos: { direccion }
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesCompletarTutor, existenteCon7, sinDecidir, HOY);
+    expect(p.envio.completar_tutores).toHaveLength(1);
+    expect(p.envio.completar_tutores[0].id).toBe(7);
+    expect(p.envio.completar_tutores[0].campos).toHaveProperty('direccion');
   });
 });
 
