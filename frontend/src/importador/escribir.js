@@ -165,9 +165,34 @@ export async function aplicar(importacionId, envio, resumen) {
  * NO tira nunca. Si tirara, taparía el error de verdad que la pantalla
  * tiene que mostrar — y el import ya falló: que el registro quede en
  * 'en_curso' es menos grave que no saber por qué falló.
+ *
+ * **Pasale siempre el `resumen`.** El `update` de Supabase reemplaza la
+ * columna jsonb entera, no la mezcla, así que llamarla sin el tercer
+ * argumento borra el resumen que `aplicar` guardó antes de intentar — y ése
+ * es justo el dato que sirve cuando algo falla: qué se le mostró a quien
+ * confirmó. No se puede recuperar acá sin leer la fila primero, y eso sería
+ * una llamada más sobre una conexión que ya demostró estar fallando.
  */
 export async function marcarFallida(importacionId, mensaje, resumen = {}) {
   try {
+    // Si la importación de verdad entró, esto NO se marca como fallida.
+    // El caso es la respuesta perdida: Postgres commiteó —y dejó la clave
+    // 'escrito' adentro de `resumen` con los contadores reales— pero el
+    // navegador no recibió la respuesta y para él fue un fallo. Escribir
+    // 'fallido' acá pondría el registro en un estado que contradice las
+    // filas que sí están colgadas, y el update plano borraría 'escrito' de
+    // paso. Mejor dejar la fila como la dejó Postgres: el tapón de
+    // `aplicar` ya frena el reintento y el historial muestra lo que entró.
+    const ya = await yaEscribio(importacionId);
+    if (ya.duenos || ya.mascotas) {
+      console.warn(
+        `[importador] la importación ${importacionId} sí escribió ` +
+        `(${ya.duenos} clientes, ${ya.mascotas} mascotas): no la marco como ` +
+        'fallida. Se perdió la respuesta, no la escritura.',
+      );
+      return;
+    }
+
     const { error } = await supabase
       .from('importaciones')
       .update({
@@ -198,6 +223,30 @@ export async function listarImportaciones() {
 
   reventar(error, 'No se pudo leer el historial de importaciones');
   return data ?? [];
+}
+
+/**
+ * Una sola importación, para la pantalla de detalle del historial.
+ *
+ * Existe para que ninguna pantalla tenga que hablarle a Supabase por su
+ * cuenta: este archivo es el único lugar del importador que conoce nombres
+ * de tablas y de columnas, y si una pantalla los repite se vuelven dos
+ * lugares que se pueden desincronizar. Filtrar `listarImportaciones()` sería
+ * bajar el historial entero para mostrar una fila.
+ *
+ * Trae `anteriores`, que la lista no trae: es lo que el import pisó al
+ * completar, y en el detalle sirve para poder decir qué se va a devolver si
+ * se deshace.
+ */
+export async function obtenerImportacion(importacionId) {
+  const { data, error } = await supabase
+    .from('importaciones')
+    .select('id, archivo, hoja, estado, mapeo, resumen, anteriores, creado_en, cerrado_en')
+    .eq('id', importacionId)
+    .single();
+
+  reventar(error, 'No se pudo leer la importación');
+  return data;
 }
 
 /**

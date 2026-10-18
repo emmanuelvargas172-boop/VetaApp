@@ -6,7 +6,7 @@ vi.mock('../lib/supabase.js', () => ({ supabase: mock, default: mock }));
 
 const {
   traerExistentes, abrirImportacion, aplicar, marcarFallida, deshacer,
-  yaEscribio, listarImportaciones,
+  yaEscribio, listarImportaciones, obtenerImportacion,
 } = await import('./escribir.js');
 
 // Un `from()` que devuelve filas y guarda qué columnas le pidieron.
@@ -26,9 +26,16 @@ const tabla = (filas) => ({
 // Un `from` que sabe contestar las tres formas que usa escribir.js: el
 // select de columnas, el select con count para el tapón del reintento, y
 // el update del resumen.
-const fromQueCuenta = ({ duenos = 0, mascotas = 0, orden = null } = {}) => (t) => ({
+const fromQueCuenta = ({
+  duenos = 0, mascotas = 0, orden = null, update = null, errorUpdate = null,
+} = {}) => (t) => ({
   select: (cols, opts) => {
     if (opts?.count) {
+      // `head: true` no es decoración: sin él Supabase hace un GET que baja
+      // las filas enteras en vez de un HEAD que solo lee el Content-Range.
+      // El mock lo exige para que quitarlo del código ponga el test rojo en
+      // vez de dejar producción bajando la base completa para contarla.
+      if (!opts.head) throw new Error('el select con count tiene que pedir head: true');
       const n = t === 'duenos' ? duenos : mascotas;
       return { eq: () => Promise.resolve({ count: n, error: null }) };
     }
@@ -36,9 +43,10 @@ const fromQueCuenta = ({ duenos = 0, mascotas = 0, orden = null } = {}) => (t) =
     p.order = () => p; p.in = () => p; p.eq = () => p;
     return p;
   },
-  update: () => {
+  update: (campos) => {
     if (orden) orden.push('resumen');
-    return { eq: () => Promise.resolve({ error: null }) };
+    if (update) update(campos);
+    return { eq: () => Promise.resolve({ error: errorUpdate }) };
   },
 });
 
@@ -187,11 +195,12 @@ describe('yaEscribio', () => {
   });
 
   // Supabase devuelve `count: null` cuando la tabla no tiene filas que
-  // cuenten. Sin el `?? 0`, `null || null` haría que el tapón de `aplicar`
-  // no frenara... pero también `0 || 0` es falsy, así que lo que se prueba
-  // acá es que el valor devuelto sea un número y no null: la pantalla lo
-  // muestra.
-  it('un count nulo sale como cero y no como null', async () => {
+  // cuenten. Para el tapón de `aplicar` da igual —`null || null` y
+  // `0 || 0` son los dos falsy— pero la pantalla del paso 4 muestra estos
+  // números, y "0 clientes" se lee y "null clientes" no. El `?? 0` es
+  // presentación, no lógica, y el título lo dice para que nadie crea que
+  // este test cubre el borde del tapón.
+  it('traduce el count nulo de Supabase a cero, que es lo que la pantalla muestra', async () => {
     mock.from.mockImplementation(() => ({
       select: () => ({ eq: () => Promise.resolve({ count: null, error: null }) }),
     }));
@@ -241,13 +250,53 @@ describe('listarImportaciones', () => {
   });
 });
 
+describe('obtenerImportacion', () => {
+  // La pantalla de detalle necesita `anteriores`, que la lista no trae: es
+  // lo que el import pisó al completar, y es lo que se devuelve si se
+  // deshace. Y necesita `mapeo` para poder decir de qué columna salió cada
+  // cosa seis meses después.
+  it('trae anteriores y mapeo, que la lista no trae', async () => {
+    let cols = '';
+    let filtro = null;
+    mock.from.mockImplementation(() => ({
+      select: (c) => {
+        cols = c;
+        return {
+          eq: (col, val) => {
+            filtro = `${col}=${val}`;
+            return { single: () => Promise.resolve({ data: { id: 7 }, error: null }) };
+          },
+        };
+      },
+    }));
+
+    const r = await obtenerImportacion(7);
+
+    expect(r).toEqual({ id: 7 });
+    expect(cols).toContain('anteriores');
+    expect(cols).toContain('mapeo');
+    expect(filtro).toBe('id=7');
+  });
+
+  it('el error sale en español', async () => {
+    mock.from.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          single: () => Promise.resolve({ data: null, error: { message: 'no rows' } }),
+        }),
+      }),
+    }));
+    await expect(obtenerImportacion(7)).rejects.toThrow(/No se pudo leer la importación/);
+  });
+});
+
 describe('marcarFallida', () => {
   // Sin esto, una importación que reventó se queda en 'en_curso' para
   // siempre y la pantalla de historial no puede distinguirla de una que
   // está corriendo ahora mismo.
   it('deja el estado en fallido y el motivo guardado', async () => {
-    const update = vi.fn(() => ({ eq: () => Promise.resolve({ error: null }) }));
-    mock.from.mockReturnValue({ update });
+    const update = vi.fn();
+    mock.from.mockImplementation(fromQueCuenta({ duenos: 0, mascotas: 0, update }));
 
     await marcarFallida(42, 'se cayó el wifi', { tutores_nuevos: 53 });
 
@@ -259,13 +308,38 @@ describe('marcarFallida', () => {
     expect(update.mock.calls[0][0].resumen.tutores_nuevos).toBe(53);
   });
 
+  // El caso de la respuesta perdida: Postgres commiteó —y dejó la clave
+  // 'escrito' adentro de `resumen`— pero el navegador no recibió nada y
+  // para él fue un fallo. Marcar 'fallido' acá pondría el registro en un
+  // estado que contradice las filas que sí están colgadas, y el update
+  // plano borraría 'escrito' de paso.
+  it('no marca fallida una importación que sí escribió', async () => {
+    const update = vi.fn();
+    mock.from.mockImplementation(fromQueCuenta({ duenos: 53, mascotas: 61, update }));
+
+    await marcarFallida(42, 'se cayó el wifi', { tutores_nuevos: 53 });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
   // Si marcarFallida tira, tapa el error de verdad que la pantalla tiene
   // que mostrar. El import ya falló; que el registro quede mal es menos
   // grave que no saber por qué falló.
   it('no tira si tampoco puede escribir el estado', async () => {
-    mock.from.mockReturnValue({
-      update: () => ({ eq: () => Promise.resolve({ error: { message: 'sin red' } }) }),
-    });
+    mock.from.mockImplementation(fromQueCuenta({
+      duenos: 0, mascotas: 0, errorUpdate: { message: 'sin red' },
+    }));
+    await expect(marcarFallida(42, 'x')).resolves.toBeUndefined();
+  });
+
+  // El guard nuevo hace una lectura más antes de escribir, sobre una
+  // conexión que ya demostró estar fallando. Si esa lectura revienta,
+  // marcarFallida tiene que seguir sin tirar: el contrato del módulo es
+  // que esta función nunca tape el error que la pantalla va a mostrar.
+  it('no tira si ni siquiera puede contar las filas', async () => {
+    mock.from.mockImplementation(() => ({
+      select: () => ({ eq: () => Promise.resolve({ count: null, error: { message: 'sin red' } }) }),
+    }));
     await expect(marcarFallida(42, 'x')).resolves.toBeUndefined();
   });
 });
