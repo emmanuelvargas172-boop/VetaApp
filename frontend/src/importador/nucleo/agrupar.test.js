@@ -12,10 +12,10 @@ const leer = (grilla, estado = nuevoEstado()) =>
 
 describe('leerFilas', () => {
   it('lee una fila completa', () => {
-    const { filas } = leer([['Ana Gómez', 'Max', '3000000200', '1000000200', 'Poodle', '26/07/2018', '', '']]);
+    const { filas } = leer([['Ana Gómez', 'Max', '3000000011', '1000000001', 'Poodle', '26/07/2018', '', '']]);
     expect(filas[0]).toMatchObject({
-      tutor: 'Ana Gómez', mascota: 'Max', tel1: '573000000200',
-      cedula: '1000000200', raza: 'Poodle', especie: 'perro', nacimiento: '2018-07-26',
+      tutor: 'Ana Gómez', mascota: 'Max', tel1: '573000000011',
+      cedula: '1000000001', raza: 'Poodle', especie: 'perro', nacimiento: '2018-07-26',
     });
   });
 
@@ -28,7 +28,7 @@ describe('leerFilas', () => {
   // Una fila con teléfono y costo pero sin nombres es una visita que se
   // cobró. No se importa, pero NO se desaparece en silencio.
   it('descarta la fila sin nombres pero la avisa', () => {
-    const { estado, filas } = leer([['', '', '3000000200', '', '', '', '', '']]);
+    const { estado, filas } = leer([['', '', '3000000011', '', '', '', '', '']]);
     expect(filas).toHaveLength(0);
     expect(estado.avisos[0].texto).toContain('sin nombres');
     // 'descarte' y no 'dato': el paso 3 cuenta estos aparte para poder
@@ -75,8 +75,8 @@ describe('formatoDeFechasRoto', () => {
 describe('agrupar', () => {
   it('une al mismo tutor por cédula aunque el nombre esté escrito distinto', () => {
     const { estado, filas } = leer([
-      ['Ana Gómez',  'Max',  '3000000200', '1000000200', 'Poodle', '', '', ''],
-      ['ana gomez',  'Luna', '3000000200', '1000000200', 'Pug',    '', '', ''],
+      ['Ana Gómez',  'Max',  '3000000011', '1000000001', 'Poodle', '', '', ''],
+      ['ana gomez',  'Luna', '3000000011', '1000000001', 'Pug',    '', '', ''],
     ]);
     const { tutores, mascotas } = agrupar(estado, filas);
     expect(tutores.size).toBe(1);
@@ -87,16 +87,16 @@ describe('agrupar', () => {
   // Pasó de verdad: hay dos "Teofilo Arboleda" en la base de La Huella.
   it('NO une dos tutores del mismo nombre con teléfonos distintos', () => {
     const { estado, filas } = leer([
-      ['Teofilo Arboleda', 'Max',  '3000000202', '', '', '', '', ''],
-      ['Teofilo Arboleda', 'Luna', '3000000203', '', '', '', '', ''],
+      ['Teofilo Arboleda', 'Max',  '3000000022', '', '', '', '', ''],
+      ['Teofilo Arboleda', 'Luna', '3000000033', '', '', '', '', ''],
     ]);
     expect(agrupar(estado, filas).tutores.size).toBe(2);
   });
 
   it('la dirección más larga gana porque dice más del mismo lugar', () => {
     const grilla = [
-      ['Ana', 'Max', '3000000200', '1000000200', '', '', '', ''],
-      ['Ana', 'Max', '3000000200', '1000000200', '', '', '', ''],
+      ['Ana', 'Max', '3000000011', '1000000001', '', '', '', ''],
+      ['Ana', 'Max', '3000000011', '1000000001', '', '', '', ''],
     ];
     const estado = nuevoEstado();
     const filas = leerFilas(estado, { grilla, mapa: { ...MAPA, direccion: 8 }, hoja: 'Hoja1' });
@@ -109,23 +109,23 @@ describe('agrupar', () => {
   // "Noah" y "Noah Emiliano" son dos perros. Decisión del dueño.
   it('no junta dos mascotas con nombres parecidos del mismo tutor', () => {
     const { estado, filas } = leer([
-      ['Ángela', 'Noah',          '3000000200', '', '', '', '', ''],
-      ['Ángela', 'Noah Emiliano', '3000000200', '', '', '', '', ''],
+      ['Ángela', 'Noah',          '3000000011', '', '', '', '', ''],
+      ['Ángela', 'Noah Emiliano', '3000000011', '', '', '', '', ''],
     ]);
     expect(agrupar(estado, filas).mascotas.size).toBe(2);
   });
 
   it('cada fila con fecha de servicio es un baño distinto', () => {
     const { estado, filas } = leer([
-      ['Ana', 'Max', '3000000200', '', '', '', '12/09/2026', ''],
-      ['Ana', 'Max', '3000000200', '', '', '', '19/09/2026', ''],
+      ['Ana', 'Max', '3000000011', '', '', '', '12/09/2026', ''],
+      ['Ana', 'Max', '3000000011', '', '', '', '19/09/2026', ''],
     ]);
     const banos = agrupar(estado, filas).eventos.filter((e) => e.t === 'bano');
     expect(banos).toHaveLength(2);
   });
 
   it('la vacuna queda con la próxima dosis un año después', () => {
-    const { estado, filas } = leer([['Ana', 'Max', '3000000200', '', '', '', '', '14/07/2026']]);
+    const { estado, filas } = leer([['Ana', 'Max', '3000000011', '', '', '', '', '14/07/2026']]);
     const v = agrupar(estado, filas).eventos.find((e) => e.tipo === 'vacuna');
     expect(v).toMatchObject({ nombre: 'Anual', fecha: '2026-07-14', proxima: '2027-07-14', notas: null });
   });

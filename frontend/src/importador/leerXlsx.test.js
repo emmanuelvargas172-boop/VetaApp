@@ -11,11 +11,11 @@ describe('celda', () => {
     expect(celda(undefined)).toBe('');
   });
 
-  // El caso de la cédula. 1000000200 escrito como "1000000200.0" lo lee el
-  // importador —que normaliza a solo dígitos— como 10000002000: un cero de
+  // El caso de la cédula. 1000000001 escrito como "1000000001.0" lo lee el
+  // importador —que normaliza a solo dígitos— como 10000000010: un cero de
   // más, y una cédula que no identifica a nadie.
   it('un entero grande no sale con decimal ni en notación científica', () => {
-    expect(celda({ t: 'n', v: 1000000200 })).toBe('1000000200');
+    expect(celda({ t: 'n', v: 1000000001 })).toBe('1000000001');
   });
 
   // El caso del costo. 40000.0 mal escrito queda "400000": diez veces más
@@ -201,7 +201,7 @@ describe('leerLibro', () => {
     const ws = XLSX.utils.aoa_to_sheet(
       // Medianoche local y no UTC: en Colombia (UTC-5) un Date.UTC se
       // convierte al día anterior y el test pasaría a fallar por el huso.
-      [['Nacimiento', 'Cedula'], [new Date(2018, 6, 26), 1000000200]],
+      [['Nacimiento', 'Cedula'], [new Date(2018, 6, 26), 1000000001]],
       { cellDates: true },
     );
     const wb = XLSX.utils.book_new();
@@ -209,7 +209,7 @@ describe('leerLibro', () => {
     const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 
     const { grilla } = leerHoja(leerLibro(bytes), 'Hoja1');
-    expect(grilla[0]).toEqual(['2018-07-26', '1000000200']);
+    expect(grilla[0]).toEqual(['2018-07-26', '1000000001']);
   });
 
   it('dice en español que el archivo no es un Excel', () => {

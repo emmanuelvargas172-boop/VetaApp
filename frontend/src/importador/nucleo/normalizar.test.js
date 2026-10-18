@@ -60,13 +60,13 @@ describe('pesos', () => {
 
 describe('telefonos', () => {
   it('separa los dos números pegados con guion', () => {
-    expect(telefonos(nuevoEstado(), '3000000200-3000000201', ctx))
-      .toEqual(['573000000200', '573000000201']);
+    expect(telefonos(nuevoEstado(), '3000000011-3000000044', ctx))
+      .toEqual(['573000000011', '573000000044']);
   });
 
   it('separa con espacios alrededor del guion', () => {
-    expect(telefonos(nuevoEstado(), '3000000202 - 3000000203', ctx))
-      .toEqual(['573000000202', '573000000203']);
+    expect(telefonos(nuevoEstado(), '3000000022 - 3000000033', ctx))
+      .toEqual(['573000000022', '573000000033']);
   });
 
   // Dato real de la hoja. Tiene que avisar y NO reventar: este tutor
@@ -78,8 +78,8 @@ describe('telefonos', () => {
   });
 
   it('no duplica cuando el mismo número viene dos veces', () => {
-    expect(telefonos(nuevoEstado(), '3000000200 / 3000000200', ctx))
-      .toEqual(['573000000200', null]);
+    expect(telefonos(nuevoEstado(), '3000000011 / 3000000011', ctx))
+      .toEqual(['573000000011', null]);
   });
 });
 
