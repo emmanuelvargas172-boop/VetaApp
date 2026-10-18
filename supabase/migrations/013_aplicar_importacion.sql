@@ -108,6 +108,11 @@ begin
       -- `select count(*) from duenos where importacion_id = X` antes de
       -- reenviar. (Revisión 2026-10-17)
       --
+      -- Y no es solo de tutores: crear_mascotas tampoco tiene dedup, y ahí
+      -- no hay ningún índice único que ni siquiera lo intente. El tapón del
+      -- navegador tiene que contar las dos tablas por importacion_id, no
+      -- solo duenos, o tapa la mitad del hueco.
+      --
       -- idx_duenos_user_cedula (011) es único por cuenta. Si el archivo
       -- trae una cédula que ya es de otro cliente, lo que NO puede pasar
       -- es que se caiga el import entero por una celda: entra sin cédula
@@ -135,10 +140,21 @@ begin
     -- forma de ejecutar nada para comprobar lo contrario. Sin esta guarda un
     -- id ajeno o inexistente hace que el update de abajo afecte 0 filas sin
     -- error, el contador se infle, y el comentario "los números salen de la
-    -- base" deje de ser cierto. Mismo idioma que usan los ids que vienen en
-    -- el plan, más abajo.
+    -- base" deje de ser cierto.
+    --
+    -- Salta en vez de reventar: `not exists` no distingue "la clínica borró
+    -- ese cliente desde otra pestaña entre el paso 3 y el Confirmar" de
+    -- "este id es de otra clínica", y el primer caso es el probable. Un
+    -- cliente borrado no puede costar el import de los otros 179 — misma
+    -- política que la cédula repetida de más arriba: el dato que ya no está
+    -- cuesta un registro y queda dicho en el paso 4. El contador sigue
+    -- exacto porque solo sube con v_toco.
     if not exists (select 1 from duenos where id = v_id and user_id = v_user) then
-      raise exception 'El tutor % no existe o no es de esta cuenta', v_id;
+      v_omitidos := v_omitidos || jsonb_build_object(
+        -- null::text y no null pelado: jsonb_build_object recibe "any" y un
+        -- NULL sin tipo revienta con "could not determine polymorphic type".
+        'que', 'tutor_no_encontrado', 'quien', v_id::text, 'valor', null::text);
+      continue;
     end if;
 
     for v_campo, v_valor in select key, value from jsonb_each_text(v_item->'campos') loop
@@ -227,10 +243,14 @@ begin
     v_id   := (v_item->>'id')::bigint;
     v_toco := false;
 
-    -- Misma razón que en completar_tutores: una vez por mascota y con
-    -- `not exists`, no con `found` después de un `execute`.
+    -- Misma razón que en completar_tutores: una vez por mascota, con
+    -- `not exists` y no con `found` después de un `execute`, y salta en vez
+    -- de reventar porque el caso probable es una mascota borrada desde otra
+    -- pestaña, no un id ajeno.
     if not exists (select 1 from mascotas where id = v_id and user_id = v_user) then
-      raise exception 'La mascota % no existe o no es de esta cuenta', v_id;
+      v_omitidos := v_omitidos || jsonb_build_object(
+        'que', 'mascota_no_encontrada', 'quien', v_id::text, 'valor', null::text);
+      continue;
     end if;
 
     for v_campo, v_valor in select key, value from jsonb_each_text(v_item->'campos') loop
@@ -351,8 +371,10 @@ begin
   -- Los contadores del resumen se suman al valor que ya estaba: el || de
   -- jsonb reemplaza claves repetidas con el valor del lado derecho, así que
   -- sin la suma el resumen refleja solo la última tanda. Se lee el valor
-  -- acumulado con (resumen->>'clave')::int y se suma lo de esta tanda.
-  -- `omitidos` es un array y también se acumula con ||.
+  -- acumulado con (resumen->'escrito'->>'clave')::int y se suma lo de esta
+  -- tanda. `omitidos` es un array y también se acumula con ||. Las dos
+  -- columnas son `not null default` en 012:31 y 012:36, así que ningún || de
+  -- acá puede anular la columna.
   --
   -- El `return` de abajo devuelve los números de ESTA tanda, no el acumulado.
   -- El navegador lleva su propio total sumando las respuestas de cada tanda:
@@ -360,23 +382,35 @@ begin
   update importaciones
      set estado     = 'listo',
          anteriores = anteriores || v_anteriores,
-         resumen    = jsonb_build_object(
+         -- Los números de la función van bajo 'escrito' y NO planos, por dos
+         -- razones que se descubrieron juntas. La primera: `resumen` no es de
+         -- esta función. El navegador escribe ahí lo que la clínica vio en el
+         -- paso 3 ANTES de llamar, y es lo que la pantalla de historial lee
+         -- para decir "53 tutores · 54 mascotas · 74 baños". Un
+         -- jsonb_build_object plano reemplaza la columna entera y se lleva eso
+         -- puesto. La segunda: `tratamientos` y `vacunas` son claves que
+         -- existen en los dos lados, así que sumar plano suma la predicción
+         -- del paso 3 con lo que de verdad se escribió y guarda 148 donde
+         -- hubo 74. Con su propio namespace no hay colisión posible y el
+         -- `||` de arriba conserva lo del paso 3. Misma forma que usa
+         -- 014_deshacer_importacion.sql con la clave 'deshecho'.
+         resumen    = resumen || jsonb_build_object('escrito', jsonb_build_object(
                         'tutores_creados',
-                          coalesce((resumen->>'tutores_creados')::int, 0)      + n_tut_nuevos,
+                          coalesce((resumen->'escrito'->>'tutores_creados')::int, 0)      + n_tut_nuevos,
                         'tutores_completados',
-                          coalesce((resumen->>'tutores_completados')::int, 0)  + n_tut_compl,
+                          coalesce((resumen->'escrito'->>'tutores_completados')::int, 0)  + n_tut_compl,
                         'mascotas_creadas',
-                          coalesce((resumen->>'mascotas_creadas')::int, 0)     + n_mas_nuevos,
+                          coalesce((resumen->'escrito'->>'mascotas_creadas')::int, 0)     + n_mas_nuevos,
                         'mascotas_completadas',
-                          coalesce((resumen->>'mascotas_completadas')::int, 0) + n_mas_compl,
+                          coalesce((resumen->'escrito'->>'mascotas_completadas')::int, 0) + n_mas_compl,
                         'tratamientos',
-                          coalesce((resumen->>'tratamientos')::int, 0)         + n_trat,
+                          coalesce((resumen->'escrito'->>'tratamientos')::int, 0)         + n_trat,
                         'vacunas',
-                          coalesce((resumen->>'vacunas')::int, 0)              + n_vac,
+                          coalesce((resumen->'escrito'->>'vacunas')::int, 0)              + n_vac,
                         'repetidos',
-                          coalesce((resumen->>'repetidos')::int, 0)            + n_repetidos,
+                          coalesce((resumen->'escrito'->>'repetidos')::int, 0)            + n_repetidos,
                         'omitidos',
-                          coalesce(resumen->'omitidos', '[]'::jsonb)           || v_omitidos),
+                          coalesce(resumen->'escrito'->'omitidos', '[]'::jsonb)           || v_omitidos)),
          cerrado_en = now()
    where id = v_imp and user_id = v_user;
 
