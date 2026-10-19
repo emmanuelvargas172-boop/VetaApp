@@ -119,13 +119,18 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
   return (
     <Card>
       <h3 style={{ margin: 0, fontSize: 15 }}>3 · Qué va a pasar</h3>
+      {/* Con respuestas pendientes los números están incompletos, y siempre
+          hacia abajo: el tutor que quedó en una duda sin contestar no entra,
+          y con él se quedan afuera sus mascotas (plan.js:351) y los eventos
+          de esas mascotas (plan.js:444). Si no se dijera, la clínica leería
+          como definitivo un número que va a subir solo en cuanto conteste. */}
       <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
         Todavía no escribí nada. Esto es lo que voy a hacer si confirmás.
+        {faltaDecidir && (
+          <> <strong>Me faltan respuestas abajo</strong>, así que estos números
+          todavía no están completos: suben cuando contestes.</>
+        )}
       </p>
-
-      {/* Los nombres son de la clínica, no del archivo. Si estos 54
-          nombres no son sus clientes, acá se nota — y es lo único que
-          protege de subir la base de otra veterinaria por error. */}
 
       <div style={{ padding: '6px 0', borderTop: '1px solid var(--divider)', borderBottom: '1px solid var(--divider)' }}>
         <Fila
@@ -152,6 +157,38 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
         )}
       </div>
 
+      {/* ─── Los nombres ─── */}
+      {/* El único control real contra subir la base de otra veterinaria.
+          Los números no sirven para eso: "53 tutores · 54 mascotas" se ve
+          igual de bien con los clientes de cualquier clínica. Y en una
+          cuenta nueva —que es justo donde pasa el error— no hay ni una
+          duda que muestre un nombre, porque no hay nada con qué comparar.
+          Los nombres sí: la clínica reconoce a sus propios clientes de un
+          vistazo y no necesita que nadie le explique qué mirar.
+
+          Salen de `envio.crear_tutores`, que es exactamente lo que se va a
+          escribir, y no de la grilla del archivo. Si lo que se muestra
+          saliera del archivo y lo que se escribe del envío, un día podrían
+          dejar de ser lo mismo —y el día que eso pase, esta pantalla deja
+          de servir para lo único para lo que existe. */}
+      {plan.envio.crear_tutores.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600 }}>
+            ¿Son tus clientes?
+          </p>
+          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+            {plan.envio.crear_tutores.slice(0, 8).map((t) => t.nombre).join(' · ')}
+            {plan.envio.crear_tutores.length > 8
+              ? ` · y ${plan.envio.crear_tutores.length - 8} más`
+              : ''}
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>
+            Si estos nombres no te suenan, el archivo es de otra veterinaria:
+            volvé atrás y no confirmes.
+          </p>
+        </div>
+      )}
+
       {/* Diez fechas vistas y más de la mitad ilegibles no es un dato suelto
           malo: es la columna equivocada en el paso 2, o una columna que
           guarda texto en vez de fechas. Importar 54 clientes con todas las
@@ -171,12 +208,12 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
           </p>
           <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             De {estado.fechasVistas} fechas no pude leer {estado.fechasRotas}. Dos
-            cosas lo explican casi siempre: en el paso 2 quedó elegida otra
-            columna como fecha de nacimiento, o esa columna guarda texto en vez
-            de fechas de verdad. Volvé al paso 2 y mirá el ejemplo que aparece
-            al lado del nombre de la columna.
-            {' '}Podés seguir igual, pero las mascotas van a entrar sin fecha de
-            nacimiento.
+            cosas lo explican casi siempre: en el paso 2 quedó elegida la
+            columna equivocada para alguna de las fechas, o esa columna guarda
+            texto en vez de fechas de verdad. Cada línea de abajo dice de qué
+            campo es la fecha que no entendí.
+            {' '}Podés seguir igual, pero las fechas que no pude leer entran en
+            blanco.
           </p>
           {/* Cinco ejemplos y no la lista entera. Con cinco se ve el patrón
               —"ah, están todas al revés"— y con cincuenta no se ve nada: la
@@ -211,8 +248,7 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
                 está decidido cuando no lo está, y además dejaría la pantalla
                 sin salida: en React, clickear un radio que ya está checked no
                 dispara onChange, así que la única forma de avanzar sería
-                clickear la otra opción y volver. Once veces, en la base de La
-                Huella.
+                clickear la otra opción y volver.
 
                 Si algún día hay que ahorrar clicks acá, el lugar es el
                 useState inicial de `decisiones` —sembrarlo con una respuesta
@@ -241,10 +277,30 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
       {/* ─── Las especies ─── */}
       {plan.especies.map((e) => (
         <div key={e.clave} style={{ marginTop: 14, padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
-            No sé qué es <strong>"{e.raza}"</strong> ({e.cuantas} mascota{e.cuantas === 1 ? '' : 's'}:{' '}
-            {e.mascotas.slice(0, 6).join(', ')}{e.mascotas.length > 6 ? '…' : ''}). ¿Perro o gato?
-          </p>
+          {/* La raza en blanco cae acá con `clave` y `raza` vacías
+              (clasificar() devuelve raza:null con la celda vacía,
+              normalizar.js:166, y armarPlan agrupa por esa clave vacía,
+              plan.js:361). Sin este caso aparte la pantalla decía, literal,
+              `No sé qué es ""`.
+
+              Va con su propio texto y no con el de una raza desconocida
+              porque no es la misma pregunta: un "Sabueso" son mascotas que
+              sí son todas lo mismo, y las que no tienen raza no tienen por
+              qué serlo. Una sola respuesta las va a tapar a todas, así que
+              eso se dice en voz alta en vez de esconderlo. Agrupar distinto
+              sería cambiar armarPlan, que ya está cerrado. */}
+          {e.clave === '' ? (
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
+              La hoja no dice la raza de {e.cuantas} mascota{e.cuantas === 1 ? '' : 's'}
+              {' '}({e.mascotas.slice(0, 6).join(', ')}{e.mascotas.length > 6 ? '…' : ''}),
+              y la especie no la adivino. ¿Perro o gato?
+            </p>
+          ) : (
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
+              No sé qué es <strong>"{e.raza}"</strong> ({e.cuantas} mascota{e.cuantas === 1 ? '' : 's'}:{' '}
+              {e.mascotas.slice(0, 6).join(', ')}{e.mascotas.length > 6 ? '…' : ''}). ¿Perro o gato?
+            </p>
+          )}
           {/* Igual que las dudas: ninguna viene marcada. Mientras
               `decisiones.especies[e.clave]` sea undefined, plan.js:356 deja
               la raza en la lista de preguntas y el botón no existe — un
@@ -263,7 +319,9 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
             ))}
           </div>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>
-            La raza se guarda igual, tal como la escribieron. Solo me falta la especie.
+            {e.clave === ''
+              ? `Lo que elijas vale para las ${e.cuantas}. Si hay de las dos, elegí la mayoría y corregí las otras desde la ficha.`
+              : 'La raza se guarda igual, tal como la escribieron. Solo me falta la especie.'}
           </p>
         </div>
       ))}
@@ -317,14 +375,26 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
         )}
         {faltaDecidir && (
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            Contestá {r.dudas > 0 ? `las ${r.dudas} dudas` : ''}
+            Contestá{' '}
+            {r.dudas > 0 ? `${r.dudas === 1 ? 'la duda' : `las ${r.dudas} dudas`}` : ''}
             {r.dudas > 0 && r.especies_sin_resolver > 0 ? ' y ' : ''}
-            {r.especies_sin_resolver > 0 ? `las ${r.especies_sin_resolver} razas` : ''} de arriba.
+            {r.especies_sin_resolver > 0
+              ? `${r.especies_sin_resolver === 1 ? 'la pregunta de la raza' : `las ${r.especies_sin_resolver} preguntas de las razas`}`
+              : ''} de arriba.
           </span>
         )}
+        {/* Los seis contadores en cero no quieren decir una sola cosa. Si
+            hubo eventos repetidos, el archivo ya estaba importado y "ya
+            está cargado" es verdad. Si lo que hubo fueron descartes, no se
+            importó nada y decirle que ya está cargado es mentirle justo
+            cuando está buscando por qué no pasó nada. */}
         {!faltaDecidir && nada && (
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            No hay nada nuevo que importar: todo esto ya está cargado.
+            {r.eventos_repetidos > 0
+              ? 'No hay nada nuevo que importar: todo esto ya está cargado.'
+              : descartes.length > 0
+                ? `No puedo importar nada: ninguna de las ${descartes.length} filas de esta hoja trae los nombres. Miralas arriba, y si el problema es el mapeo, volvé al paso 2.`
+                : 'Esta hoja no trae ninguna fila que pueda importar.'}
           </span>
         )}
       </div>

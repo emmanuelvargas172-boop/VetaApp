@@ -10,6 +10,7 @@ const mockSupabase = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock('../lib/supabase.js', () => ({ supabase: mockSupabase, default: mockSupabase }));
 
 import { calcular } from './paso3Revisar.jsx';
+import { formatoDeFechasRoto } from './nucleo/filas.js';
 
 // Los valores son inventados. Ver el commit 888a8ce: los datos reales de
 // clientes no van a los tests, ni aunque el test sea sobre ellos.
@@ -98,6 +99,12 @@ describe('calcular', () => {
     const grilla = [['Ana Gómez', 'Max', '3000000011', '', 'Poodle', '31/02/2026', '12/09/2026 10:18:00']];
     const a = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     const b = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
+    // Comparar los largos NO alcanza: con un estado de módulo las dos
+    // corridas devolverían el mismo array y los largos coincidirían igual.
+    // Que sean objetos distintos es lo único que prueba que cada corrida
+    // arrancó de cero.
+    expect(a.estado).not.toBe(b.estado);
+    expect(a.estado.avisos).not.toBe(b.estado.avisos);
     expect(a.estado.avisos.length).toBe(b.estado.avisos.length);
     expect(a.estado.avisos.length).toBeGreaterThan(0);
   });
@@ -110,5 +117,34 @@ describe('calcular', () => {
     ));
     const { estado } = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     expect(estado.fechasRotas).toBeGreaterThanOrEqual(10);
+    expect(formatoDeFechasRoto(estado)).toBe(true);
+  });
+
+  // La otra cara: unas pocas fechas malas son filas sucias, no la hoja
+  // equivocada. Si el banner rojo saliera acá, saldría siempre, y un aviso
+  // que sale siempre no lo lee nadie.
+  it('unas pocas fechas malas no encienden el banner', () => {
+    const grilla = Array.from({ length: 12 }, (_, i) => (
+      [`Tutor ${i}`, `Mascota ${i}`, '3000000011', '', 'Poodle', i < 2 ? 'ayer' : '26/07/2018', '12/09/2026 10:18:00']
+    ));
+    const { estado } = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
+    expect(formatoDeFechasRoto(estado)).toBe(false);
+  });
+
+  // El único control contra subir la base de otra veterinaria, y por eso
+  // los nombres tienen que salir del envío: es lo que se va a escribir.
+  it('los nombres que se muestran son los que se van a crear', () => {
+    const { plan } = calcular({ columnas: cols(UNA), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
+    expect(plan.envio.crear_tutores.map((t) => t.nombre)).toEqual(['Ana Gómez']);
+  });
+
+  // La raza en blanco cae en el grupo de clave vacía. La pantalla lo
+  // pregunta aparte porque `No sé qué es ""` no es una pregunta.
+  it('las mascotas sin raza quedan en el grupo de clave vacía', () => {
+    const grilla = [['Ana Gómez', 'Max', '3000000011', '', '', '', '12/09/2026 10:18:00']];
+    const { plan } = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
+    expect(plan.especies).toHaveLength(1);
+    expect(plan.especies[0].clave).toBe('');
+    expect(plan.especies[0].raza).toBe('');
   });
 });
