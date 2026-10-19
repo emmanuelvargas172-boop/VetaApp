@@ -7,7 +7,7 @@
 // "Deshacer" no borró todo— y adentro del componente no se pueden probar.
 // ============================================================
 
-/** 1 → "1 vacuna", 3 → "3 vacunas". El plural a mano porque son cuatro casos. */
+/** 1 → "1 vacuna", 3 → "3 vacunas". El plural a mano: son pocos casos y ninguno es irregular, así que una librería de i18n acá sería más código que el que ahorra. */
 const n = (cuantos, singular, plural) =>
   `${cuantos} ${cuantos === 1 ? singular : plural}`;
 
@@ -73,6 +73,30 @@ export function textoDeshecho(d) {
   if (d.tratamientos > 0)       l.push(n(d.tratamientos, 'baño o desparasitación', 'baños y desparasitaciones'));
   if (d.vacunas > 0)            l.push(n(d.vacunas, 'vacuna', 'vacunas'));
   if (d.campos_restaurados > 0) l.push(n(d.campos_restaurados, 'dato que devolví a como estaba', 'datos que devolví a como estaban'));
+  return l;
+}
+
+/**
+ * Qué está por escribir, según la predicción del paso 3.
+ *
+ * Es el ÚNICO lugar del paso 4 donde se usa la predicción y no la respuesta
+ * de Postgres, y está bien: la frase habla de lo que va a hacer, no de lo
+ * que quedó. En cuanto hay un resultado, la pantalla lo tira y muestra lo
+ * que volvió (ver textoResultado).
+ *
+ * Los ceros no se escriben, por lo mismo que en textoResultado y por un
+ * motivo más fuerte acá: el segundo archivo de la misma clínica trae cero
+ * tutores nuevos y cero mascotas nuevas con 74 baños adentro, y decir
+ * "escribiendo 0 y 0" mientras escribe 74 es falso.
+ */
+export function textoVaAEscribir(r) {
+  const l = [];
+  if (r.tutores_nuevos > 0)       l.push(n(r.tutores_nuevos, 'tutor', 'tutores'));
+  if (r.mascotas_nuevas > 0)      l.push(n(r.mascotas_nuevas, 'mascota', 'mascotas'));
+  if (r.tutores_a_completar > 0)  l.push(n(r.tutores_a_completar, 'dato de tutor', 'datos de tutores'));
+  if (r.mascotas_a_completar > 0) l.push(n(r.mascotas_a_completar, 'dato de mascota', 'datos de mascotas'));
+  if (r.tratamientos > 0)         l.push(n(r.tratamientos, 'baño o desparasitación', 'baños y desparasitaciones'));
+  if (r.vacunas > 0)              l.push(n(r.vacunas, 'vacuna', 'vacunas'));
   return l;
 }
 

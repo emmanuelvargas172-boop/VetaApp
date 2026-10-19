@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho } from './textos.js';
+import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir } from './textos.js';
 
 describe('textoResultado', () => {
   it('cuenta lo que devolvió Postgres', () => {
@@ -48,18 +48,47 @@ describe('textoResultado', () => {
     expect(lineas).toContain('1 baño o desparasitación');
     expect(lineas).toContain('1 ya estaba cargado, ese no lo repetí');
   });
+
+  // Las dos cadenas más largas del módulo, y las únicas que ningún test
+  // miraba: un typo acá salía a producción callado.
+  it('cuenta los que ya estaban y a los que les completó datos', () => {
+    const lineas = textoResultado({
+      tutores_creados: 0, tutores_completados: 4,
+      mascotas_creadas: 0, mascotas_completadas: 7,
+      tratamientos: 0, vacunas: 0, repetidos: 0, omitidos: [],
+    });
+    expect(lineas).toEqual([
+      '4 tutores a los que les completé datos',
+      '7 mascotas a las que les completé datos',
+    ]);
+  });
+
+  it('el singular de los completados tampoco dice "1 tutores"', () => {
+    const lineas = textoResultado({
+      tutores_creados: 0, tutores_completados: 1,
+      mascotas_creadas: 0, mascotas_completadas: 1,
+      tratamientos: 0, vacunas: 0, repetidos: 0, omitidos: [],
+    });
+    expect(lineas).toEqual([
+      '1 tutor al que le completé datos',
+      '1 mascota a la que le completé datos',
+    ]);
+  });
 });
 
 describe('textoOmitidos', () => {
   // La cédula repetida es el único dato que la función deja afuera a
   // propósito. Si no se dice, la clínica cree que entró y busca por esa
   // cédula para siempre sin encontrar a nadie.
+  // Los valores son inventados, y tienen que seguir siéndolo. Ver el commit
+  // 888a8ce: los datos reales de clientes del piloto ya se filtraron a los
+  // tests de este módulo tres veces, y esta cédula fue la cuarta.
   it('dice de quién no pudo guardar la cédula y por qué', () => {
     const lineas = textoOmitidos([
-      { que: 'cedula_repetida', quien: 'Ana Gómez', valor: '1000000200' },
+      { que: 'cedula_repetida', quien: 'Ana Gómez', valor: '1000000001' },
     ]);
     expect(lineas[0]).toContain('Ana Gómez');
-    expect(lineas[0]).toContain('1000000200');
+    expect(lineas[0]).toContain('1000000001');
     expect(lineas[0]).toContain('ya la tenía otro cliente');
   });
 
@@ -75,6 +104,13 @@ describe('textoOmitidos', () => {
       { que: 'tutor_no_encontrado', quien: '41', valor: null },
     ]);
     expect(lineas[0]).toBe('41: tutor_no_encontrado');
+  });
+
+  it('un caso que no conoce pero con valor lo muestra entre paréntesis', () => {
+    const lineas = textoOmitidos([
+      { que: 'algo_nuevo', quien: 'Ana Gómez', valor: 'x' },
+    ]);
+    expect(lineas[0]).toBe('Ana Gómez: algo_nuevo (x)');
   });
 });
 
@@ -165,5 +201,45 @@ describe('textoDeshecho', () => {
     expect(lineas).toContain('1 baño o desparasitación');
     expect(lineas).toContain('1 vacuna');
     expect(lineas).toContain('1 dato que devolví a como estaba');
+  });
+});
+
+describe('textoVaAEscribir', () => {
+  it('dice lo que va a escribir', () => {
+    const lineas = textoVaAEscribir({
+      tutores_nuevos: 53, mascotas_nuevas: 54,
+      tutores_a_completar: 0, mascotas_a_completar: 0,
+      tratamientos: 74, vacunas: 13,
+    });
+    expect(lineas).toContain('53 tutores');
+    expect(lineas).toContain('54 mascotas');
+    expect(lineas).toContain('74 baños y desparasitaciones');
+    expect(lineas).toContain('13 vacunas');
+  });
+
+  // El caso del segundo archivo de la misma clínica: los mismos clientes
+  // con baños nuevos. Decir "escribiendo 0 tutores y 0 mascotas" mientras
+  // escribe 74 baños es falso, y paso3Revisar SÍ deja confirmar acá.
+  it('un archivo que solo trae eventos no dice "0 tutores y 0 mascotas"', () => {
+    const lineas = textoVaAEscribir({
+      tutores_nuevos: 0, mascotas_nuevas: 0,
+      tutores_a_completar: 0, mascotas_a_completar: 0,
+      tratamientos: 74, vacunas: 0,
+    });
+    expect(lineas).toEqual(['74 baños y desparasitaciones']);
+  });
+
+  it('el singular no dice "1 tutores"', () => {
+    const lineas = textoVaAEscribir({
+      tutores_nuevos: 1, mascotas_nuevas: 1,
+      tutores_a_completar: 1, mascotas_a_completar: 1,
+      tratamientos: 1, vacunas: 1,
+    });
+    expect(lineas).toContain('1 tutor');
+    expect(lineas).toContain('1 mascota');
+    expect(lineas).toContain('1 dato de tutor');
+    expect(lineas).toContain('1 dato de mascota');
+    expect(lineas).toContain('1 baño o desparasitación');
+    expect(lineas).toContain('1 vacuna');
   });
 });

@@ -23,10 +23,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Card } from '../components/ui.jsx';
 import { abrirImportacion, aplicar, marcarFallida, deshacer } from './escribir.js';
-import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho } from './textos.js';
+import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir } from './textos.js';
 
 export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
-  const [fase, setFase] = useState('escribiendo'); // escribiendo | listo | error | deshaciendo | deshecho
+  const [fase, setFase] = useState('escribiendo'); // escribiendo | listo | error | deshaciendo | deshecho | error_deshacer
   const [res, setRes] = useState(null);
   const [desRes, setDesRes] = useState(null);
   const [error, setError] = useState('');
@@ -55,11 +55,18 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
         setRes(r);
         setFase('listo');
       } catch (err) {
+        // `marcarFallida` va ANTES de pintar la pantalla, y no después.
+        // La pantalla de error trae un botón de Deshacer: si se pinta
+        // primero, un clic adentro del roundtrip manda el deshacer en
+        // paralelo, y el update de marcarFallida puede aterrizar último y
+        // pisar la fila —`estado` de vuelta a 'fallido' y la columna
+        // `resumen` entera reemplazada, porque el update de Supabase no
+        // mezcla jsonb (escribir.js:196-210)—, borrando el registro de qué
+        // conservó el deshacer. No tira nunca (escribir.js:177-214), así
+        // que esperarla no puede tapar el error de verdad.
+        if (id) await marcarFallida(id, err.message || String(err), confirmado.resumen);
         setError(err.message || String(err));
         setFase('error');
-        // Deja constancia de que alguien intentó importar y falló. No tira
-        // nunca: si tirara, taparía el error de verdad que está arriba.
-        if (id) await marcarFallida(id, err.message || String(err), confirmado.resumen);
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -77,19 +84,27 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
       setDesRes(d);
       setFase('deshecho');
     } catch (err) {
+      // Fase aparte y NO 'error'. La fase 'error' es la del fallo de
+      // escritura y dice "no entró nada": acá el import SÍ entró y lo que
+      // falló fue sacarlo. Mandar los dos fallos a la misma pantalla le
+      // afirmaría a la clínica que su base está vacía mientras tiene 54
+      // mascotas adentro.
       setError(err.message || String(err));
-      setFase('error');
+      setFase('error_deshacer');
     }
   };
 
   if (fase === 'escribiendo') {
+    const vaAEscribir = textoVaAEscribir(confirmado.resumen);
     return (
       <Card>
         <h3 style={{ margin: 0, fontSize: 15 }}>4 · Importando</h3>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Escribiendo {confirmado.resumen.tutores_nuevos} tutores y{' '}
-          {confirmado.resumen.mascotas_nuevas} mascotas. Es una sola operación:
-          no cierres esta pestaña.
+          {/* vaAEscribir no puede quedar vacío acá: paso3Revisar.jsx:115-117
+              no deja confirmar si los seis contadores están en cero. Si esa
+              condición cambia alguna vez, esta frase depende de ella. */}
+          Escribiendo {vaAEscribir.join(', ')}. Es una sola operación: no
+          cierres esta pestaña.
         </p>
         {/* Una barra que avanza sola sería una mentira: la escritura es una
             sola llamada y no hay progreso que reportar. Un indicador que
@@ -110,9 +125,17 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
             español para que se pueda leer. */}
         <p style={{ fontSize: 13, color: 'var(--danger)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{error}</p>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          No quedó nada a medias: la escritura es una sola operación, así que o
-          entró todo o no entró nada.
-          {impId && <> Si querés asegurarte, la importación quedó anotada con el número <strong>{impId}</strong> en Configuración → Datos y backups.</>}
+          {/* No dice "no entró nada". La escritura es atómica, así que no hay
+              medio import — pero si lo que se perdió fue la respuesta y no la
+              escritura (wifi, portátil cerrado), entró todo y acá se ve un
+              error igual. Es el caso que el encabezado de este archivo
+              describe y para el que existe el tapón de `aplicar`. Afirmar
+              "no entró nada" sería afirmar lo que no se sabe. */}
+          No hay medio import: la escritura es una sola operación, así que o
+          entró completa o no entró. Lo que no se puede saber desde acá es
+          cuál de las dos fue, porque el error puede ser que se haya perdido
+          la respuesta y no la escritura.
+          {impId && <> La importación quedó anotada con el número <strong>{impId}</strong> en Configuración → Datos y backups: ahí se ve si entró, y se puede deshacer.</>}
         </p>
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="secondary" onClick={onReiniciar}>Empezar de nuevo</Button>
@@ -123,7 +146,12 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
   }
 
   if (fase === 'deshaciendo') {
-    return <Card>Deshaciendo…</Card>;
+    return (
+      <Card>
+        <h3 style={{ margin: 0, fontSize: 15 }}>Deshaciendo…</h3>
+        <div style={{ width: 22, height: 22, borderRadius: '50%', border: '3px solid var(--verde-100)', borderTopColor: 'var(--verde-500)', animation: 'spin 0.7s linear infinite' }} />
+      </Card>
+    );
   }
 
   if (fase === 'deshecho') {
@@ -137,10 +165,14 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
         <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
           {borrado.length > 0
             ? <>Borré {borrado.join(', ')}.</>
-            // El deshacer funcionó y no borró nada porque todo tenía trabajo
-            // clínico encima. Hay que decir que funcionó, porque una lista
-            // de ceros se lee como que falló.
-            : <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>}
+            // Sin nada borrado hay dos casos distintos, y la causa solo se
+            // puede afirmar en uno: si hay mascotas conservadas, es porque
+            // tenían algo encima; si no hay ninguna, el import no había
+            // escrito nada y decir que la clínica escribió encima sería
+            // inventar una causa.
+            : conservadas.length > 0
+              ? <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>
+              : <>No había nada que borrar: esta importación no había escrito nada.</>}
         </p>
 
         {/* Lo más importante de esta pantalla. Si no se explica, la clínica
@@ -156,21 +188,48 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
             <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               {conservadas.map((t, i) => <li key={i}>{t}</li>)}
             </ul>
-            {/* Dice "todo eso de arriba" y no "esas consultas y esas citas":
-                014 mira cinco contadores (historias, citas, vacunas, baños y
-                cobros), así que nombrar dos sería afirmar algo falso en los
-                otros tres casos. Lo que arriba ya está nombrado una por una
-                no hace falta repetirlo acá mal. */}
+            {/* Dos razones distintas, y hay que decir las dos. Para
+                historias y citas la cascada es `on delete cascade`: borrar
+                la mascota se lleva las consultas. Para los cobros es
+                `on delete set null` (003_cobros.sql:18), así que el recibo
+                sobrevive —tiene que, ya está emitido— pero queda sin
+                paciente. Decir "se las habría llevado" de un cobro es
+                falso, y nombrar solo dos de los cinco contadores de 014
+                es falso en los otros tres. */}
             <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>
-              Borrarlas se habría llevado con ellas todo eso de arriba, que lo
-              escribió la clínica y no el archivo. Se quedaron, y sus dueños
-              también. Si de verdad querés sacarlas, hay que borrarlas una por
-              una desde su ficha.
+              Eso lo escribió la clínica, no el archivo. Borrar las mascotas
+              se habría llevado las consultas, las citas, las vacunas y los
+              baños con ellas, y habría dejado los recibos sin paciente. Se
+              quedaron, y sus dueños también. Si de verdad querés sacarlas,
+              hay que borrarlas una por una desde su ficha.
             </p>
           </div>
         )}
 
         <Button variant="secondary" onClick={onReiniciar}>Importar otro archivo</Button>
+      </Card>
+    );
+  }
+
+  if (fase === 'error_deshacer') {
+    return (
+      <Card>
+        <h3 style={{ margin: 0, fontSize: 15 }}>No se pudo deshacer</h3>
+        {/* El mensaje de la función va crudo: `deshacer_importacion` ya los
+            escribe en español ("La importación N ya se deshizo") y
+            reemplazarlo borraría la única pista que sirve. */}
+        <p style={{ fontSize: 13, color: 'var(--danger)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{error}</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          <strong>El import sigue cargado.</strong> Lo que falló fue sacarlo,
+          así que tus clientes y tus mascotas están en la base — no se perdió
+          nada. Podés volver a intentar deshacerlo acá, o desde Configuración
+          → Datos y backups, donde la importación quedó anotada
+          {impId && <> con el número <strong>{impId}</strong></>}.
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button variant="secondary" onClick={hacerDeshacer}>Volver a intentar deshacer</Button>
+          <Button variant="secondary" onClick={onReiniciar}>Dejarlo así</Button>
+        </div>
       </Card>
     );
   }
