@@ -117,9 +117,14 @@ export default function Importaciones() {
   };
 
   // Un reintento solo relee: no escribe nada y no puede duplicar nada, así que
-  // no pide confirmación. `setFilas(null)` es necesario — sin eso un segundo
-  // fallo deja la pantalla en blanco en vez de volver a mostrar el error.
-  const reintentar = () => { setError(''); setFilas(null); cargar(); };
+  // no pide confirmación.
+  //
+  // Y NO limpia `filas` a propósito. Vaciarlas haría pasar la pantalla por
+  // "Cargando…" y, si el reintento vuelve a fallar, por la pantalla de error
+  // entera — que se llevaría el panel con las mascotas que NO se borraron,
+  // que es justo lo que este manejo de error existe para no perder. Dejando
+  // las filas, un segundo fallo solo vuelve a poner el aviso arriba.
+  const reintentar = () => { setError(''); cargar(); };
 
   // El error tapa la pantalla SOLO si no hay nada que tapar. Con filas ya
   // cargadas va como aviso arriba (más abajo): el `cargar()` que corre después
@@ -181,6 +186,15 @@ export default function Importaciones() {
         const borrado = desh ? textoDeshecho(desh) : [];
         const restaurados = textoRestaurados(desh);
 
+        // Si el deshacer de ESTE rato salió bien, el botón se va aunque la
+        // fila que está en pantalla todavía diga 'listo'. No es cosmético: el
+        // `cargar()` de después puede haber fallado, y entonces la fila es la
+        // de antes del deshacer. Volver a apretar el botón llama a 014, que
+        // contesta "ya se deshizo", y ese error pisa `accion[id]` — con lo que
+        // `desh` cae en el `resumen` viejo, que no tiene la clave `deshecho`,
+        // y desaparece la lista de las mascotas que NO se borraron.
+        const yaSeDeshizo = Boolean(a && a.estado);
+
         return (
           <div key={imp.id} style={{
             padding: '10px 12px', background: 'var(--surface)',
@@ -197,7 +211,7 @@ export default function Importaciones() {
                 </p>
               </div>
               <Badge tone={est.tono} size="sm">{est.texto}</Badge>
-              {sePuedeDeshacer(imp.estado) && (
+              {sePuedeDeshacer(imp.estado) && !yaSeDeshizo && (
                 <Button
                   variant="secondary" size="sm"
                   disabled={a === 'deshaciendo'}
@@ -225,26 +239,36 @@ export default function Importaciones() {
 
             {desh && (
               <div style={{ margin: '8px 0 0', paddingTop: 8, borderTop: '1px solid var(--divider)' }}>
-                {/* Sin nada borrado hay dos casos distintos y hay que
-                    separarlos, pero ninguno de los dos puede afirmar POR QUÉ
-                    no había nada. Los contadores de 014 miden lo que existía
-                    al momento de deshacer: que una mascota no se haya borrado
-                    ni conservado significa que no estaba, y eso puede ser
-                    porque el import nunca la creó o porque la clínica la borró
-                    a mano después. Acá esa frase es más peligrosa que en el
-                    paso 4 —allá pasan segundos, acá pueden pasar seis meses— y
-                    quedaría justo debajo de la línea que dice "53 tutores · 54
-                    mascotas".
+                {/* Cuatro ramos, y el orden importa. La lista de ceros no va
+                    en ninguno: "Borré 0 tutores y 0 mascotas" se lee como que
+                    el deshacer falló, justo cuando funcionó.
 
-                    Y la lista de ceros tampoco va: "Borré 0 tutores y 0
-                    mascotas" se lee como que el deshacer falló, justo cuando
-                    funcionó. */}
+                    De los tres ramos sin nada borrado, solo el de las
+                    conservadas puede decir POR QUÉ: ahí los contadores de 014
+                    muestran qué tenía encima cada mascota. Los otros dos no
+                    tienen con qué. Los contadores miden lo que existía al
+                    momento de deshacer, y que una mascota no se haya borrado
+                    ni conservado significa solo que no estaba — puede ser que
+                    el import nunca la creó o que la clínica la borró a mano
+                    después. Acá eso pesa más que en el paso 4: allá pasan
+                    segundos entre escribir y deshacer, acá pueden pasar seis
+                    meses, y la frase queda debajo de una línea que dice
+                    "53 tutores · 54 mascotas".
+
+                    El ramo de `restaurados` existe porque sin él los dos
+                    textos se contradicen: un import que solo completó datos no
+                    borra ni conserva nada, caía en el último ramo, y la
+                    pantalla decía "de este archivo no quedaba nada en la base"
+                    y enseguida "Devolví 2 datos a como estaban" — o sea que sí
+                    quedaba, y eran de este archivo. */}
                 <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-muted)' }}>
                   {borrado.length > 0
                     ? <>Borré {borrado.join(', ')}.</>
                     : conservadas.length > 0
                       ? <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>
-                      : <>No había nada que borrar: de este archivo no quedaba nada en la base.</>}
+                      : restaurados
+                        ? <>No hubo clientes ni mascotas que borrar.</>
+                        : <>No había nada que borrar: de este archivo no quedaba nada en la base.</>}
                   {restaurados && <>{' '}{restaurados}</>}
                 </p>
                 {/* La frase que explica por qué no borró todo. Sin esto, la
