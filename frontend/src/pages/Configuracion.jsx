@@ -6,6 +6,7 @@ import { getAdminPhone, saveAdminPhone } from '../utils/whatsapp';
 import SelectorPlanes from '../components/SelectorPlanes';
 import { PASARELA_ACTIVA } from '../lib/pagos';
 import { CONJUNTOS, exportarTabla } from '../lib/exportar';
+import Importaciones from '../importador/Importaciones.jsx';
 import {
   Card, Button, Badge, Topbar, Page, iconBtnStyle,
 } from '../components/ui';
@@ -584,6 +585,13 @@ export default function Configuracion() {
                       <Button variant="secondary" size="sm">Importar un archivo</Button>
                     </Link>
                   </div>
+                </ConfigSection>
+
+                <ConfigSection
+                  title="Archivos que importaste"
+                  subtitle="Qué entró, de qué archivo salió, y cómo deshacerlo"
+                >
+                  <Importaciones />
                 </ConfigSection>
 
                 <SeccionDatos />
