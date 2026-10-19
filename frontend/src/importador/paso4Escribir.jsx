@@ -219,13 +219,32 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
             escribe en español ("La importación N ya se deshizo") y
             reemplazarlo borraría la única pista que sirve. */}
         <p style={{ fontSize: 13, color: 'var(--danger)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{error}</p>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          <strong>El import sigue cargado.</strong> Lo que falló fue sacarlo,
-          así que tus clientes y tus mascotas están en la base — no se perdió
-          nada. Podés volver a intentar deshacerlo acá, o desde Configuración
-          → Datos y backups, donde la importación quedó anotada
-          {impId && <> con el número <strong>{impId}</strong></>}.
-        </p>
+        {/* `res` dice por dónde se llegó, y hay que distinguirlo: solo
+            existe si `aplicar` respondió, o sea si la escritura entró
+            seguro. Si es null se llegó desde la pantalla de error, y ahí no
+            se sabe si entró —puede haberse perdido la respuesta y no la
+            escritura—, así que afirmar "sigue cargado" sería el error
+            simétrico del que esta fase vino a arreglar: la fase `error`
+            afirmaba que no había entrado nada cuando sí. Una sola frase
+            para los dos casos tiene que mentir en uno. */}
+        {res ? (
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <strong>El import sigue cargado.</strong> Lo que falló fue sacarlo,
+            así que tus clientes y tus mascotas están en la base — no se perdió
+            nada. Podés volver a intentar deshacerlo acá, o desde Configuración
+            → Datos y backups, donde la importación quedó anotada
+            {impId && <> con el número <strong>{impId}</strong></>}.
+          </p>
+        ) : (
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <strong>No sé si el import entró o no.</strong> Falló la escritura
+            y falló también el intento de deshacerla, así que desde acá no se
+            puede saber qué quedó en la base. Lo que dice el error de arriba es
+            la única pista. Mirá Configuración → Datos y backups
+            {impId && <> con el número <strong>{impId}</strong></>}: ahí se ve
+            qué entró de verdad, y se puede deshacer desde ahí.
+          </p>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="secondary" onClick={hacerDeshacer}>Volver a intentar deshacer</Button>
           <Button variant="secondary" onClick={onReiniciar}>Dejarlo así</Button>
