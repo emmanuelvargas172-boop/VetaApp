@@ -65,6 +65,13 @@ export function textoOmitidos(omitidos) {
  * crudos, y ahí decía "Borré 0 tutores, 0 mascotas, 0 baños y 0 vacunas"
  * cuando el deshacer conservaba todo — el caso que más confunde, porque el
  * deshacer sí funcionó y el texto se lee como si hubiera fallado.
+ *
+ * `campos_restaurados` NO entra en esta lista y tiene que seguir afuera: los
+ * dos llamadores la leen detrás de un "Borré", y restaurar un dato es lo
+ * contrario de borrarlo. Con el contador adentro, una importación que solo
+ * completó campos imprime "Borré 2 datos que devolví a como estaban", que
+ * además es el único elemento de la lista en ese caso. Va aparte, en
+ * textoRestaurados.
  */
 export function textoDeshecho(d) {
   const l = [];
@@ -72,8 +79,30 @@ export function textoDeshecho(d) {
   if (d.mascotas_borradas > 0)  l.push(n(d.mascotas_borradas, 'mascota', 'mascotas'));
   if (d.tratamientos > 0)       l.push(n(d.tratamientos, 'baño o desparasitación', 'baños y desparasitaciones'));
   if (d.vacunas > 0)            l.push(n(d.vacunas, 'vacuna', 'vacunas'));
-  if (d.campos_restaurados > 0) l.push(n(d.campos_restaurados, 'dato que devolví a como estaba', 'datos que devolví a como estaban'));
   return l;
+}
+
+/**
+ * Qué datos devolvió a como estaban. Frase entera, no un pedazo de lista.
+ *
+ * Es la otra mitad del deshacer y necesita su propio verbo: lo que el import
+ * había COMPLETADO —un teléfono que estaba vacío y quedó lleno— no se borra al
+ * deshacer, se devuelve al valor que tenía antes.
+ *
+ * Devuelve '' cuando no hubo ninguno, así el llamador no tiene que mirar el
+ * número. Y tolera que el contador no exista: el objeto que 014:162-165 deja
+ * guardado en `resumen.deshecho` NO incluye `campos_restaurados` —solo lo trae
+ * la respuesta de la llamada—, y el historial lee de ahí cuando la fila se
+ * deshizo hace meses.
+ */
+export function textoRestaurados(d) {
+  const c = d?.campos_restaurados ?? 0;
+  if (c === 0) return '';
+  // Las dos palabras concuerdan o ninguna: "1 datos a como estaban" y
+  // "1 dato a como estaban" están los dos mal.
+  return c === 1
+    ? 'Devolví 1 dato a como estaba.'
+    : `Devolví ${c} datos a como estaban.`;
 }
 
 /**

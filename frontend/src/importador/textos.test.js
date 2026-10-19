@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir } from './textos.js';
+import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir, textoRestaurados } from './textos.js';
 
 describe('textoResultado', () => {
   it('cuenta lo que devolvió Postgres', () => {
@@ -200,7 +200,35 @@ describe('textoDeshecho', () => {
     expect(lineas).toContain('1 mascota');
     expect(lineas).toContain('1 baño o desparasitación');
     expect(lineas).toContain('1 vacuna');
-    expect(lineas).toContain('1 dato que devolví a como estaba');
+  });
+
+  // La lista se lee detrás de un "Borré", y restaurar un dato es lo
+  // contrario de borrarlo. Un import que solo completó campos imprimía
+  // "Borré 2 datos que devolví a como estaban", con eso como único elemento.
+  it('no mete los datos restaurados en la lista de lo borrado', () => {
+    expect(textoDeshecho({
+      tutores_borrados: 0, mascotas_borradas: 0,
+      tratamientos: 0, vacunas: 0, campos_restaurados: 2,
+    })).toEqual([]);
+  });
+});
+
+describe('textoRestaurados', () => {
+  it('dice cuántos datos devolvió', () => {
+    expect(textoRestaurados({ campos_restaurados: 3 })).toBe('Devolví 3 datos a como estaban.');
+  });
+
+  it('el singular concuerda en las dos palabras', () => {
+    expect(textoRestaurados({ campos_restaurados: 1 })).toBe('Devolví 1 dato a como estaba.');
+  });
+
+  // El jsonb que 014:162-165 guarda en resumen.deshecho no trae este
+  // contador. El historial lee de ahí para las filas viejas, y ahí no se
+  // puede afirmar nada sobre campos restaurados: se calla.
+  it('sin el contador no dice nada', () => {
+    expect(textoRestaurados({ campos_restaurados: 0 })).toBe('');
+    expect(textoRestaurados({})).toBe('');
+    expect(textoRestaurados(null)).toBe('');
   });
 });
 

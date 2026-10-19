@@ -16,7 +16,7 @@
 import { useEffect, useState } from 'react';
 import { Badge, Button } from '../components/ui.jsx';
 import { listarImportaciones, deshacer } from './escribir.js';
-import { textoConservadas, textoDeshecho, textoVaAEscribir } from './textos.js';
+import { textoConservadas, textoDeshecho, textoVaAEscribir, textoRestaurados } from './textos.js';
 
 export const ESTADOS = {
   en_curso:         { texto: 'Sin terminar',    tono: 'warn' },
@@ -29,6 +29,25 @@ export const ESTADOS = {
 };
 
 const FECHA = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+
+/**
+ * ¿Se le puede ofrecer el botón de Deshacer a esta fila?
+ *
+ * La regla es la de 014:65-67 y no una lista propia: deshacer está bloqueado
+ * solo para lo que ya se deshizo. Enumerar al revés —'listo' y 'en_curso'—
+ * deja afuera a 'fallido', y una fila 'fallido' puede tener datos adentro:
+ * marcarFallida decide mirando solo `duenos` y `mascotas` (escribir.js:186),
+ * así que un archivo que solo le agregó 74 baños a mascotas que ya existían y
+ * perdió la respuesta queda 'fallido' con los 74 escritos. Sin este botón no
+ * hay forma de sacarlos.
+ *
+ * Un estado desconocido también lleva botón: la autoridad es la función de
+ * Postgres, que revienta con un mensaje en español si no se puede, y ese
+ * mensaje se muestra. Esconder el botón por las dudas esconde datos.
+ */
+export function sePuedeDeshacer(estado) {
+  return estado !== 'deshecho' && estado !== 'deshecho_parcial';
+}
 
 /**
  * El `resumen` del paso 3, en una línea.
@@ -68,7 +87,10 @@ export default function Importaciones() {
   const [accion, setAccion] = useState({});
 
   const cargar = () => {
-    listarImportaciones().then(setFilas).catch((e) => setError(e.message));
+    // El `||` no es decoración: un `message` vacío dejaría `error` falsy y la
+    // pantalla trabada en "Cargando…" sin forma de salir.
+    listarImportaciones().then(setFilas)
+      .catch((e) => setError(e?.message || 'No se pudo leer el historial de importaciones'));
   };
 
   useEffect(cargar, []);
@@ -90,20 +112,26 @@ export default function Importaciones() {
       setAccion((a) => ({ ...a, [id]: d }));
       cargar(); // el estado de la fila cambió en la base
     } catch (e) {
-      setAccion((a) => ({ ...a, [id]: { error: e.message } }));
+      setAccion((a) => ({ ...a, [id]: { error: e?.message || 'No se pudo deshacer' } }));
     }
   };
 
-  if (error) {
+  // Un reintento solo relee: no escribe nada y no puede duplicar nada, así que
+  // no pide confirmación. `setFilas(null)` es necesario — sin eso un segundo
+  // fallo deja la pantalla en blanco en vez de volver a mostrar el error.
+  const reintentar = () => { setError(''); setFilas(null); cargar(); };
+
+  // El error tapa la pantalla SOLO si no hay nada que tapar. Con filas ya
+  // cargadas va como aviso arriba (más abajo): el `cargar()` que corre después
+  // de un deshacer exitoso puede fallar por un corte de red, y si eso
+  // reemplazara el componente se llevaría la lista de las mascotas que NO se
+  // borraron, que es la salida más importante de todo el importador y no queda
+  // guardada en ninguna otra parte de la pantalla.
+  if (error && (!filas || filas.length === 0)) {
     return (
       <div>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--danger)' }}>{error}</p>
-        {/* Leer el historial es solo un `select`: reintentar no puede escribir
-            nada ni duplicar nada, así que el botón no necesita confirmación.
-            Sin él, un corte de red al abrir la pestaña deja esta sección
-            muerta hasta recargar la página entera. */}
-        <Button variant="secondary" size="sm" style={{ marginTop: 6 }}
-                onClick={() => { setError(''); setFilas(null); cargar(); }}>
+        <Button variant="secondary" size="sm" style={{ marginTop: 6 }} onClick={reintentar}>
           Volver a intentar
         </Button>
       </div>
@@ -121,20 +149,37 @@ export default function Importaciones() {
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
+      {/* La lista que se ve es la de antes del error, y hay que decirlo: si una
+          fila se acabó de deshacer, su etiqueta todavía dice "Importada"
+          aunque en la base ya diga "Deshecha". */}
+      {error && (
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)', lineHeight: 1.5 }}>
+          {error} — lo que ves es el historial de antes de ese error.{' '}
+          <button
+            onClick={reintentar}
+            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Volver a intentar
+          </button>
+        </p>
+      )}
       {filas.map((imp) => {
         const est = ESTADOS[imp.estado] ?? { texto: imp.estado, tono: 'neutral' };
         const a = accion[imp.id];
-        // La regla es la de 014:65-67 y no una lista propia: deshacer está
-        // bloqueado solo para lo que ya se deshizo. Enumerar al revés —'listo'
-        // y 'en_curso'— deja afuera a 'fallido', y una fila 'fallido' puede
-        // tener datos adentro: marcarFallida decide mirando solo `duenos` y
-        // `mascotas` (escribir.js:186), así que un archivo que solo le agregó
-        // 74 baños a mascotas que ya existían y perdió la respuesta queda
-        // 'fallido' con los 74 escritos. Sin este botón no hay forma de
-        // sacarlos.
-        const sePuedeDeshacer = imp.estado !== 'deshecho' && imp.estado !== 'deshecho_parcial';
-        const conservadas = a && a.conservadas ? textoConservadas(a.conservadas) : [];
-        const borrado = a && a.estado ? textoDeshecho(a) : [];
+        // El resultado del deshacer, de las dos fuentes posibles. `accion` es
+        // el de este rato; `resumen.deshecho` es el que 014:162-165 dejó
+        // guardado, y es el único que queda después de recargar la página. Sin
+        // leerlo, una fila "Deshecha en parte" vuelve del reload con la
+        // etiqueta amarilla y sin decir qué conservó — y esa fila existe
+        // precisamente porque dejó mascotas en la base. Es el caso de uso
+        // número uno de esta pantalla.
+        //
+        // El guardado NO trae `campos_restaurados` ni `estado`: de ahí que el
+        // panel se condicione a `desh` y no a `desh.estado`.
+        const desh = (a && a.estado) ? a : (imp.resumen?.deshecho ?? null);
+        const conservadas = desh?.conservadas ? textoConservadas(desh.conservadas) : [];
+        const borrado = desh ? textoDeshecho(desh) : [];
+        const restaurados = textoRestaurados(desh);
 
         return (
           <div key={imp.id} style={{
@@ -152,7 +197,7 @@ export default function Importaciones() {
                 </p>
               </div>
               <Badge tone={est.tono} size="sm">{est.texto}</Badge>
-              {sePuedeDeshacer && (
+              {sePuedeDeshacer(imp.estado) && (
                 <Button
                   variant="secondary" size="sm"
                   disabled={a === 'deshaciendo'}
@@ -178,7 +223,7 @@ export default function Importaciones() {
               <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--danger)' }}>{a.error}</p>
             )}
 
-            {a && a.estado && (
+            {desh && (
               <div style={{ margin: '8px 0 0', paddingTop: 8, borderTop: '1px solid var(--divider)' }}>
                 {/* Los dos casos de "no borré nada" se distinguen, porque la
                     causa solo se puede afirmar en uno. Si quedaron mascotas
@@ -193,7 +238,8 @@ export default function Importaciones() {
                     ? <>Borré {borrado.join(', ')}.</>
                     : conservadas.length > 0
                       ? <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>
-                      : <>No había nada que borrar: esta importación no había escrito nada.</>}
+                      : <>No había nada que borrar: de este archivo no quedaba nada en la base.</>}
+                  {restaurados && <>{' '}{restaurados}</>}
                 </p>
                 {/* La frase que explica por qué no borró todo. Sin esto, la
                     clínica cree que Deshacer falló; lo que pasó es que NO
@@ -215,12 +261,18 @@ export default function Importaciones() {
                         que el recibo sobrevive —tiene que, ya está emitido—
                         pero queda sin paciente. Decir "se las habría llevado"
                         de un cobro es falso, y nombrar solo dos de los cinco
-                        contadores de 014:89 es falso en los otros tres. */}
+                        contadores de 014:89 es falso en los otros tres.
+                        No dice "lo escribió la clínica": el paso 1 de 014 borra
+                        solo los eventos de ESTA importación, así que un segundo
+                        import que le agregó baños a una mascota del primero
+                        también la conserva, y eso no lo escribió la clínica. Lo
+                        único que se puede afirmar de los cinco contadores es
+                        que no vinieron en este archivo. */}
                     <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--text-faint)', lineHeight: 1.5 }}>
-                      Eso lo escribió la clínica, no el archivo. Borrarlas se
-                      habría llevado las consultas, las citas, las vacunas y
-                      los baños con ellas, y habría dejado los recibos sin
-                      paciente. Se quedaron, y sus dueños también.
+                      Eso no lo trajo este archivo. Borrarlas se habría llevado
+                      las consultas, las citas, las vacunas y los baños con
+                      ellas, y habría dejado los recibos sin paciente. Se
+                      quedaron, y sus dueños también.
                     </p>
                   </>
                 )}

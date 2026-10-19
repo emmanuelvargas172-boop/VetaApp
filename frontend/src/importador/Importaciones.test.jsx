@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 // llegue a esa línea; es el mismo patrón de `escribir.test.js:5`.
 vi.mock('../lib/supabase.js', () => ({ supabase: {}, default: {} }));
 
-import { lineaResumen, ESTADOS } from './Importaciones.jsx';
+import { lineaResumen, ESTADOS, sePuedeDeshacer } from './Importaciones.jsx';
 
 describe('lineaResumen', () => {
   // El resumen que guardó el paso 3, leído seis meses después. Las
@@ -66,5 +66,30 @@ describe('ESTADOS', () => {
   // tiene que poder ver de un vistazo cuál dejó mascotas atrás.
   it('distingue el deshecho parcial del completo', () => {
     expect(ESTADOS.deshecho_parcial.texto).not.toBe(ESTADOS.deshecho.texto);
+  });
+});
+
+describe('sePuedeDeshacer', () => {
+  // La regla tiene que ser la misma que la de 014:65-67, que es la que manda
+  // de verdad. Si la pantalla esconde el botón para un estado que la función
+  // sí acepta, esos datos quedan sin forma de sacarse.
+  it('solo lo bloquea para lo que ya se deshizo', () => {
+    expect(sePuedeDeshacer('deshecho')).toBe(false);
+    expect(sePuedeDeshacer('deshecho_parcial')).toBe(false);
+  });
+
+  // 'fallido' es el que importa. marcarFallida mira solo `duenos` y
+  // `mascotas`, así que un archivo que solo le agregó baños a mascotas que ya
+  // existían y perdió la respuesta queda 'fallido' CON los baños escritos.
+  it('deja deshacer una que falló, que puede tener datos adentro', () => {
+    expect(sePuedeDeshacer('fallido')).toBe(true);
+    expect(sePuedeDeshacer('en_curso')).toBe(true);
+    expect(sePuedeDeshacer('listo')).toBe(true);
+  });
+
+  // La autoridad es Postgres, que contesta con un mensaje en español. Esconder
+  // el botón por las dudas esconde datos.
+  it('un estado que no conoce igual lleva botón', () => {
+    expect(sePuedeDeshacer('algo_nuevo')).toBe(true);
   });
 });

@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Card } from '../components/ui.jsx';
 import { abrirImportacion, aplicar, marcarFallida, deshacer } from './escribir.js';
-import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir } from './textos.js';
+import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir, textoRestaurados } from './textos.js';
 
 export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
   const [fase, setFase] = useState('escribiendo'); // escribiendo | listo | error | deshaciendo | deshecho | error_deshacer
@@ -157,6 +157,7 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
   if (fase === 'deshecho') {
     const conservadas = textoConservadas(desRes.conservadas);
     const borrado = textoDeshecho(desRes);
+    const restaurados = textoRestaurados(desRes);
     return (
       <Card>
         <h3 style={{ margin: 0, fontSize: 15 }}>
@@ -165,14 +166,19 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
         <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
           {borrado.length > 0
             ? <>Borré {borrado.join(', ')}.</>
-            // Sin nada borrado hay dos casos distintos, y la causa solo se
-            // puede afirmar en uno: si hay mascotas conservadas, es porque
-            // tenían algo encima; si no hay ninguna, el import no había
-            // escrito nada y decir que la clínica escribió encima sería
-            // inventar una causa.
+            // Sin nada borrado hay dos casos distintos y hay que separarlos,
+            // pero ninguno de los dos puede afirmar POR QUÉ no había nada. Los
+            // contadores de 014 miden lo que existía al momento de deshacer:
+            // que una mascota no se haya borrado ni conservado significa que no
+            // estaba, y eso puede ser porque el import nunca la creó o porque
+            // la clínica la borró a mano después. Decir "esta importación no
+            // había escrito nada" elige una de las dos sin tener con qué, y en
+            // el historial puede quedar debajo de una línea que dice
+            // "53 tutores · 54 mascotas".
             : conservadas.length > 0
               ? <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>
-              : <>No había nada que borrar: esta importación no había escrito nada.</>}
+              : <>No había nada que borrar: de este archivo no quedaba nada en la base.</>}
+          {restaurados && <>{' '}{restaurados}</>}
         </p>
 
         {/* Lo más importante de esta pantalla. Si no se explica, la clínica
