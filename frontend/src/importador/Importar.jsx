@@ -16,6 +16,7 @@ import { Topbar, Page } from '../components/ui.jsx';
 import Paso1Archivo from './paso1Archivo.jsx';
 import Paso2Columnas from './paso2Columnas.jsx';
 import Paso3Revisar from './paso3Revisar.jsx';
+import Paso4Escribir from './paso4Escribir.jsx';
 
 export default function Importar() {
   // `null` = todavía no pasó por ese paso.
@@ -68,12 +69,14 @@ export default function Importar() {
               onListo={(c) => { setConfirmado(c); setPaso(4); }}
             />
           )}
-          {paso === 4 && confirmado && (
-            // Tarea 13: acá va la escritura. El placeholder existe para que
-            // el paso 4 no sea una pantalla en blanco mientras tanto.
-            <pre style={{ fontSize: 12 }}>
-              {JSON.stringify(confirmado.resumen, null, 2)}
-            </pre>
+          {paso === 4 && confirmado && archivo && columnas && (
+            <Paso4Escribir
+              confirmado={confirmado}
+              archivo={{ archivo: archivo.archivo, hoja: archivo.hoja, mapa: columnas.mapa }}
+              onReiniciar={() => {
+                setArchivo(null); setColumnas(null); setConfirmado(null); setPaso(1);
+              }}
+            />
           )}
         </div>
       </Page>
