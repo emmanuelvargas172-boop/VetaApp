@@ -225,14 +225,20 @@ export default function Importaciones() {
 
             {desh && (
               <div style={{ margin: '8px 0 0', paddingTop: 8, borderTop: '1px solid var(--divider)' }}>
-                {/* Los dos casos de "no borré nada" se distinguen, porque la
-                    causa solo se puede afirmar en uno. Si quedaron mascotas
-                    conservadas, no borró porque tenían algo encima. Si no
-                    quedó ninguna, el import no había escrito nada y decir que
-                    la clínica escribió encima sería inventar la causa.
-                    Afirmar "Borré 0 tutores y 0 mascotas" era peor que las
-                    dos: el deshacer funcionó y la frase se lee como que
-                    falló. */}
+                {/* Sin nada borrado hay dos casos distintos y hay que
+                    separarlos, pero ninguno de los dos puede afirmar POR QUÉ
+                    no había nada. Los contadores de 014 miden lo que existía
+                    al momento de deshacer: que una mascota no se haya borrado
+                    ni conservado significa que no estaba, y eso puede ser
+                    porque el import nunca la creó o porque la clínica la borró
+                    a mano después. Acá esa frase es más peligrosa que en el
+                    paso 4 —allá pasan segundos, acá pueden pasar seis meses— y
+                    quedaría justo debajo de la línea que dice "53 tutores · 54
+                    mascotas".
+
+                    Y la lista de ceros tampoco va: "Borré 0 tutores y 0
+                    mascotas" se lee como que el deshacer falló, justo cuando
+                    funcionó. */}
                 <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-muted)' }}>
                   {borrado.length > 0
                     ? <>Borré {borrado.join(', ')}.</>
