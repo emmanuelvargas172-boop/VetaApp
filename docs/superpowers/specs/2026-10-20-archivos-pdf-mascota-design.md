@@ -181,13 +181,52 @@ más nuevo primero.
 
 ### RLS
 
-`archivos_mascota` se **agrega a la lista de tablas del bucle** de
-`001_init.sql:110-125`, que aplica `auth.uid() = user_id` tabla por tabla.
+La política se escribe **dentro de `015`**, en el molde de
+`012_importaciones.sql:70-77`:
 
-No se escribe una política aparte. Si se escribe aparte, la próxima vez que
-alguien toque el bucle esta tabla queda afuera y nadie se entera — y lo que
-queda afuera es el acceso a documentos clínicos de clientes de otra
-clínica.
+```sql
+alter table public.archivos_mascota enable row level security;
+drop policy if exists "own_rows_archivos_mascota" on public.archivos_mascota;
+create policy "own_rows_archivos_mascota" on public.archivos_mascota
+  for all to authenticated
+  using      (auth.uid() = user_id and public.esta_activo())
+  with check (auth.uid() = user_id and public.esta_activo());
+```
+
+#### Corregido el 2026-10-20: por qué NO va en el bucle de `001`
+
+La versión anterior de esta sección decía que `archivos_mascota` se agregara
+a la lista de tablas del bucle de `001_init.sql:112-115`. Está mal por dos
+motivos, y el segundo es grave:
+
+1. **`001` ya corrió en producción.** Editar su texto no vuelve a ejecutarlo.
+   La tabla nacería con RLS apagada y sin ninguna política: cualquier cuenta
+   vería los documentos clínicos de todas las demás.
+2. **El `create policy` del bucle es desnudo** (`001:119`) — sin
+   `drop policy if exists`. Si alguien corriera `001` de nuevo en un
+   proyecto nuevo, revienta con `42710` a la mitad. Es exactamente el motivo
+   por el que `012` dejó de usar ese molde.
+
+El miedo de la versión anterior —"si se escribe aparte, el día que alguien
+toque el bucle esta tabla queda afuera"— apunta al revés: la tabla que queda
+afuera es la que *depende* del bucle. Una política con nombre propio en su
+propia migración no depende de nada.
+
+#### Y por qué lleva `esta_activo()`
+
+El bucle de `001` es de antes de que existieran las suscripciones. Toda
+tabla desde `002` lleva las dos condiciones: `002_admin.sql:253-254`,
+`003_cobros.sql:90-91`, `004_planes.sql:98-99` y `106-107`,
+`012_importaciones.sql:70-77`.
+
+Sin `esta_activo()`, una clínica con la suscripción vencida sigue subiendo
+PDFs de 5 MB a un bucket que el dueño paga. Y la regla del proyecto es que
+el bloqueo por suscripción vive en RLS, no en React: en React se salta con
+F12.
+
+La función es la de `007_pagos.sql:54` —la que sabe vencer— y devuelve
+`true` cuando no hay perfil, así que no bloquea a nadie por una fila
+faltante.
 
 ---
 
@@ -354,20 +393,34 @@ Aparte y no inline: `Historias.jsx` ya tiene 852 líneas y es el archivo que
 más hay que leer para entender la app. Metiendo esto adentro llega a ~1100
 y empeora con cada cosa que se le agregue después.
 
-**`archivos/limites.js`** — funciones puras, sin React:
+**`archivos/limites.js`** — qué se deja subir. Funciones puras, sin React:
 
 ```js
+export const MAX_BYTES = 5242880;   // el mismo número que el check de 015
+export const MAX_POR_MASCOTA = 10;
 // `cuantosHay` es el conteo actual de esa mascota: el tope de 10 no se
 // puede decidir mirando solo el archivo.
 export function revisarArchivo(file, cuantosHay)  // → { ok } | { ok:false, motivo }
-export const ETIQUETA_TIPO            // llave de la base → etiqueta que se lee
-export function textoArchivo(a)        // la línea que se lee en la lista
 ```
 
-Afuera del JSX por el mismo motivo que `importador/textos.js:6`: son las
-frases que más importan y adentro del componente no se pueden probar. El
-mensaje de "este PDF pesa 12 MB" es el único lugar donde la clínica se
-entera de qué hacer; si se rompe, se rompe en silencio.
+**`archivos/textos.js`** — las frases. También puras:
+
+```js
+export const ETIQUETA_TIPO     // llave de la base → etiqueta que se lee
+export function textoArchivo(a) // la línea que se lee en la lista
+```
+
+**Corregido el 2026-10-20: son dos archivos, no uno.** La versión anterior
+metía `ETIQUETA_TIPO` y `textoArchivo` dentro de `limites.js`. Un archivo
+llamado "limites" que además guarda el diccionario de etiquetas es un
+archivo cuyo nombre miente, y el repo ya tiene la separación hecha en el
+importador: `nucleo/` decide, `textos.js` redacta
+(`importador/textos.js:1-8`). Se sigue ese corte.
+
+Los dos van afuera del JSX por el motivo que `importador/textos.js:6` deja
+escrito: adentro del componente no se pueden probar. El mensaje de "este PDF
+pesa 12 MB" es el único lugar donde la clínica se entera de qué hacer; si se
+rompe, se rompe en silencio.
 
 ### El formulario
 
@@ -486,9 +539,25 @@ que existe hoy: borrar una mascota deja su foto en el bucket para siempre.
 
 ## 7. La columna "Espacio" en el Admin
 
-Va en `admin_listar_veterinarias()` (`002_admin.sql:135`), que ya es
-`security definer` y ya valida `es_admin()` en `:152`: una columna más en
-el `returns table`, y una más en la tabla de `Admin.jsx:380`.
+Va en `admin_listar_veterinarias()`, que ya es `security definer` y ya
+valida `es_admin()` antes de devolver nada: una columna más en el
+`returns table`, y una más en la tabla de `Admin.jsx:380`.
+
+**Corregido el 2026-10-20:** esta sección decía `002_admin.sql:135`. Esa es
+la **primera** versión de la función, de ocho columnas. La que está viva hoy
+se redefinió tres veces —`004_planes.sql:117`, `005_prueba.sql:124` y por
+última vez `007_pagos.sql:331`— y devuelve once columnas, con `plan`,
+`prueba_hasta` y `suscripcion_hasta`. `015` tiene que partir de **esa**, no
+de la de `002`.
+
+Si se parte de la de `002`, el `drop function` + `create` deja una función
+de nueve columnas y `Admin.jsx` pierde de golpe el selector de plan
+(`:425`), el badge de días de prueba (`:411-414`) y el botón "+8 días"
+(`:440`). Tres cosas que funcionan hoy, rotas por copiar la línea
+equivocada.
+
+Y como cambia la firma de salida, va `drop function if exists` antes del
+`create or replace` — mismo paso que `007:329` tuvo que dar por lo mismo.
 
 Un KPI nuevo arriba (`Admin.jsx:340`): **"Espacio total"**, para ver de
 una si va por 200 MB o por 900 del giga del plan gratis.
@@ -604,6 +673,35 @@ Separadas por lo que de verdad verifica cada una.
 
 El subtítulo de `Historias.jsx`:
 - con 1 consulta dice "1 consulta", no "1 consultas"
+
+#### Cómo se prueba el subtítulo, dado que no hay jsdom
+
+**Verificado el 2026-10-20:** el proyecto no tiene `vitest.config.*` ni
+`@testing-library/*` en `package.json`, y `paso3Revisar.test.jsx:1-10` lo
+deja escrito: *"en este entorno de vitest sin jsdom no"*. O sea que no se
+puede renderizar un componente en una prueba, y una prueba que pretenda
+hacerlo no compila.
+
+La línea se saca entonces a una función pura **exportada desde
+`pages/Historias.jsx`**, con el precedente exacto de `calcular`, que
+`paso3Revisar.test.jsx:12` importa de un `.jsx`:
+
+```js
+export const subtituloPaciente = (consultas, vacunas, archivos) => [
+  n(consultas, 'consulta', 'consultas'),
+  n(vacunas,   'vacuna',   'vacunas'),
+  n(archivos,  'archivo',  'archivos'),
+].join(' · ');
+```
+
+La prueba la importa con `vi.mock('../lib/supabase.js', …)` antes del
+import, igual que `paso3Revisar.test.jsx:10`: `Historias.jsx` importa
+`api/axios`, que importa `lib/supabase.js`, que hace `window.supabase = …`
+en DEV (`lib/supabase.js:21`) — y sin `window` eso revienta al importar.
+
+No va a `archivos/textos.js`: el subtítulo cuenta consultas y vacunas, que
+no tienen nada que ver con archivos. Guardarlo ahí lo esconde del único
+lugar donde alguien lo buscaría.
 
 ### Contra Postgres de verdad
 
