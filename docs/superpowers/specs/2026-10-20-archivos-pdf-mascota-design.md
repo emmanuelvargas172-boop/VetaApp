@@ -1,0 +1,612 @@
+# Archivos PDF por mascota · diseño
+
+Que la clínica suba documentos clínicos en PDF y queden colgados del
+animal, ordenados por lo que la clínica escribe al subirlos.
+
+Escrito el 2026-10-20. Nace de un pedido del dueño: *"hay que agregar un
+apartado en donde se puedan subir las historias clinicas de los animales en
+pdf"*, y de cómo él mismo lo ordenó después: *"cuando se sube el PDF se
+pone tipo de documento, chequeo, que el animal se le hizo unos exámenes
+[…] se coloca la fecha […] y las especificaciones. Y así se tiene un orden
+mejor."*
+
+---
+
+## 1. El problema
+
+`historias_clinicas` (`001_init.sql:33`) guarda lo que la veterinaria
+**escribe** en VetaApp: motivo, diagnóstico, tratamiento, medicamentos,
+peso. Eso cubre la consulta de hoy.
+
+No cubre dos cosas que llegan en papel o en PDF y que hoy no tienen dónde
+vivir:
+
+- **El pasado del animal.** Una clínica que entra a VetaApp tiene historias
+  en carpetas de cartón. Ese pasado es dato clínico —qué cirugía tuvo, a
+  qué reaccionó mal— y hoy se pierde, porque transcribir 54 historias a
+  mano no lo va a hacer nadie.
+
+- **Lo que no se escribe, se recibe.** Un hemograma, una radiografía, una
+  ecografía, la remisión de un especialista. Llegan como PDF desde el
+  laboratorio. Hoy quedan en el WhatsApp de la veterinaria o en una carpeta
+  del computador del mostrador, y cuando el animal vuelve en seis meses,
+  nadie los encuentra.
+
+Las dos clases de documento son del **animal**, no de una consulta de
+VetaApp. Por eso el modelo las trata igual.
+
+---
+
+## 2. Decisiones tomadas
+
+Las cuatro decisiones del dueño, en el orden en que se tomaron:
+
+1. **Los dos casos.** Historias viejas escaneadas y exámenes de ahora. No
+   uno de los dos.
+2. **Límites apretados** (5 MB por archivo, 10 por mascota) **más una
+   columna "Espacio" en el panel de Admin**, para que él vea cuánto gasta
+   cada clínica.
+3. **El frontend borra los archivos junto con las filas, y además hay un
+   barrido manual** para los huérfanos que el camino normal no cubre.
+4. **Tipo de documento, fecha del documento y descripción**, los dos
+   últimos opcionales.
+
+Y una quinta, que salió de él a mitad del diseño: **los PDFs no se unen a
+las consultas.** Cuelgan solo de la mascota.
+
+### Por qué no se unen a las consultas
+
+La versión anterior de este diseño tenía una columna `historia_id`
+nullable: un PDF podía además pertenecer a una consulta. Se quitó.
+
+`historia_id` solo se gana el puesto si alguien, parado dentro de una
+consulta, quiere ver los archivos de **esa** consulta. Nadie lo pidió. La
+lista de la mascota sale completa en los dos casos, y el tipo más la fecha
+del documento ya dicen de qué es cada archivo.
+
+Y la dirección importa: agregar una columna nullable después es una
+migración de una línea. Quitar una columna que ya tiene datos y código
+encima, no.
+
+### Por qué la app no lee el PDF por dentro
+
+No se extrae nada del contenido del archivo. Ni texto, ni fechas, ni
+nombres. Lo único que organiza un documento es lo que la clínica escribe
+al subirlo.
+
+Un dato que la app adivina de un escaneo se muestra con la misma cara que
+un dato que alguien verificó. Un diagnóstico mal leído de una fotocopia
+torcida, mostrado como si fuera cierto, es peor que no mostrar nada.
+
+### Por qué los dos campos opcionales son opcionales
+
+`fecha_documento` y `descripcion` no son obligatorios, y la pantalla **dice
+que son opcionales**.
+
+Si fueran forzosos, la clínica pondría cualquier cosa para pasar la
+pantalla: la fecha de hoy en un papel de 2023, un punto en la descripción.
+Un dato inventado que se lee como cierto es peor que un campo vacío. Mismo
+criterio que las tres columnas de `011_ficha_completa.sql:31`.
+
+---
+
+## 3. Los datos · migración `015_archivos_mascota.sql`
+
+```sql
+create table if not exists public.archivos_mascota (
+  id              bigint generated always as identity primary key,
+  user_id         uuid   not null default auth.uid() references auth.users(id) on delete cascade,
+  mascota_id      bigint not null references public.mascotas(id) on delete cascade,
+
+  tipo            text   not null,
+  descripcion     text,
+  fecha_documento text,
+
+  ruta            text   not null,
+  nombre_original text   not null,
+  peso_bytes      bigint not null,
+
+  created_at      timestamptz not null default now()
+);
+```
+
+### Las dos fechas
+
+`created_at` es cuándo se subió. `fecha_documento` es de cuándo es el
+papel.
+
+Son dos columnas y no una porque el caso principal las separa: un
+laboratorio de marzo de 2023 escaneado en octubre de 2026 tiene las dos, y
+son distintas. Con una sola, la historia del animal queda en orden
+mentiroso — todo su pasado fechado el día en que alguien lo escaneó.
+
+Es el mismo error que `011_ficha_completa.sql:21` evita guardando
+`fecha_nacimiento` en vez de la edad: un dato congelado en el día en que
+alguien lo escribió se vuelve mentira solo.
+
+### El formato de `fecha_documento`
+
+```sql
+check (fecha_documento is null or fecha_documento ~ '^\d{4}-\d{2}-\d{2}$')
+```
+
+Idéntico a `mascotas_fecha_nacimiento_iso` (`011:74`), y por el mismo
+motivo: sin el check, `1/06/2021` queda guardado y `new Date()` lo
+interpreta como 1 de junio o 6 de enero según el navegador. El mismo
+documento tendría dos fechas en dos computadores de la misma clínica.
+
+Va dentro de un bloque `do $$ … end $$` que pregunta por `pg_constraint`
+primero, porque Postgres no tiene `add constraint if not exists` y la
+migración tiene que poder correrse dos veces.
+
+### El tipo
+
+```sql
+check (tipo in ('chequeo','examenes','imagenes','cirugia','historia_anterior','otro'))
+```
+
+**Cerrado, no texto libre.** Con texto libre, en seis meses hay `Examen`,
+`examenes`, `EXÁMENES` y `lab` en la misma columna, y no sirve para agrupar
+ni filtrar nada. Con el check, agregar un tipo es una línea de migración y
+queda registrado cuándo y por qué se agregó.
+
+**Las llaves van sin tildes y en minúscula.** La etiqueta que se lee
+—"Exámenes", "Historia anterior"— vive en el frontend. Si la llave
+guardada fuera `'Exámenes'`, una fila escrita desde el SQL Editor sin la
+tilde sería un tipo distinto que no cae en ningún filtro, y el check la
+rechazaría sin que se entienda por qué.
+
+El vocabulario es el del dueño, no el mío: él dijo "chequeo" y "exámenes".
+Los que venden esto son él y las clínicas.
+
+### El peso
+
+```sql
+check (peso_bytes > 0 and peso_bytes <= 5242880)
+```
+
+5 MB exactos. El `> 0` rechaza un PDF de cero bytes, que es lo que deja un
+escáner que falló a mitad: la fila existe, la pantalla lo muestra como
+disponible, y no abre.
+
+### Índice
+
+```sql
+create index if not exists idx_archivos_mascota
+  on public.archivos_mascota(mascota_id, created_at desc);
+```
+
+Es la única consulta que hace la pantalla: los archivos de esta mascota, el
+más nuevo primero.
+
+### RLS
+
+`archivos_mascota` se **agrega a la lista de tablas del bucle** de
+`001_init.sql:110-125`, que aplica `auth.uid() = user_id` tabla por tabla.
+
+No se escribe una política aparte. Si se escribe aparte, la próxima vez que
+alguien toque el bucle esta tabla queda afuera y nadie se entera — y lo que
+queda afuera es el acceso a documentos clínicos de clientes de otra
+clínica.
+
+---
+
+## 4. El bucket
+
+```sql
+insert into storage.buckets (id, name, public)
+values ('documentos', 'documentos', false)
+on conflict (id) do nothing;
+```
+
+Privado. Las cuatro políticas son copia literal de `001_init.sql:135-149`
+con `'documentos'` en lugar de `'mascotas'`: misma carpeta
+`{user_id}/...`, mismo `(storage.foldername(name))[1] = auth.uid()::text`.
+
+Ruta de cada objeto: `{user_id}/{mascota_id}/{timestamp}-{aleatorio}.pdf`.
+
+**No lleva el `id` de la fila**, aunque sería más bonito. El orden de la
+sección 6 es subir primero y insertar después, así que en el momento de
+subir el `id` todavía no existe — lo genera Postgres en el insert. Poner el
+`id` en la ruta obligaría a insertar primero, que es el orden que deja
+filas mentirosas.
+
+El `{aleatorio}` va además del timestamp porque dos archivos subidos en el
+mismo milisegundo —la clínica seleccionando 8 escaneos de una— chocarían.
+`subirFoto` (`api/axios.js:112`) usa solo `Date.now()` y tiene ese hueco;
+acá no se copia.
+
+### Por qué un bucket nuevo y no el de fotos
+
+Los límites son distintos (PDF de 5 MB vs. foto), los tipos permitidos son
+distintos, y el barrido de la sección 6 apunta a un bucket sin riesgo de
+tocar fotos. Un bucket con dos clases de cosas adentro obliga a que toda
+regla pregunte primero "¿esto es foto o documento?".
+
+### Los límites, en tres capas
+
+1. **Frontend** — mira `file.size` y `file.type` antes de subir. Es la
+   única capa que puede decir algo útil: *"Este PDF pesa 12 MB y el máximo
+   son 5. Si lo escaneaste en color, volvé a escanearlo en blanco y
+   negro."*
+2. **`check` en la tabla** — atrapa cualquier inserción que no pase por la
+   pantalla.
+3. **El bucket** — `file_size_limit` y `allowed_mime_types`.
+
+Tres y no una porque la primera es la que ayuda y la más fácil de
+saltarse, y la tercera es la que nadie puede saltarse y no sabe
+explicarse.
+
+### El límite de 10 por mascota
+
+Las tres capas de arriba son del **tamaño**. El tope de cantidad es otra
+cosa y no cabe en un `check`: un `check` mira una fila, y "cuántas hay" es
+una pregunta sobre la tabla entera.
+
+Se hace con un trigger `before insert`:
+
+```sql
+create or replace function public.limite_archivos_mascota()
+returns trigger language plpgsql as $$
+begin
+  if (select count(*) from public.archivos_mascota
+       where mascota_id = new.mascota_id) >= 10 then
+    raise exception 'limite_archivos_mascota';
+  end if;
+  return new;
+end $$;
+```
+
+Y el frontend cuenta antes de ofrecer el botón, para que el mensaje sea
+útil (*"Esta mascota ya tiene 10 archivos. Borrá uno para subir otro."*) en
+vez de un error de Postgres.
+
+El trigger levanta un nombre seco y no una frase en español a propósito: la
+frase que lee la clínica vive en `archivos/limites.js`, donde se puede
+probar. Un mensaje bonito dentro del `raise exception` es una cadena que
+nadie prueba y que sale cruda si el frontend no la reconoce.
+
+**Esto no es a prueba de carreras.** Dos subidas simultáneas de la misma
+mascota pueden pasar las dos el `count` y dejar 11. Se acepta: el daño de
+once archivos donde caben diez es cero, y la alternativa —bloquear la fila
+de la mascota en cada subida— es complejidad real por un problema
+imaginario en una clínica donde sube archivos una persona a la vez.
+
+### Pendiente de verificar antes de escribir la migración
+
+La documentación de Supabase muestra `fileSizeLimit: '1MB'` y
+`allowedMimeTypes: ['image/*']` por el cliente de JavaScript, pero **no
+documenta los nombres de columna para ponerlos por SQL**.
+
+Correr en el SQL Editor antes de escribir la capa 3:
+
+```sql
+select column_name, data_type
+from information_schema.columns
+where table_schema = 'storage' and table_name = 'buckets'
+order by ordinal_position;
+```
+
+Si existen `file_size_limit` y `allowed_mime_types`, la capa 3 va en la
+migración. Si no, se configura a mano en el dashboard y **la migración lo
+dice en un comentario**, en vez de llevar un SQL que no corre. Las capas 1
+y 2 no dependen de esto.
+
+### Cómo se abre un PDF: URL firmada
+
+```js
+const { data } = await supabase.storage
+  .from('documentos')
+  .createSignedUrl(ruta, 300);
+```
+
+Se pide en el momento del clic, vive 5 minutos, y **no se guarda** en la
+tabla ni en el estado de React.
+
+Esto es deliberadamente lo contrario de lo que hace el código de hoy.
+`api/axios.js:116` guarda `getPublicUrl(...)` de un bucket privado — una
+URL que no resuelve. Ese patrón no se copia.
+
+Y hay una razón más fuerte que ese bug: una URL firmada guardada en la base
+es una llave con fecha de vencimiento escrita en un campo de texto. Dentro
+de un año la fila sigue ahí y la llave ya no sirve; o peor, todavía sirve.
+
+---
+
+## 5. La pantalla
+
+### Dónde va
+
+Tercer tab en `pages/Historias.jsx`. Las tabs son un arreglo literal en
+`:468-470`, así que es una entrada más:
+
+```js
+{ key: 'archivos', label: 'Archivos', count: archivos.length },
+```
+
+Y el panel al lado de los otros dos (`:492`):
+
+```jsx
+{tabActiva === 'archivos' && <ArchivosMascota mascotaId={mascota.id} />}
+```
+
+No va en una página nueva ni en la ficha de la mascota. Va donde el
+veterinario ya está mirando el historial del animal.
+
+### Archivos nuevos
+
+**`components/ArchivosMascota.jsx`** — la lista y el formulario.
+
+Aparte y no inline: `Historias.jsx` ya tiene 852 líneas y es el archivo que
+más hay que leer para entender la app. Metiendo esto adentro llega a ~1100
+y empeora con cada cosa que se le agregue después.
+
+**`archivos/limites.js`** — funciones puras, sin React:
+
+```js
+// `cuantosHay` es el conteo actual de esa mascota: el tope de 10 no se
+// puede decidir mirando solo el archivo.
+export function revisarArchivo(file, cuantosHay)  // → { ok } | { ok:false, motivo }
+export const ETIQUETA_TIPO            // llave de la base → etiqueta que se lee
+export function textoArchivo(a)        // la línea que se lee en la lista
+```
+
+Afuera del JSX por el mismo motivo que `importador/textos.js:6`: son las
+frases que más importan y adentro del componente no se pueden probar. El
+mensaje de "este PDF pesa 12 MB" es el único lugar donde la clínica se
+entera de qué hacer; si se rompe, se rompe en silencio.
+
+### El formulario
+
+Pide, en este orden: el archivo, el tipo (desplegable, obligatorio), la
+fecha del documento (opcional) y la descripción (opcional). Los dos
+opcionales dicen "opcional" en la pantalla.
+
+### La lista
+
+Por fila: el tipo como etiqueta, la fecha del documento si la hay, la
+descripción, y el nombre original del escáner en letra chica. El más nuevo
+arriba — es el orden del índice.
+
+El nombre original se muestra aunque sea `scan_0001.pdf`: es lo que la
+clínica reconoce si tiene que buscar el mismo archivo en su computador.
+Pero va en chico, porque no es lo que identifica el documento.
+
+Clic en una fila → se pide la URL firmada y se abre en pestaña nueva.
+
+### Lo que se modifica
+
+- `pages/Historias.jsx` — entrada de tab, panel, y el subtítulo (abajo)
+- `api/axios.js` — las rutas de la sección 6
+
+### El plural del subtítulo
+
+`Historias.jsx:410` arma hoy:
+
+```js
+subtitle={`${consultas.length} consultas · ${vacunas.length} vacunas`}
+```
+
+Con una sola consulta dice **"1 consultas"**. El bug ya está ahí, y es
+exactamente el que `importador/textos.js:16` describe. Agregar
+`${archivos.length} archivos` sin más agrega un tercer "1 archivos" a la
+misma línea.
+
+Esa línea pasa a usar `n()` (`importador/textos.js:20`), lo que **arregla
+de paso los otros dos**. Es la línea que se está tocando, no una
+refactorización suelta.
+
+---
+
+## 6. Las rutas, el borrado y el barrido
+
+Cuatro rutas, en el patrón de tabla `{ m, re, fn }` que ya usa
+`api/axios.js`:
+
+```
+GET    /archivos/mascota/:id   → lista
+POST   /archivos               → sube al bucket + inserta la fila
+GET    /archivos/:id/url       → createSignedUrl(ruta, 300)
+DELETE /archivos/:id           → .remove() del bucket + borra la fila
+```
+
+### El orden de las dos operaciones, en cada sentido
+
+**Al subir: primero el bucket, después la fila.** Si se cae en el medio,
+queda un archivo sin fila — un huérfano, que el barrido limpia. Al revés
+quedaría una fila apuntando a un archivo que no existe, y la pantalla lo
+muestra como un PDF disponible que no abre.
+
+Falla mejor un huérfano que una fila mentirosa.
+
+**Al borrar: primero el bucket, después la fila** — y la fila se borra
+**solo si `.remove()` devolvió sin error**. Si el `.remove()` falla, la fila
+se queda y el usuario ve "no se pudo borrar", que es la verdad. Al revés
+quedaría una fila sin archivo, que es el caso peor.
+
+### Borrar una mascota
+
+`api/axios.js:223` hoy solo borra la fila. Pasa a: listar los archivos de
+la mascota, `.remove()` de todas las rutas en una llamada, y después borrar
+la fila.
+
+Postgres borra en cascada las **filas**, no los **archivos**:
+`storage.objects` no tiene ninguna llave hacia `mascotas`. Sin esto, los
+PDFs quedan en el bucket cobrando para siempre, y la columna "Espacio"
+empieza a contar basura — lo contrario de para qué se pidió.
+
+### El barrido de huérfanos
+
+Edge function `limpiar-huerfanos`, en el molde de `pago-webhook` que ya
+existe.
+
+1. Lista los objetos de los buckets `documentos` **y** `mascotas`.
+2. Compara contra `archivos_mascota.ruta` y `mascotas.foto`.
+3. Lo que no tenga fila, lo borra **por la Storage API**.
+
+**Nunca con SQL, y esto está verificado, no supuesto.** La documentación
+oficial dice: *"Deleting objects should always be done via the Storage API
+and NOT via a SQL query […] will result in the object being orphaned."* Y
+desde el 5 de marzo de 2026 Supabase lo rechaza activamente: *"A new
+statement-level trigger now rejects DELETE on Storage schema tables unless
+the session variable `storage.allow_delete_query` is set to true."*
+
+Un trigger en Postgres que borrara el objeto era la primera idea de este
+diseño. Se descartó al verificar: era la causa más común del problema que
+pretendía resolver.
+
+La variante "trigger + `pg_net` llamando a la Storage API" también se
+descarta: obliga a guardar la `service_role` key dentro de Postgres, la
+llamada es asíncrona y sin manejo de error, y la documentación no la
+respalda. Meter una llave de servicio en la base para ahorrar una llamada
+de frontend es un mal cambio.
+
+**Quién la puede llamar.** Corre con `service_role` porque mira cuentas que
+no son la del invocador, y **lo primero que hace es validar `es_admin()`**
+(`002_admin.sql:78`). Una función que puede borrar archivos de todas las
+clínicas y no pregunta quién la llamó es una puerta abierta.
+
+**Cubre el bucket de fotos gratis**, con el mismo código. Eso tapa una fuga
+que existe hoy: borrar una mascota deja su foto en el bucket para siempre.
+
+---
+
+## 7. La columna "Espacio" en el Admin
+
+Va en `admin_listar_veterinarias()` (`002_admin.sql:135`), que ya es
+`security definer` y ya valida `es_admin()` en `:152`: una columna más en
+el `returns table`, y una más en la tabla de `Admin.jsx:380`.
+
+Un KPI nuevo arriba (`Admin.jsx:340`): **"Espacio total"**, para ver de
+una si va por 200 MB o por 900 del giga del plan gratis.
+
+### El número sale del bucket, no de la tabla
+
+La suma se hace sobre `storage.objects` por carpeta `{user_id}`, no sobre
+`sum(peso_bytes)` de `archivos_mascota`.
+
+Porque lo que se quiere saber es **lo que Supabase cobra**, y eso incluye
+los huérfanos. Sumando la tabla propia, el número diría lo que creemos que
+hay, no lo que hay — y los huérfanos, que son justo el problema, serían
+invisibles.
+
+Efecto secundario bueno: después de correr el barrido, el número baja a la
+vista. Ahí se comprueba que el barrido funcionó.
+
+### Pendiente de verificar antes de escribir la función
+
+`storage.objects` guarda el tamaño dentro de una columna `metadata` de tipo
+`jsonb`, pero el nombre exacto de la llave no está verificado en este
+proyecto. Correr en el SQL Editor:
+
+```sql
+select metadata from storage.objects limit 1;
+```
+
+Si el tamaño viene como `metadata->>'size'`, la suma es directa. Si viene
+con otro nombre, se ajusta. La migración no se escribe antes de esta
+consulta.
+
+---
+
+## 8. Lo legal
+
+`pages/Legal.jsx:63` enumera hoy qué datos se guardan: cuenta, correo,
+nombre y foto de Google. No menciona documentos clínicos de animales de
+terceros.
+
+Cuando la clínica sube la historia de un animal, entra un documento con el
+nombre del animal, el del tutor y a veces su cédula. La política de
+privacidad tiene que decirlo.
+
+La frase nueva tiene que decir la verdad de lo que hace `015`: documentos
+en bucket privado, accesibles solo por la cuenta que los subió, borrables
+por ella, y acceso por enlaces que vencen en 5 minutos. Cada parte de esa
+frase apunta a una línea de código verificable:
+
+| Lo que dirá la política | Lo que lo cumple |
+|---|---|
+| bucket privado | `storage.buckets.public = false` |
+| solo la cuenta que los subió | las 4 políticas de `storage.objects` por carpeta |
+| borrables por ella | `DELETE /archivos/:id` + `.remove()` |
+| enlaces que vencen | `createSignedUrl(ruta, 300)` |
+
+No se publica una frase que no se pueda rastrear a una de esas líneas.
+
+---
+
+## 9. Pruebas
+
+Separadas por lo que de verdad verifica cada una.
+
+### Sin navegador ni base (vitest, se suman a los 203 actuales)
+
+`limites.js`:
+- exactamente 5 MB → pasa
+- un byte más → falla, y el motivo nombra el tamaño y qué hacer
+- 0 bytes → falla
+- un `.jpg` renombrado a `.pdf` → falla (se mira `file.type`, no la extensión)
+- con 9 archivos ya subidos → pasa; con 10 → falla, y el motivo dice que
+  hay que borrar uno
+
+`textoArchivo`:
+- con fecha y con descripción
+- con fecha, sin descripción
+- sin fecha, sin descripción (el caso de la subida más rápida posible)
+- cada una de las seis llaves de tipo tiene etiqueta en `ETIQUETA_TIPO`
+  (si se agrega un tipo al check de `015` y no acá, esta prueba lo avisa)
+
+El subtítulo de `Historias.jsx`:
+- con 1 consulta dice "1 consulta", no "1 consultas"
+
+### Contra Postgres de verdad
+
+Bloques `do $$ … end $$` que terminan en `raise exception`, al final de la
+migración y comentados, como las cinco de `011_ficha_completa.sql:120`. La
+transacción se aborta y el resultado viaja en el mensaje de error: se
+prueba contra la base real sin dejar basura.
+
+- `fecha_documento`: acepta `2023-03-14`, acepta `null`, rechaza
+  `1/06/2021`, rechaza `'no sé'`
+- `tipo`: acepta `'examenes'`, rechaza `'Exámenes'` y rechaza `'lab'`
+- `peso_bytes`: acepta 5242880, rechaza 5242881, rechaza 0
+- el trigger de cantidad: la décima fila entra, la undécima revienta con
+  `limite_archivos_mascota`
+- RLS: la cuenta A no ve ni una fila de la cuenta B
+- cascada: borrar la mascota borra las filas de sus archivos
+
+### En el navegador, a mano
+
+Ninguna de las de arriba cubre esto:
+
+1. Subir un PDF, hacer clic, y que **abra de verdad**. Es la prueba de que
+   la URL firmada funciona y de que no se repitió el bug de
+   `getPublicUrl`.
+2. Borrar la mascota desde la app y confirmar **en el dashboard de
+   Supabase** que el archivo ya no está en el bucket.
+3. Borrar una mascota **desde el dashboard** (el camino que la parte B no
+   cubre), correr el barrido, y ver la columna "Espacio" bajar.
+
+La 3 es la única que prueba el barrido, y la única que no se puede
+automatizar.
+
+---
+
+## 10. Lo que este diseño NO hace
+
+- **No lee el PDF por dentro.** Ver sección 2.
+- **No une archivos a consultas.** Ver sección 2. Si se pide, es una
+  columna nullable y una migración de una línea.
+- **No arregla la foto de las mascotas.** `api/axios.js:116` guarda una URL
+  pública de un bucket privado, y es muy probable que las fotos no se vean.
+  Es un bug anterior y aparte; esta tarea solo se cuida de **no copiarlo**.
+  El barrido sí cubre las fotos huérfanas, porque sale gratis.
+- **No comparte documentos con el tutor.** Ni por WhatsApp ni por enlace.
+  Nadie lo pidió, y abrirlo significa decidir cuánto vive un enlace que
+  sale de la clínica — una decisión distinta de las cinco de arriba.
+- **No acepta otra cosa que PDF.** Ni fotos de la historia, ni Word. Si
+  entra `image/*`, el límite de 5 MB se topa con cualquier foto de celular
+  moderna y el escaneo de 8 páginas se vuelve 8 archivos sueltos.
+- **No avisa al dueño cuando una clínica se pasa de espacio.** La columna y
+  el KPI son para que él mire; no hay alerta. Con 1 o 2 clínicas la mira
+  cuando entra al Admin. A los 10 clientes eso se revisa de nuevo.
