@@ -52,9 +52,9 @@ create table if not exists public.archivos_mascota (
   nombre      text   not null,
 
   -- Las seis llaves van sin tildes a propósito: son valores de base de
-  -- datos, no texto de pantalla. Lo que la clínica lee sale de
-  -- ETIQUETA_TIPO en frontend/src/archivos/textos.js, que es donde se
-  -- puede cambiar la palabra sin tocar una migración ya corrida.
+  -- datos, no texto de pantalla. Lo que la clínica lea saldrá de
+  -- ETIQUETA_TIPO en frontend/src/archivos/textos.js (lo crea la Task 2),
+  -- que es donde se podrá cambiar la palabra sin tocar una migración ya corrida.
   tipo        text   not null check (tipo in (
                 'chequeo','examenes','imagenes','cirugia','historia_anterior','otro')),
 
@@ -159,19 +159,31 @@ create policy "own_rows_archivos_mascota" on public.archivos_mascota
 -- definer` contaría los de todas y una clínica quedaría bloqueada por los
 -- archivos de otra.
 --
--- NO es a prueba de carreras: dos inserts simultáneos pueden leer 9 los
--- dos y quedar 11. Se acepta. La alternativa es bloquear la fila de la
--- mascota en cada subida, que es complejidad real por un problema
--- imaginario en una clínica donde sube archivos una persona a la vez, y
--- el daño de un 11 donde caben 10 es cero.
+-- NO es a prueba de carreras: el limite es POR SENTENCIA, no por
+-- transaccion. Dos inserts simultaneos pueden leer 9 los dos, disparar
+-- el trigger sobre 9 cada uno, y quedar 11. Se acepta — la app sube de
+-- a un archivo por sentencia (POST /archivos, Task 4, inserta una sola
+-- fila), asi que el desborde no es alcanzable desde el producto; solo
+-- seria alcanzable escribiendo SQL a mano.
+--
+-- Ademas: un `insert ... values (...), (...)` de dos filas en UNA sola
+-- sentencia pasa por el trigger dos veces, pero ambas veces leen el mismo
+-- conteo pre-insert (las filas del mismo comando son invisibles entre si
+-- en los triggers `before`), asi que el limite se salta completamente —
+-- no queda 11, puede quedar cualquier numero. Por eso la restriccion
+-- correcta es "una fila por sentencia", que es lo que garantiza la ruta
+-- de la app. La alternativa seria bloquear la fila de la mascota en cada
+-- subida: complejidad real por un problema imaginario en una clinica donde
+-- sube archivos una persona a la vez.
 --
 -- El `raise exception` dice un nombre seco, no una frase en español. La
--- frase que lee la clínica vive en limites.js, que sí se puede probar;
+-- frase que lee la clínica vivirá en limites.js, que sí se puede probar;
 -- acá quedaría encerrada en una migración ya corrida. api/axios.js
--- reconoce este nombre y lo traduce.
+-- reconocerá este nombre y lo traducirá (lo construye la Task 4).
 create or replace function public.limite_archivos_mascota()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare cuantos int;
 begin
@@ -179,6 +191,8 @@ begin
     from public.archivos_mascota
    where mascota_id = new.mascota_id;
 
+  -- El 10 tiene un gemelo: MAX_POR_MASCOTA en frontend/src/archivos/limites.js
+  -- (lo crea la Task 2). Si se sube ese numero, cambiarlo acá tambien.
   if cuantos >= 10 then
     raise exception 'limite_archivos_mascota' using errcode = 'check_violation';
   end if;
@@ -193,9 +207,9 @@ create trigger trg_limite_archivos_mascota
 
 
 -- ---------- 6. EL BUCKET ----------
--- `public = false`: un PDF clínico no se sirve por URL pública. Se abre
--- con URL firmada de 300 s, pedida al momento del clic (ver
--- api/axios.js, GET /archivos/:id/url).
+-- `public = false`: un PDF clínico no se sirve por URL pública. Se abrirá
+-- con URL firmada de 300 s, pedida al momento del clic (la ruta es
+-- GET /archivos/:id/url, que construye la Task 4 con createSignedUrl).
 --
 -- `file_size_limit` es bigint EN BYTES, no la cadena '5MB' que usa el
 -- cliente de JavaScript — verificado contra information_schema el
@@ -228,6 +242,12 @@ drop policy if exists "documentos_insert_own" on storage.objects;
 drop policy if exists "documentos_update_own" on storage.objects;
 drop policy if exists "documentos_delete_own" on storage.objects;
 
+-- `select` tampoco mira la suscripción: la política de la tabla
+-- (own_rows_archivos_mascota, `for all`, línea 147) ya bloquea la fila
+-- a una clínica vencida, así que no puede pedir una URL firmada para un
+-- archivo que ya no ve. Lo que sí puede hacer es leer bytes de una ruta
+-- que tenga guardada de antes de vencer — eso es comportamiento aceptado,
+-- porque quien ya tenía la ruta no es la amenaza que defiende esta política.
 create policy "documentos_read_own"
   on storage.objects for select to authenticated
   using (bucket_id = 'documentos' and (storage.foldername(name))[1] = auth.uid()::text);
@@ -285,7 +305,8 @@ create policy "documentos_delete_own"
 --   exception when check_violation then rechazo := true;
 --   end;
 --
---   raise exception 'A: rechazo=% (esperado: true)', rechazo;
+--   raise exception 'A: % — el check de tipo rechazo un tipo invalido: rechazo=%',
+--     case when rechazo then 'OK' else 'FALLO' end, rechazo;
 -- end $$;
 
 -- ---------- PRUEBA B · el peso: 0, justo 5 MB, y un byte más ----------
@@ -314,7 +335,8 @@ create policy "documentos_delete_own"
 --   exception when check_violation then r_grande := true;
 --   end;
 --
---   raise exception 'B: cero=% grande=% (ambos deben ser true)', r_cero, r_grande;
+--   raise exception 'B: % — el check de peso rechazo cero y exceso: cero=% grande=%',
+--     case when r_cero and r_grande then 'OK' else 'FALLO' end, r_cero, r_grande;
 -- end $$;
 
 -- ---------- PRUEBA C · el décimo entra, el once no ----------
@@ -338,7 +360,8 @@ create policy "documentos_delete_own"
 --   exception when check_violation then freno := true;
 --   end;
 --
---   raise exception 'C: diez entraron, el once freno=% (esperado: true)', freno;
+--   raise exception 'C: % — el trigger freno el once: freno=%',
+--     case when freno then 'OK' else 'FALLO' end, freno;
 -- end $$;
 
 -- ---------- PRUEBA D · la fecha del documento solo acepta ISO ----------
@@ -362,7 +385,8 @@ create policy "documentos_delete_own"
 --   exception when check_violation then rechazo := true;
 --   end;
 --
---   raise exception 'D: rechazo_dmy=% (esperado: true)', rechazo;
+--   raise exception 'D: % — el check ISO rechazo el formato dd/mm/aaaa: rechazo=%',
+--     case when rechazo then 'OK' else 'FALLO' end, rechazo;
 -- end $$;
 
 -- ---------- PRUEBA E · la misma ruta no entra dos veces ----------
@@ -383,7 +407,8 @@ create policy "documentos_delete_own"
 --   exception when unique_violation then choco := true;
 --   end;
 --
---   raise exception 'E: choco=% (esperado: true)', choco;
+--   raise exception 'E: % — el unique de ruta rechazo la ruta duplicada: choco=%',
+--     case when choco then 'OK' else 'FALLO' end, choco;
 -- end $$;
 
 -- ---------- PRUEBA F · el bucket quedó con sus dos límites ----------
@@ -393,7 +418,9 @@ create policy "documentos_delete_own"
 --   select file_size_limit, array_to_string(allowed_mime_types, ',')
 --     into lim, tipos
 --     from storage.buckets where id = 'documentos';
---   raise exception 'F: limite=% tipos=% (esperado: 5242880 / application/pdf)', lim, tipos;
+--   raise exception 'F: % — limites del bucket: limite=% (esperado: 5242880) tipos=% (esperado: application/pdf)',
+--     case when lim = 5242880 and tipos = 'application/pdf' then 'OK' else 'FALLO' end,
+--     lim, tipos;
 -- end $$;
 
 -- ---------- PRUEBA G · borrar la mascota borra las filas de sus archivos ----------
@@ -418,5 +445,113 @@ create policy "documentos_delete_own"
 --   delete from public.mascotas where id = v_m;
 --
 --   select count(*) into quedaron from public.archivos_mascota where mascota_id = v_m;
---   raise exception 'G: filas que sobrevivieron=% (esperado: 0)', quedaron;
+--   raise exception 'G: % — cascada al borrar mascota: filas que sobrevivieron=%',
+--     case when quedaron = 0 then 'OK' else 'FALLO' end, quedaron;
 -- end $$;
+
+-- ---------- PRUEBA H · el trigger cuenta solo los archivos del invocador ----------
+--
+-- POR QUE EXISTE ESTA PRUEBA:
+-- El comentario de la funcion afirma que el count(*) queda acotado a la
+-- clinica que invoca porque la RLS se evalua con el rol invocador. Si eso
+-- fuera falso (por ejemplo, si alguien le agrega security definer), una
+-- clinica con 10 archivos bloquearia a todas las demas. Ninguna de las
+-- pruebas A-G cubre ese invariante: PRUEBA C corre como `postgres`, que
+-- salta la RLS, y por eso no puede detectar si el conteo cruza clinicas.
+--
+-- POR QUE NO ES UN BLOQUE do $$:
+-- `set role` dentro de plpgsql no funciona con la semantica de impersonacion
+-- que se necesita acá: el rol cambia pero request.jwt.claims no, y la
+-- funcion esta_activo() lee ese claim. La unica forma de impersonar un JWT
+-- completo en el SQL Editor es con `set local role` + `set_config` dentro
+-- de una transaccion explicita, igual que el Step 2 del brief. Un `do $$`
+-- que llame a `set role` haria el cambio de rol pero no tocaria los claims,
+-- asi que esta_activo() seguiria viendo el claim del postgres original y la
+-- prueba pasaria aunque la logica estuviera rota.
+--
+-- COMO CORRER:
+-- Descomentar TODO el bloque de abajo (desde `begin;` hasta `rollback;`)
+-- y pegarlo entero en el SQL Editor. Requiere al menos dos cuentas en
+-- auth.users con suscripcion activa. Si solo hay una, registrarse con otro
+-- correo antes de correr esto.
+--
+-- RESULTADO ESPERADO:
+-- Primera consulta (insercion 11 de cuenta 2): debe lanzar check_violation,
+--   lo que produce un error con mensaje que empieza con 'H: OK'.
+-- Si el mensaje empieza con 'H: FALLO', el trigger cruzó clinicas y el
+--   conteo de la cuenta 1 consumio presupuesto de la cuenta 2.
+--
+-- begin;
+--
+-- create temp table _ctas as
+--   select id, row_number() over (order by created_at) as n
+--   from auth.users order by created_at limit 2;
+--
+-- -- Cuenta 1: dueno, mascota y 10 archivos (como postgres, sin RLS).
+-- insert into public.duenos(user_id, nombre, telefono)
+--   select id, 'Prueba H c1', '3000000010' from _ctas where n = 1;
+-- insert into public.mascotas(user_id, nombre, especie, dueno_id)
+--   select d.user_id, 'Prueba H c1', 'perro', d.id
+--   from public.duenos d where d.telefono = '3000000010';
+-- -- Los 10 archivos de cuenta 1 se insertan como postgres (sin RLS activa).
+-- do $$
+-- declare v_u uuid; v_m bigint; i int;
+-- begin
+--   select m.user_id, m.id into v_u, v_m
+--     from public.mascotas m where m.nombre = 'Prueba H c1' limit 1;
+--   for i in 1..10 loop
+--     insert into public.archivos_mascota(user_id, mascota_id, ruta, nombre, tipo, peso_bytes)
+--       values (v_u, v_m, 'h/c1/' || i || '.pdf', i || '.pdf', 'otro', 1000);
+--   end loop;
+-- end $$;
+--
+-- -- Cuenta 2: dueno y mascota (como postgres, sin RLS activa).
+-- insert into public.duenos(user_id, nombre, telefono)
+--   select id, 'Prueba H c2', '3000000011' from _ctas where n = 2;
+-- insert into public.mascotas(user_id, nombre, especie, dueno_id)
+--   select d.user_id, 'Prueba H c2', 'perro', d.id
+--   from public.duenos d where d.telefono = '3000000011';
+--
+-- -- Ahora suplantamos la cuenta 2 con JWT real.
+-- set local role authenticated;
+-- select set_config('request.jwt.claims',
+--   json_build_object('sub', (select id from _ctas where n = 2),
+--                     'role', 'authenticated')::text,
+--   true);
+--
+-- -- Cuenta 2 inserta 10 archivos: deben entrar todos (cuenta 1 no los contamina).
+-- do $$
+-- declare v_m bigint; i int; error_prematuro boolean := false;
+-- begin
+--   select m.id into v_m
+--     from public.mascotas m where m.nombre = 'Prueba H c2' limit 1;
+--   for i in 1..10 loop
+--     begin
+--       insert into public.archivos_mascota(user_id, mascota_id, ruta, nombre, tipo, peso_bytes)
+--         values (auth.uid(), v_m, 'h/c2/' || i || '.pdf', i || '.pdf', 'otro', 1000);
+--     exception when check_violation then
+--       error_prematuro := true;
+--     end;
+--   end loop;
+--   if error_prematuro then
+--     raise exception 'H: FALLO — el trigger freno antes del archivo 11 de cuenta 2 (el conteo cruzo clinicas)';
+--   end if;
+-- end $$;
+--
+-- -- El archivo 11 de cuenta 2 debe ser rechazado.
+-- do $$
+-- declare v_m bigint; freno boolean := false;
+-- begin
+--   select m.id into v_m
+--     from public.mascotas m where m.nombre = 'Prueba H c2' limit 1;
+--   begin
+--     insert into public.archivos_mascota(user_id, mascota_id, ruta, nombre, tipo, peso_bytes)
+--       values (auth.uid(), v_m, 'h/c2/11.pdf', '11.pdf', 'otro', 1000);
+--   exception when check_violation then
+--     freno := true;
+--   end;
+--   raise exception 'H: % — el trigger freno el once de cuenta 2 sin contaminar con cuenta 1: freno=%',
+--     case when freno then 'OK' else 'FALLO' end, freno;
+-- end $$;
+--
+-- rollback;
