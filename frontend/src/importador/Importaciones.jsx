@@ -89,7 +89,14 @@ export default function Importaciones() {
   const cargar = () => {
     // El `||` no es decoración: un `message` vacío dejaría `error` falsy y la
     // pantalla trabada en "Cargando…" sin forma de salir.
-    listarImportaciones().then(setFilas)
+    //
+    // Y el `setError('')` del éxito tampoco: el aviso de arriba de la lista
+    // afirma que lo que se ve es de ANTES del error. Sin limpiarlo, una
+    // relectura que sí funcionó deja el aviso puesto diciendo que la lista
+    // está vieja cuando se acaba de releer — y el caso normal es justo ese,
+    // porque el `cargar()` de después de un deshacer exitoso pasa por acá.
+    listarImportaciones()
+      .then((f) => { setFilas(f); setError(''); })
       .catch((e) => setError(e?.message || 'No se pudo leer el historial de importaciones'));
   };
 
@@ -263,12 +270,19 @@ export default function Importaciones() {
                     borra ni conserva nada, caía en el último ramo, y la
                     pantalla decía "de este archivo no quedaba nada en la base"
                     y enseguida "Devolví 2 datos a como estaban" — o sea que sí
-                    quedaba, y eran de este archivo. */}
+                    quedaba, y eran de este archivo.
+
+                    Y el ramo de las conservadas dice "lo que QUEDABA de este
+                    archivo", no "lo que había entrado": por lo mismo de arriba,
+                    los contadores no ven lo que ya no está. Un import que creó
+                    dos mascotas, una con una consulta encima y la otra borrada
+                    a mano, cae en este ramo — y de la borrada a mano no es
+                    cierto que le quedó algo escrito encima. */}
                 <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-muted)' }}>
                   {borrado.length > 0
                     ? <>Borré {borrado.join(', ')}.</>
                     : conservadas.length > 0
-                      ? <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>
+                      ? <>No borré nada: a todo lo que quedaba de este archivo le quedó algo escrito encima.</>
                       : restaurados
                         ? <>No hubo clientes ni mascotas que borrar.</>
                         : <>No había nada que borrar: de este archivo no quedaba nada en la base.</>}

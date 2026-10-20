@@ -20,13 +20,13 @@ describe('lineaResumen', () => {
 
   it('dice qué entró, en una línea', () => {
     expect(lineaResumen({ resumen: RESUMEN })).toBe(
-      '53 tutores · 54 mascotas · 2 datos de tutores · 74 baños y desparasitaciones · 13 vacunas',
+      '53 tutores · 54 mascotas · 2 tutores a los que les completo datos · 74 baños y desparasitaciones · 13 vacunas',
     );
   });
 
   it('no escribe las partes en cero', () => {
     expect(lineaResumen({ resumen: { ...RESUMEN, vacunas: 0, tratamientos: 0 } })).toBe(
-      '53 tutores · 54 mascotas · 2 datos de tutores',
+      '53 tutores · 54 mascotas · 2 tutores a los que les completo datos',
     );
   });
 

@@ -110,7 +110,7 @@ export default function Paso1Archivo({ onListo }) {
         eso se arruinan las cédulas, los costos y las fechas.
         <br />
         El archivo no se sube a ninguna parte: se lee acá en tu computador y
-        lo único que viaja son los clientes que confirmes en el paso 4.
+        lo único que viaja son los clientes que confirmes en el paso 3.
       </p>
 
       {/* Se dice que el archivo no se sube porque es verdad y porque es lo

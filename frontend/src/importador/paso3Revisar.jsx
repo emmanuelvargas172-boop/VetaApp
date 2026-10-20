@@ -20,6 +20,10 @@ import { leerFilas, formatoDeFechasRoto } from './nucleo/filas.js';
 import { agrupar } from './nucleo/agrupar.js';
 import { armarPlan } from './nucleo/plan.js';
 import { traerExistentes } from './escribir.js';
+// `n` y no un plural pegado a mano: ver el comentario de textos.js:10. Los
+// tres contadores de abajo decían "1 tutores · 1 mascotas" con un archivo de
+// una fila, en la única pantalla que la clínica lee ANTES de confirmar.
+import { n } from './textos.js';
 
 /**
  * De la grilla del paso 2 al plan, en una función pura.
@@ -135,17 +139,17 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
       <div style={{ padding: '6px 0', borderTop: '1px solid var(--divider)', borderBottom: '1px solid var(--divider)' }}>
         <Fila
           etiqueta="Voy a crear"
-          valor={`${r.tutores_nuevos} tutores · ${r.mascotas_nuevas} mascotas`}
+          valor={`${n(r.tutores_nuevos, 'tutor', 'tutores')} · ${n(r.mascotas_nuevas, 'mascota', 'mascotas')}`}
         />
         <Fila
           etiqueta="Les voy a agregar"
-          valor={`${r.tratamientos} baños y desparasitaciones · ${r.vacunas} vacunas`}
+          valor={`${n(r.tratamientos, 'baño o desparasitación', 'baños y desparasitaciones')} · ${n(r.vacunas, 'vacuna', 'vacunas')}`}
           detalle={r.eventos_repetidos > 0 ? `${r.eventos_repetidos} ya estaban, esos no los repito` : ''}
         />
         {(r.tutores_a_completar > 0 || r.mascotas_a_completar > 0) && (
           <Fila
             etiqueta="Ya existen"
-            valor={`${r.tutores_a_completar} tutores · ${r.mascotas_a_completar} mascotas`}
+            valor={`${n(r.tutores_a_completar, 'tutor', 'tutores')} · ${n(r.mascotas_a_completar, 'mascota', 'mascotas')}`}
             detalle="les completo lo que tengan en blanco, no les piso nada"
           />
         )}

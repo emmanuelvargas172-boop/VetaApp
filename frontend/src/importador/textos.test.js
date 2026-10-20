@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir, textoRestaurados } from './textos.js';
+import { textoResultado, textoOmitidos, textoConservadas, textoDeshecho, textoVaAEscribir, textoRestaurados, n } from './textos.js';
 
 describe('textoResultado', () => {
   it('cuenta lo que devolvió Postgres', () => {
@@ -280,9 +280,32 @@ describe('textoVaAEscribir', () => {
     });
     expect(lineas).toContain('1 tutor');
     expect(lineas).toContain('1 mascota');
-    expect(lineas).toContain('1 dato de tutor');
-    expect(lineas).toContain('1 dato de mascota');
+    // "tutor al que le completo datos" y no "dato de tutor": el contador
+    // cuenta tutores, no campos (plan.js:504-506 usa el largo de
+    // `completar_tutores`, una entrada por id del existente). Dos tutores con
+    // tres campos en blanco cada uno son seis datos, y la pantalla decía dos.
+    expect(lineas).toContain('1 tutor al que le completo datos');
+    expect(lineas).toContain('1 mascota a la que le completo datos');
     expect(lineas).toContain('1 baño o desparasitación');
     expect(lineas).toContain('1 vacuna');
+  });
+});
+
+// `n` se exporta solo porque el paso 3 la necesita, y se testea acá porque
+// ese es el defecto que ningún test agarraba: paso3Revisar.jsx pegaba el
+// plural a mano —`${r.tutores_nuevos} tutores`— y un archivo de una sola fila
+// decía "1 tutores · 1 mascotas" en la pantalla que la clínica lee ANTES de
+// confirmar. Los números del piloto (53 y 54) no lo podían agarrar.
+describe('n', () => {
+  it('uno va en singular y el resto en plural', () => {
+    expect(n(1, 'tutor', 'tutores')).toBe('1 tutor');
+    expect(n(2, 'tutor', 'tutores')).toBe('2 tutores');
+  });
+
+  // El cero no es singular. Sale en el paso 3, en la fila "Ya existen", que
+  // se muestra si CUALQUIERA de los dos contadores es > 0: un archivo que
+  // solo le completa datos a mascotas pasa 0 en el de tutores.
+  it('el cero va en plural', () => {
+    expect(n(0, 'mascota', 'mascotas')).toBe('0 mascotas');
   });
 });

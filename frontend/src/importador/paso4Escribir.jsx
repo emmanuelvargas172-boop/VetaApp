@@ -181,8 +181,14 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
             // conserva nada, caía en el último ramo, y la pantalla decía "de
             // este archivo no quedaba nada en la base" y enseguida "Devolví 2
             // datos a como estaban".
+            //
+            // Dice "lo que QUEDABA de este archivo" y no "lo que había
+            // entrado": los contadores no ven lo que ya no está. Un import
+            // que creó dos mascotas, una con una consulta encima y la otra
+            // borrada a mano, cae en este ramo — y de la borrada a mano no es
+            // cierto que le quedó algo escrito encima.
             : conservadas.length > 0
-              ? <>No borré nada: a todo lo que había entrado por el archivo le quedó algo escrito encima.</>
+              ? <>No borré nada: a todo lo que quedaba de este archivo le quedó algo escrito encima.</>
               : restaurados
                 ? <>No hubo clientes ni mascotas que borrar.</>
                 : <>No había nada que borrar: de este archivo no quedaba nada en la base.</>}
@@ -209,13 +215,22 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
                 sobrevive —tiene que, ya está emitido— pero queda sin
                 paciente. Decir "se las habría llevado" de un cobro es
                 falso, y nombrar solo dos de los cinco contadores de 014
-                es falso en los otros tres. */}
+                es falso en los otros tres.
+
+                No dice "lo escribió la clínica": el paso 1 de 014 borra solo
+                los eventos de ESTA importación, así que un segundo import que
+                le agregó baños a una mascota del primero también la conserva,
+                y eso no lo escribió la clínica a mano. Lo único que se puede
+                afirmar de los cinco contadores es que no vino en este
+                archivo. Es la misma frase que Importaciones.jsx:305, y tiene
+                que seguir siendo la misma: son la misma situación vista en
+                dos momentos. */}
             <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>
-              Eso lo escribió la clínica, no el archivo. Borrar las mascotas
-              se habría llevado las consultas, las citas, las vacunas y los
-              baños con ellas, y habría dejado los recibos sin paciente. Se
-              quedaron, y sus dueños también. Si de verdad querés sacarlas,
-              hay que borrarlas una por una desde su ficha.
+              Eso no lo trajo este archivo. Borrarlas se habría llevado las
+              consultas, las citas, las vacunas y los baños con ellas, y
+              habría dejado los recibos sin paciente. Se quedaron, y sus
+              dueños también. Si de verdad querés sacarlas, hay que borrarlas
+              una por una desde la lista de mascotas.
             </p>
           </div>
         )}

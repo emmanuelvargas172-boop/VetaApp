@@ -7,8 +7,17 @@
 // "Deshacer" no borró todo— y adentro del componente no se pueden probar.
 // ============================================================
 
-/** 1 → "1 vacuna", 3 → "3 vacunas". El plural a mano: son pocos casos y ninguno es irregular, así que una librería de i18n acá sería más código que el que ahorra. */
-const n = (cuantos, singular, plural) =>
+/**
+ * 1 → "1 vacuna", 3 → "3 vacunas". El plural a mano: son pocos casos y ninguno
+ * es irregular, así que una librería de i18n acá sería más código que el que
+ * ahorra.
+ *
+ * Exportada porque el paso 3 la necesita. Ahí los contadores se pegaban con
+ * el plural fijo —`${r.tutores_nuevos} tutores`— y un archivo de una fila
+ * decía "1 tutores · 1 mascotas" en la pantalla que la clínica lee ANTES de
+ * confirmar. Es la pantalla donde menos se puede dudar de lo que dice.
+ */
+export const n = (cuantos, singular, plural) =>
   `${cuantos} ${cuantos === 1 ? singular : plural}`;
 
 /**
@@ -51,7 +60,7 @@ export function textoOmitidos(omitidos) {
     }
     // Un `que` que esta versión de la pantalla no conoce igual se muestra
     // crudo. Esconderlo sería esconder exactamente el caso nuevo. 013 manda
-    // tres `que` más —tutor_no_encontrado (013:156), mascota_no_encontrada
+    // dos `que` más —tutor_no_encontrado (013:156) y mascota_no_encontrada
     // (013:252)— y en esos `valor` viene null: imprimirlo da "(null)".
     return o.valor ? `${o.quien}: ${o.que} (${o.valor})` : `${o.quien}: ${o.que}`;
   });
@@ -122,13 +131,20 @@ export function textoRestaurados(d) {
  * motivo más fuerte acá: el segundo archivo de la misma clínica trae cero
  * tutores nuevos y cero mascotas nuevas con 74 baños adentro, y decir
  * "escribiendo 0 y 0" mientras escribe 74 es falso.
+ *
+ * `tutores_a_completar` y `mascotas_a_completar` cuentan TUTORES y MASCOTAS,
+ * no campos: plan.js:504-506 los saca del largo de `completar_tutores` y
+ * `completar_mascotas`, que se acumulan una entrada por id del existente. Acá
+ * decían "2 datos de tutores", y dos tutores con tres campos en blanco cada
+ * uno son seis datos, no dos. El paso 3 ya lo dice bien ("Ya existen: 2
+ * tutores"), así que además se contradecían entre pantallas.
  */
 export function textoVaAEscribir(r) {
   const l = [];
   if (r.tutores_nuevos > 0)       l.push(n(r.tutores_nuevos, 'tutor', 'tutores'));
   if (r.mascotas_nuevas > 0)      l.push(n(r.mascotas_nuevas, 'mascota', 'mascotas'));
-  if (r.tutores_a_completar > 0)  l.push(n(r.tutores_a_completar, 'dato de tutor', 'datos de tutores'));
-  if (r.mascotas_a_completar > 0) l.push(n(r.mascotas_a_completar, 'dato de mascota', 'datos de mascotas'));
+  if (r.tutores_a_completar > 0)  l.push(n(r.tutores_a_completar, 'tutor al que le completo datos', 'tutores a los que les completo datos'));
+  if (r.mascotas_a_completar > 0) l.push(n(r.mascotas_a_completar, 'mascota a la que le completo datos', 'mascotas a las que les completo datos'));
   if (r.tratamientos > 0)         l.push(n(r.tratamientos, 'baño o desparasitación', 'baños y desparasitaciones'));
   if (r.vacunas > 0)              l.push(n(r.vacunas, 'vacuna', 'vacunas'));
   return l;
@@ -179,12 +195,20 @@ export function textoConservadas(conservadas) {
       ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`
       : partes[0];
 
+    // Dos cosas, y las dos son a propósito.
+    //
     // El verbo va ADELANTE, no un participio atrás ("…escritas después del
     // import"). Un participio tiene que concordar en género con la lista, y
     // la lista mezcla géneros en cuanto entra `cobro`: "1 consulta y 1
     // cobro escritas" está mal. Con el verbo delante no hay nada que
-    // concordar, y la frase sigue diciendo lo único que importa: eso lo
-    // escribió la clínica DESPUÉS, no el archivo.
+    // concordar.
+    //
+    // Y el verbo es impersonal —"le escribieron"— y no "la clínica le
+    // escribió". El paso 1 de 014 borra solo los eventos de ESTA
+    // importación, así que un segundo archivo que le agregó baños a una
+    // mascota del primero también la conserva, y eso no lo escribió la
+    // clínica a mano: lo escribió otro import. Lo único que se puede
+    // afirmar de los cinco contadores es que no vino en este archivo.
     return `${m.nombre}: después del import le escribieron ${lista}`;
   });
 }
