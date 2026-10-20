@@ -90,6 +90,21 @@ describe('traducirErrorSql', () => {
     expect(f).toContain('5');
   });
 
+  it('traduce el check del tipo de documento', () => {
+    const f = traducirErrorSql('violates check constraint "archivos_mascota_tipo_check"');
+    expect(f).toBe('Ese tipo de documento no existe. Elegí uno de la lista.');
+  });
+
+  it('traduce el check de la fecha del documento', () => {
+    const f = traducirErrorSql('violates check constraint "archivos_mascota_fecha_documento_iso"');
+    expect(f).toBe('La fecha del documento no quedó bien. Usá el calendario del campo.');
+  });
+
+  it('traduce el check de la ruta única', () => {
+    const f = traducirErrorSql('violates unique constraint "archivos_mascota_ruta_key"');
+    expect(f).toBe('Ese archivo ya se había subido. Actualizá la página para verlo.');
+  });
+
   // Un error que esta versión no conoce devuelve null, para que el
   // llamador muestre el de Postgres crudo. Inventarle una frase sería
   // tapar el único caso nuevo.

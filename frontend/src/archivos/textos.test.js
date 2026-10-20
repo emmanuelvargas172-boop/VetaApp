@@ -97,4 +97,8 @@ describe('textoArchivo', () => {
   it('muestra crudo un tipo que no conoce', () => {
     expect(textoArchivo({ tipo: 'radiografia' })).toBe('radiografia');
   });
+
+  it('con argumento null devuelve vacío', () => {
+    expect(textoArchivo(null)).toBe('');
+  });
 });

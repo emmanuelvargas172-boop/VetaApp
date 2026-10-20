@@ -30,7 +30,10 @@ export const MAX_POR_MASCOTA = 10;
  */
 const mb = (bytes) => (bytes / 1048576).toFixed(1).replace('.', ',');
 
-/** La frase del cupo, compartida con traducirErrorSql: tienen que decir lo mismo. */
+/**
+ * La frase del cupo, compartida con traducirErrorSql: tienen que decir lo mismo.
+ * El lowercase 'b' en 'borrá' es lo que limites.test.js busca con toContain('borrá').
+ */
 const MOTIVO_CUPO =
   `Esta mascota ya tiene ${MAX_POR_MASCOTA} documentos, que es el máximo; ` +
   `borrá uno para poder subir otro.`;
