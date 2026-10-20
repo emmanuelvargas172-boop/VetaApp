@@ -70,7 +70,7 @@ describe('ESTADOS', () => {
 });
 
 describe('sePuedeDeshacer', () => {
-  // La regla tiene que ser la misma que la de 014:65-67, que es la que manda
+  // La regla tiene que ser la misma que la de 014:76, que es la que manda
   // de verdad. Si la pantalla esconde el botón para un estado que la función
   // sí acepta, esos datos quedan sin forma de sacarse.
   it('solo lo bloquea para lo que ya se deshizo', () => {

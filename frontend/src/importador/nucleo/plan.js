@@ -195,7 +195,7 @@ const ctxDe = (origen) => {
  * Los campos de `duenos` que este archivo puede completar.
  *
  * `telefono` queda afuera de los campos que se pueden completar porque la
- * función de Postgres (013_aplicar_importacion.sql:165) solo acepta
+ * función de Postgres (013_aplicar_importacion.sql:184) solo acepta
  * ('cedula','direccion','telefono2') y tiraría excepción si `telefono`
  * llegara en la lista blanca, cayendo la importación entera.
  *

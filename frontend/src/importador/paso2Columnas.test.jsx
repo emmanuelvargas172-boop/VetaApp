@@ -5,7 +5,7 @@ import { columnasConEjemplo } from './paso2Columnas.jsx';
 //
 // El espacio al final de 'Nombre y apellidos del Tutor ' es entrada hostil
 // a propósito y NO lo que llega en producción: `celda()` ya recorta cada
-// celda de texto (leerXlsx.js:90), así que hoy un encabezado nunca llega
+// celda de texto (leerXlsx.js:103), así que hoy un encabezado nunca llega
 // con espacios. Está acá para que `columnasConEjemplo` no dependa de ese
 // recorte de arriba — el día que se lea un PDF o un Google Sheet por API,
 // el lector nuevo puede no recortar nada, y el encabezado es lo que la

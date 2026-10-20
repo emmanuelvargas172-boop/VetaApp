@@ -49,7 +49,7 @@ export function columnasConEjemplo(encabezados, grilla, mapa) {
       //
       // El `trim()` decide si está vacío, pero lo que se muestra es el
       // original sin recortar. Hoy da igual —`celda()` ya recorta cada
-      // celda de texto (leerXlsx.js:90)— y justamente por eso no se
+      // celda de texto (leerXlsx.js:103)— y justamente por eso no se
       // recorta de nuevo acá: esta función no debe depender de un recorte
       // que hace otro módulo. El día que entre un lector de PDF o de
       // Google Sheets por API, puede no recortar nada, y el encabezado es

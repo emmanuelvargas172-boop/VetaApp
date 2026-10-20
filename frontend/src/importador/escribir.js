@@ -110,8 +110,12 @@ export async function abrirImportacion({ archivo, hoja, mapeo }) {
  *    adentro se reportaba como "no escribió nada": marcarFallida la cerraba
  *    en 'fallido' contradiciendo sus propias filas, y el reintento pasaba el
  *    tapón. No duplicaba —013 deduplica eventos por mascota+tipo+fecha— pero
- *    el estado de la fila mentía sobre su contenido, y de ahí viene que la
- *    fila 'fallido' lleve botón de Deshacer (Importaciones.jsx:39-42).
+ *    el estado de la fila mentía sobre su contenido.
+ *
+ * Con las cuatro, ese caso ya no ocurre, y el botón de Deshacer de la fila
+ * 'fallido' NO se apoya en él: se apoya en lo que queda después —la carrera
+ * del recuento contra el commit, y el recuento que falla por la misma
+ * conexión caída—. El argumento completo vive en `sePuedeDeshacer`.
  *
  * Las cuatro tienen `id` (001_init.sql:50, :75) y las cuatro van con
  * `head: true`, así que esto son cuatro conteos y cero filas bajadas.

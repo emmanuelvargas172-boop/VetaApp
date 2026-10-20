@@ -145,7 +145,7 @@ describe('textoConservadas', () => {
     expect(lineas[0]).toBe('Toby: después del import le escribieron 2 consultas, 1 cita y 4 baños');
   });
 
-  // 014:87-89 cuenta cobros para decidir si la conserva, y 014:97-100 lo
+  // 014:116-122 cuenta cobros para decidir si la conserva, y 014:130-133 lo
   // devuelve. Una mascota que se quedó SOLO por un cobro tiene que salir
   // nombrada, no como "undefined".
   it('cuenta los cobros, que son el quinto contador de 014', () => {
@@ -233,7 +233,7 @@ describe('textoRestaurados', () => {
   });
 
   // El caso del reload, con el objeto tal cual queda en `resumen.deshecho`
-  // (014:171-175) — sin `estado`, que vive en su propia columna. Es el que
+  // (014:234-238) — sin `estado`, que vive en su propia columna. Es el que
   // falla si alguien vuelve a sacar `campos_restaurados` del jsonb que se
   // guarda: la pantalla de historial pasaría a decir "de este archivo no
   // quedaba nada en la base" de una importación cuyos datos sí se revirtieron.
@@ -281,7 +281,7 @@ describe('textoVaAEscribir', () => {
     expect(lineas).toContain('1 tutor');
     expect(lineas).toContain('1 mascota');
     // "tutor al que le completo datos" y no "dato de tutor": el contador
-    // cuenta tutores, no campos (plan.js:504-506 usa el largo de
+    // cuenta tutores, no campos (plan.js:597-599 usa el largo de
     // `completar_tutores`, una entrada por id del existente). Dos tutores con
     // tres campos en blanco cada uno son seis datos, y la pantalla decía dos.
     expect(lineas).toContain('1 tutor al que le completo datos');

@@ -60,8 +60,8 @@ export function textoOmitidos(omitidos) {
     }
     // Un `que` que esta versión de la pantalla no conoce igual se muestra
     // crudo. Esconderlo sería esconder exactamente el caso nuevo. 013 manda
-    // dos `que` más —tutor_no_encontrado (013:156) y mascota_no_encontrada
-    // (013:252)— y en esos `valor` viene null: imprimirlo da "(null)".
+    // dos `que` más —tutor_no_encontrado (013:171) y mascota_no_encontrada
+    // (013:272)— y en esos `valor` viene null: imprimirlo da "(null)".
     return o.valor ? `${o.quien}: ${o.que} (${o.valor})` : `${o.quien}: ${o.que}`;
   });
 }
@@ -133,7 +133,7 @@ export function textoRestaurados(d) {
  * "escribiendo 0 y 0" mientras escribe 74 es falso.
  *
  * `tutores_a_completar` y `mascotas_a_completar` cuentan TUTORES y MASCOTAS,
- * no campos: plan.js:504-506 los saca del largo de `completar_tutores` y
+ * no campos: plan.js:597-599 los saca del largo de `completar_tutores` y
  * `completar_mascotas`, que se acumulan una entrada por id del existente. Acá
  * decían "2 datos de tutores", y dos tutores con tres campos en blanco cada
  * uno son seis datos, no dos. El paso 3 ya lo dice bien ("Ya existen: 2
@@ -156,9 +156,9 @@ const COSAS = [
   ['vacunas',      'vacuna',    'vacunas'],
   ['tratamientos', 'baño',      'baños'],
   // `cobros` es el quinto contador que 014 mira para decidir si la mascota
-  // se conserva (014:87-89), y el quinto que devuelve. Sin él, una mascota
-  // que se quedó SOLO porque tiene un cobro cae acá con la lista vacía y la
-  // pantalla dice "tiene undefined". Los cinco de 014 van los cinco acá:
+  // se conserva (014:116-122), y el quinto que devuelve (014:130-133). Sin
+  // él, una mascota que se quedó SOLO por un cobro cae acá con la lista
+  // vacía y la pantalla dice "tiene undefined". Los cinco de 014 van acá:
   // si alguna vez se agrega un sexto allá, el `if` de abajo lo avisa.
   ['cobros',       'cobro',     'cobros'],
 ];

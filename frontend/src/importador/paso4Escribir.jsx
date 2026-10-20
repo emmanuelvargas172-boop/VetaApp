@@ -61,8 +61,8 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
         // paralelo, y el update de marcarFallida puede aterrizar último y
         // pisar la fila —`estado` de vuelta a 'fallido' y la columna
         // `resumen` entera reemplazada, porque el update de Supabase no
-        // mezcla jsonb (escribir.js:196-210)—, borrando el registro de qué
-        // conservó el deshacer. No tira nunca (escribir.js:177-214), así
+        // mezcla jsonb (escribir.js:250-257)—, borrando el registro de qué
+        // conservó el deshacer. No tira nunca (escribir.js:225-265), así
         // que esperarla no puede tapar el error de verdad.
         if (id) await marcarFallida(id, err.message || String(err), confirmado.resumen);
         setError(err.message || String(err));
@@ -100,7 +100,7 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
       <Card>
         <h3 style={{ margin: 0, fontSize: 15 }}>4 · Importando</h3>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          {/* vaAEscribir no puede quedar vacío acá: paso3Revisar.jsx:115-117
+          {/* vaAEscribir no puede quedar vacío acá: paso3Revisar.jsx:119-121
               no deja confirmar si los seis contadores están en cero. Si esa
               condición cambia alguna vez, esta frase depende de ella. */}
           Escribiendo {vaAEscribir.join(', ')}. Es una sola operación: no
@@ -222,7 +222,7 @@ export default function Paso4Escribir({ confirmado, archivo, onReiniciar }) {
                 le agregó baños a una mascota del primero también la conserva,
                 y eso no lo escribió la clínica a mano. Lo único que se puede
                 afirmar de los cinco contadores es que no vino en este
-                archivo. Es la misma frase que Importaciones.jsx:305, y tiene
+                archivo. Es la misma frase que Importaciones.jsx:324, y tiene
                 que seguir siendo la misma: son la misma situación vista en
                 dos momentos. */}
             <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-faint)' }}>

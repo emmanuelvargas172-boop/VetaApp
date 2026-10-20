@@ -33,13 +33,18 @@ const FECHA = { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digi
 /**
  * ¿Se le puede ofrecer el botón de Deshacer a esta fila?
  *
- * La regla es la de 014:65-67 y no una lista propia: deshacer está bloqueado
+ * La regla es la de 014:76 y no una lista propia: deshacer está bloqueado
  * solo para lo que ya se deshizo. Enumerar al revés —'listo' y 'en_curso'—
- * deja afuera a 'fallido', y una fila 'fallido' puede tener datos adentro:
- * marcarFallida decide mirando solo `duenos` y `mascotas` (escribir.js:186),
- * así que un archivo que solo le agregó 74 baños a mascotas que ya existían y
- * perdió la respuesta queda 'fallido' con los 74 escritos. Sin este botón no
- * hay forma de sacarlos.
+ * deja afuera a 'fallido', y una fila 'fallido' puede tener datos adentro.
+ *
+ * El caso grueso ya no llega acá: marcarFallida recuenta las cuatro tablas
+ * antes de escribir 'fallido' (escribir.js:235-236), así que una importación
+ * que sí entró y perdió la respuesta no se marca. Lo que queda es la carrera
+ * —el recuento corre y la transacción commitea un instante después, con lo
+ * que el conteo vio cero sobre filas que iban a existir— y el recuento que
+ * falla por la misma conexión caída, que deja la fila en 'en_curso'. Los dos
+ * terminan en una fila cuyo estado no describe su contenido, y sin este botón
+ * esos datos no tienen forma de salir.
  *
  * Un estado desconocido también lleva botón: la autoridad es la función de
  * Postgres, que revienta con un mensaje en español si no se puede, y ese
@@ -66,7 +71,7 @@ export function sePuedeDeshacer(estado) {
  */
 export function lineaResumen(imp) {
   const r = imp?.resumen ?? {};
-  // El error vive en el mismo jsonb (escribir.js:207). En esa fila es el
+  // El error vive en el mismo jsonb (escribir.js:257). En esa fila es el
   // único dato que importa, así que reemplaza a los números.
   if (r.error) return `Falló: ${r.error}`;
 
@@ -179,7 +184,7 @@ export default function Importaciones() {
         const est = ESTADOS[imp.estado] ?? { texto: imp.estado, tono: 'neutral' };
         const a = accion[imp.id];
         // El resultado del deshacer, de las dos fuentes posibles. `accion` es
-        // el de este rato; `resumen.deshecho` es el que 014:171-175 dejó
+        // el de este rato; `resumen.deshecho` es el que 014:234-238 dejó
         // guardado, y es el único que queda después de recargar la página. Sin
         // leerlo, una fila "Deshecha en parte" vuelve del reload con la
         // etiqueta amarilla y sin decir qué conservó — y esa fila existe
@@ -308,7 +313,7 @@ export default function Importaciones() {
                         que el recibo sobrevive —tiene que, ya está emitido—
                         pero queda sin paciente. Decir "se las habría llevado"
                         de un cobro es falso, y nombrar solo dos de los cinco
-                        contadores de 014:89 es falso en los otros tres.
+                        contadores de 014:116-122 es falso en los otros tres.
                         No dice "lo escribió la clínica": el paso 1 de 014 borra
                         solo los eventos de ESTA importación, así que un segundo
                         import que le agregó baños a una mascota del primero

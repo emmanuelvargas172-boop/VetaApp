@@ -119,8 +119,9 @@ begin
       -- La guarda de v_estado de arriba NO alcanza contra este caso: el
       -- segundo intento abre una fila nueva de `importaciones` en 'en_curso'
       -- (paso4Escribir.jsx:48), así que llega limpia. Por la misma razón el
-      -- conteo de `yaEscribio()` (escribir.js:105) tampoco lo tapa: cuenta
-      -- por importacion_id, y sobre un id recién nacido siempre da 0/0 —
+      -- conteo de `yaEscribio()` (escribir.js:123) tampoco lo tapa: cuenta
+      -- por importacion_id, y sobre un id recién nacido siempre da 0 en las
+      -- cuatro tablas —
       -- sirve contra un doble envío de la MISMA fila, no contra volver a
       -- correr el asistente. Lo que hoy frena el duplicado es que el paso 3
       -- recalcula el plan contra la base y empareja por cédula/nombre/

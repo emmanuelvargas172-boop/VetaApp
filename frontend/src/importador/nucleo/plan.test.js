@@ -258,7 +258,7 @@ describe('armarPlan · completar sin pisar', () => {
 
   // Un tutor creado por una importación anterior sin número disponible tiene
   // telefono = ''. Si el archivo nuevo trae el número, no se puede escribir
-  // (013_aplicar_importacion.sql:165 no acepta 'telefono' en la lista blanca
+  // (013_aplicar_importacion.sql:184 no acepta 'telefono' en la lista blanca
   // y caería toda la importación). Se avisa para que lo pongan a mano.
   it('tutor con telefono vacío: avisa el número que trae el archivo y no lo agrega a completar', () => {
     const conTelVacio = { ...vacia, duenos: [
