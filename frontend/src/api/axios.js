@@ -335,12 +335,18 @@ const routes = [
     // que no conoce la interfaz. Se valida igual que `mascota_id` y `tipo`.
     const cuantosRaw = g('cuantos_hay');
     if (cuantosRaw == null || cuantosRaw === '') throw apiError('Falta indicar cuántos archivos tiene la mascota');
+    // Y un valor que no es número tampoco sirve: `Number('abc')` da NaN, y
+    // `NaN >= MAX_POR_MASCOTA` es false, así que el cupo se apagaría igual
+    // que si el campo no hubiera llegado. Un FormData manda strings siempre,
+    // de ahí que se convierta antes de mirarlo.
+    const cuantosHay = Number(cuantosRaw);
+    if (!Number.isFinite(cuantosHay) || cuantosHay < 0) throw apiError('No se pudo leer cuántos archivos tiene la mascota');
 
     // El chequeo del frontend corre ACÁ y no solo en el componente, para
     // que ninguna pantalla futura pueda saltárselo. Es la capa que da el
     // mensaje útil; las otras dos (el check de la tabla y el límite del
     // bucket) solo rechazan.
-    const veredicto = revisarArchivo(file, Number(cuantosRaw));
+    const veredicto = revisarArchivo(file, cuantosHay);
     if (!veredicto.ok) throw apiError(veredicto.motivo);
 
     const mascotaIdRaw = g('mascota_id');
@@ -441,12 +447,19 @@ const routes = [
     // "Borrar". Es el modo de falla que se puede reintentar.
     //
     // Asimetría de `.remove()`: devuelve `{ error: null }` aunque no haya
-    // borrado nada — el objeto ya no existía o la política lo negó. Esos
-    // casos no aparecen como error; el objeto ausente simplemente no está en
-    // `data`. El check de `borrado.error` captura fallos de red y de
-    // autenticación, pero no el "borré cero objetos". En ese caso la fila
-    // tampoco se borra: se avisa en consola y se lanza igual, para que el
-    // botón "Borrar" siga siendo reintentable y el barrido lo encuentre.
+    // borrado nada. Storage contesta con la lista de objetos que sí borró, y
+    // el que no estaba —o el que la política negó— simplemente no aparece en
+    // `data`, sin error. Así que `borrado.error` atrapa fallas de red y de
+    // autenticación, no el "borré cero objetos".
+    //
+    // Cuando pasa eso la fila SE BORRA IGUAL, y es a propósito: desde el
+    // cliente no hay forma de distinguir "el objeto ya no estaba" (el caso
+    // normal si el barrido pasó antes) de "la política lo negó" (no
+    // alcanzable para un archivo propio, porque las cuatro políticas del
+    // bucket gatean por el primer segmento de la ruta, que es el uid del
+    // que llama). Frenar acá dejaría a la clínica con una fila que no puede
+    // sacar nunca de la ficha, que es peor que un huérfano. Se avisa en
+    // consola para que el huérfano quede nombrado en alguna parte.
     const borrado = await supabase.storage.from('documentos').remove([fila.ruta]);
     if (borrado.error) throw apiError(borrado.error.message);
     if (!borrado.data || borrado.data.length === 0) {
