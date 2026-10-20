@@ -93,6 +93,46 @@ describe('agrupar', () => {
     expect(agrupar(estado, filas).tutores.size).toBe(2);
   });
 
+  // Misma persona por cédula, con un número distinto en cada fila. El
+  // segundo es un dato que la clínica tiene y que vale: es por donde la
+  // llaman cuando el primero no contesta. Se guardaba solo el de la primera
+  // fila y el otro se perdía sin aviso, teniendo `telefono2` vacío al lado.
+  it('un segundo número en otra fila cae en telefono2 en vez de perderse', () => {
+    const { estado, filas } = leer([
+      ['Ana Gómez', 'Max',  '3000000011', '1000000001', '', '', '', ''],
+      ['Ana Gómez', 'Luna', '3100000022', '1000000001', '', '', '', ''],
+    ]);
+    const t = [...agrupar(estado, filas).tutores.values()][0];
+    expect(t.tel1).toBe('573000000011');
+    expect(t.tel2).toBe('573100000022');
+  });
+
+  // El mismo número repetido en dos filas NO es un segundo número.
+  it('el mismo número en dos filas no se copia a telefono2', () => {
+    const { estado, filas } = leer([
+      ['Ana Gómez', 'Max',  '3000000011', '1000000001', '', '', '', ''],
+      ['Ana Gómez', 'Luna', '3000000011', '1000000001', '', '', '', ''],
+    ]);
+    const t = [...agrupar(estado, filas).tutores.values()][0];
+    expect(t.tel2).toBe(null);
+  });
+
+  // Con los dos cupos llenos, un tercer número distinto sí se queda afuera:
+  // `duenos` tiene dos columnas de teléfono y no una lista. Pero se dice en
+  // voz alta, porque es un dato de contacto de un cliente real que la clínica
+  // puede querer poner a mano.
+  it('un tercer número distinto se avisa en vez de desaparecer', () => {
+    const { estado, filas } = leer([
+      ['Ana Gómez', 'Max',  '3000000011', '1000000001', '', '', '', ''],
+      ['Ana Gómez', 'Luna', '3100000022', '1000000001', '', '', '', ''],
+      ['Ana Gómez', 'Nube', '3200000033', '1000000001', '', '', '', ''],
+    ]);
+    const t = [...agrupar(estado, filas).tutores.values()][0];
+    expect(t.tel1).toBe('573000000011');
+    expect(t.tel2).toBe('573100000022');
+    expect(estado.avisos.some((a) => a.texto.includes('573200000033'))).toBe(true);
+  });
+
   it('la dirección más larga gana porque dice más del mismo lugar', () => {
     const grilla = [
       ['Ana', 'Max', '3000000011', '1000000001', '', '', '', ''],

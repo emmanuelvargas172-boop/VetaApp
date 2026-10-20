@@ -44,8 +44,28 @@ export function agrupar(estado, filas) {
       // "Calle 10 #20-30 Barrio Prueba" dice más que "Calle 11 #20-30 Barrio Prueba" y
       // es el mismo lugar.
       if (r.direccion && (!prev.direccion || r.direccion.length > prev.direccion.length)) prev.direccion = r.direccion;
-      if (!prev.tel1 && r.tel1) prev.tel1 = r.tel1;
-      if (!prev.tel2 && r.tel2 && r.tel2 !== prev.tel1) prev.tel2 = r.tel2;
+      // Los dos cupos de `duenos` se llenan con TODOS los números distintos
+      // que traigan las filas de esta persona, no solo con los de la primera.
+      //
+      // Antes era `if (!prev.tel1 …)` y `if (!prev.tel2 …)` mirando solo la
+      // fila de origen: con el primer cupo ya lleno, un número distinto en una
+      // fila posterior se perdía en silencio teniendo `telefono2` vacío al
+      // lado. Es el número por el que la clínica llama cuando el primero no
+      // contesta, y el formulario lo anotó porque alguien lo dio.
+      //
+      // La comparación es de texto crudo y alcanza: los dos lados salieron de
+      // telefonos() → normalizarTelefonoCO (normalizar.js:103-116), así que
+      // acá todos vienen en la misma forma '57XXXXXXXXXX'.
+      for (const t of [r.tel1, r.tel2]) {
+        if (!t) continue;
+        if (t === prev.tel1 || t === prev.tel2) continue;
+        if (!prev.tel1)      prev.tel1 = t;
+        else if (!prev.tel2) prev.tel2 = t;
+        // Tercer número distinto: `duenos` tiene dos columnas y no una lista,
+        // así que éste no entra. Se dice en voz alta igual —es un contacto de
+        // un cliente real— para que la clínica decida si lo pone a mano.
+        else aviso(estado, ctx, `${prev.nombre} tiene más de dos teléfonos: ${t} se queda afuera (quedaron ${prev.tel1} y ${prev.tel2})`);
+      }
       if (!prev.cedula && r.cedula) prev.cedula = r.cedula;
       prev.origen.push(`${r.hoja}:${r.nFila}`);
     }
