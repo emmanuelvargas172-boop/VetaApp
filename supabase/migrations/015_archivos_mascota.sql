@@ -452,16 +452,31 @@ create policy "documentos_delete_own"
 -- ---------- PRUEBA H · el trigger cuenta solo los archivos del invocador ----------
 --
 -- POR QUE EXISTE ESTA PRUEBA:
--- El comentario de la funcion afirma que el count(*) queda acotado a la
--- clinica que invoca porque la RLS se evalua con el rol invocador. Si eso
--- fuera falso (por ejemplo, si alguien le agrega security definer), una
--- clinica con 10 archivos bloquearia a todas las demas. Ninguna de las
--- pruebas A-G cubre ese invariante: PRUEBA C corre como `postgres`, que
--- salta la RLS, y por eso no puede detectar si el conteo cruza clinicas.
+-- El count(*) de la funcion trigger esta acotado por mascota_id (linea 192).
+-- Sin security definer, la RLS se evalua con el rol invocador, asi que el
+-- count ademas solo ve las filas cuyo user_id = auth.uid(): las filas de
+-- otra clinica son invisibles aunque compartan mascota_id.
+--
+-- La politica de la tabla (lineas 147-148) valida unicamente
+-- auth.uid() = user_id; NO valida que mascota_id pertenezca al invocador.
+-- Por eso es posible construir el siguiente estado: la clinica A inserta
+-- 10 filas con su propio user_id apuntando a la mascota de la clinica B.
+-- Postgres lo permite porque la cuenta A tiene suscripcion activa y el
+-- user_id es suyo; la restriccion de ownership de la mascota no existe en
+-- la politica. Con security invoker esas 10 filas son invisibles para B
+-- porque la RLS filtra por user_id. Con security definer el count bypassea
+-- la RLS y ve las 10 filas de A sobre la misma mascota_id de B, bloqueando
+-- el primer insert de B antes de que haya subido nada.
+--
+-- Ningun otro bloque cubre este caso: PRUEBA C corre como `postgres`, que
+-- salta la RLS completamente.
+-- NOTA: el gap de que la politica no valide la propiedad de mascota_id es
+-- conocido y esta anotado para la revision final de la rama. No se corrige
+-- aqui porque Tasks 4 y 8 consumen el contrato actual de la politica.
 --
 -- POR QUE NO ES UN BLOQUE do $$:
 -- `set role` dentro de plpgsql no funciona con la semantica de impersonacion
--- que se necesita acá: el rol cambia pero request.jwt.claims no, y la
+-- que se necesita aca: el rol cambia pero request.jwt.claims no, y la
 -- funcion esta_activo() lee ese claim. La unica forma de impersonar un JWT
 -- completo en el SQL Editor es con `set local role` + `set_config` dentro
 -- de una transaccion explicita, igual que el Step 2 del brief. Un `do $$`
@@ -475,11 +490,12 @@ create policy "documentos_delete_own"
 -- auth.users con suscripcion activa. Si solo hay una, registrarse con otro
 -- correo antes de correr esto.
 --
--- RESULTADO ESPERADO:
--- Primera consulta (insercion 11 de cuenta 2): debe lanzar check_violation,
---   lo que produce un error con mensaje que empieza con 'H: OK'.
--- Si el mensaje empieza con 'H: FALLO', el trigger cruzó clinicas y el
---   conteo de la cuenta 1 consumio presupuesto de la cuenta 2.
+-- RESULTADO ESPERADO con el codigo actual (security invoker):
+--   Sub-bloque 1 (10 inserts de cuenta 2): todos entran; imprime 'H: OK'.
+-- RESULTADO SI ALGUIEN AGREGA security definer:
+--   Sub-bloque 1 (primer insert de cuenta 2): ya lanza check_violation
+--   porque el count ve las 10 filas de cuenta 1 sobre la misma mascota_id;
+--   error_prematuro = true; imprime 'H: FALLO'.
 --
 -- begin;
 --
@@ -487,30 +503,30 @@ create policy "documentos_delete_own"
 --   select id, row_number() over (order by created_at) as n
 --   from auth.users order by created_at limit 2;
 --
--- -- Cuenta 1: dueno, mascota y 10 archivos (como postgres, sin RLS).
--- insert into public.duenos(user_id, nombre, telefono)
---   select id, 'Prueba H c1', '3000000010' from _ctas where n = 1;
--- insert into public.mascotas(user_id, nombre, especie, dueno_id)
---   select d.user_id, 'Prueba H c1', 'perro', d.id
---   from public.duenos d where d.telefono = '3000000010';
--- -- Los 10 archivos de cuenta 1 se insertan como postgres (sin RLS activa).
--- do $$
--- declare v_u uuid; v_m bigint; i int;
--- begin
---   select m.user_id, m.id into v_u, v_m
---     from public.mascotas m where m.nombre = 'Prueba H c1' limit 1;
---   for i in 1..10 loop
---     insert into public.archivos_mascota(user_id, mascota_id, ruta, nombre, tipo, peso_bytes)
---       values (v_u, v_m, 'h/c1/' || i || '.pdf', i || '.pdf', 'otro', 1000);
---   end loop;
--- end $$;
---
 -- -- Cuenta 2: dueno y mascota (como postgres, sin RLS activa).
+-- -- La mascota de cuenta 2 es la que se usa como mascota_id compartida.
 -- insert into public.duenos(user_id, nombre, telefono)
 --   select id, 'Prueba H c2', '3000000011' from _ctas where n = 2;
 -- insert into public.mascotas(user_id, nombre, especie, dueno_id)
 --   select d.user_id, 'Prueba H c2', 'perro', d.id
 --   from public.duenos d where d.telefono = '3000000011';
+--
+-- -- 10 filas de cuenta 1 apuntando a la mascota de cuenta 2.
+-- -- Se insertan como postgres (sin RLS): la politica permite estas filas
+-- -- porque user_id es de cuenta 1 (activa) y mascota_id no se valida.
+-- -- Con security invoker estas filas son invisibles para cuenta 2.
+-- -- Con security definer el count las ve y bloquea el primer insert de cuenta 2.
+-- do $$
+-- declare v_u1 uuid; v_m2 bigint; i int;
+-- begin
+--   select id into v_u1 from _ctas where n = 1;
+--   select m.id into v_m2
+--     from public.mascotas m where m.nombre = 'Prueba H c2' limit 1;
+--   for i in 1..10 loop
+--     insert into public.archivos_mascota(user_id, mascota_id, ruta, nombre, tipo, peso_bytes)
+--       values (v_u1, v_m2, 'h/c1sobre_c2/' || i || '.pdf', i || '.pdf', 'otro', 1000);
+--   end loop;
+-- end $$;
 --
 -- -- Ahora suplantamos la cuenta 2 con JWT real.
 -- set local role authenticated;
@@ -519,7 +535,11 @@ create policy "documentos_delete_own"
 --                     'role', 'authenticated')::text,
 --   true);
 --
--- -- Cuenta 2 inserta 10 archivos: deben entrar todos (cuenta 1 no los contamina).
+-- -- Cuenta 2 inserta hasta 10 archivos en su propia mascota.
+-- -- Con security invoker: las 10 filas de cuenta 1 son invisibles para
+-- -- cuenta 2, el count arranca en 0 y los 10 inserts pasan -> 'H: OK'.
+-- -- Con security definer: el count bypassea RLS, ve las 10 filas de cuenta 1,
+-- -- el primer insert ya alcanza >= 10 -> error_prematuro = true -> 'H: FALLO'.
 -- do $$
 -- declare v_m bigint; i int; error_prematuro boolean := false;
 -- begin
@@ -533,25 +553,8 @@ create policy "documentos_delete_own"
 --       error_prematuro := true;
 --     end;
 --   end loop;
---   if error_prematuro then
---     raise exception 'H: FALLO — el trigger freno antes del archivo 11 de cuenta 2 (el conteo cruzo clinicas)';
---   end if;
--- end $$;
---
--- -- El archivo 11 de cuenta 2 debe ser rechazado.
--- do $$
--- declare v_m bigint; freno boolean := false;
--- begin
---   select m.id into v_m
---     from public.mascotas m where m.nombre = 'Prueba H c2' limit 1;
---   begin
---     insert into public.archivos_mascota(user_id, mascota_id, ruta, nombre, tipo, peso_bytes)
---       values (auth.uid(), v_m, 'h/c2/11.pdf', '11.pdf', 'otro', 1000);
---   exception when check_violation then
---     freno := true;
---   end;
---   raise exception 'H: % — el trigger freno el once de cuenta 2 sin contaminar con cuenta 1: freno=%',
---     case when freno then 'OK' else 'FALLO' end, freno;
+--   raise exception 'H: % — los 10 inserts de cuenta 2 pasaron sin ser bloqueados por cuenta 1: error_prematuro=%',
+--     case when not error_prematuro then 'OK' else 'FALLO' end, error_prematuro;
 -- end $$;
 --
 -- rollback;
