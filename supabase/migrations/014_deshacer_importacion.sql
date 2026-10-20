@@ -29,6 +29,16 @@
 -- Entonces deshacer es: borrar solo lo que no tiene nada encima, y frenar
 -- en lo demás mostrándoselo.
 --
+-- ---------- POR QUÉ security invoker ----------
+-- Lo mismo que 013_aplicar_importacion.sql:12-16, y acá pesa más porque esta
+-- función BORRA. Corre con los permisos de la clínica que llama, así que RLS
+-- aplica en cada sentencia y ningún delete de abajo alcanza una fila de otra
+-- cuenta. Y `importacion_id` NO identifica dueño: cualquier clínica puede
+-- estampar sus propias filas con el importacion_id de otra desde PostgREST
+-- —la verificación de la FK no pasa por RLS y las filas son suyas—, así que
+-- pasar esto a `definer` convertiría el paso 1 en borrado de eventos clínicos
+-- ajenos. No se cambia nunca.
+--
 -- Ejecutar completo en: Supabase Dashboard → SQL Editor → New query
 -- ============================================================
 
@@ -51,6 +61,7 @@ declare
   n_mas         int := 0;
   n_duenos      int := 0;
   n_restaurados int := 0;
+  v_filas       int;
   v_hist        int; v_citas int; v_vac_m int; v_trat_m int; v_cobros int;
 begin
   select estado into v_estado
@@ -67,13 +78,35 @@ begin
   end if;
 
   -- ---------- 1. LOS EVENTOS DEL IMPORT ----------
-  -- Se van siempre y van primero. Un baño importado no tiene nada colgado
-  -- abajo, y sacarlos antes es lo que deja ver si a una mascota le queda
-  -- historia propia o solo tenía lo que trajo el archivo.
-  with d as (delete from tratamientos where importacion_id = p_importacion returning 1)
+  -- Se van siempre y van primero: sacarlos antes es lo que deja ver si a una
+  -- mascota le queda historia propia o solo tenía lo que trajo el archivo.
+  --
+  -- Un tratamiento importado no tiene nada colgado abajo. Una vacuna SÍ:
+  -- avisos.vacuna_id la referencia (006_avisos.sql:23) con `on delete set
+  -- null`. El aviso sobrevive —006:24-26 guarda mascota_nombre, dueno_nombre
+  -- y telefono como copia— pero el enlace se corta, y con él la memoria de "a
+  -- este ya le escribí" que vive en idx_avisos_vacuna (006:37). Consecuencia
+  -- concreta: si después del deshacer se vuelve a subir el archivo, las
+  -- vacunas entran con ids nuevos y el mismo dueño puede recibir el mismo
+  -- recordatorio por WhatsApp dos veces. Se acepta a cambio de que deshacer
+  -- signifique algo; el día que no se acepte, hay que contar avisos antes de
+  -- borrar la vacuna, igual que el paso 2 cuenta cobros.
+  --
+  -- El `user_id` de estos dos delete no es lo que da el aislamiento: esta
+  -- función es security invoker, así que RLS ya restringe las dos tablas a
+  -- esta cuenta, y el select de arriba ya levantó excepción si el
+  -- p_importacion no era de ella. Es defensa en profundidad y está escrito
+  -- igual que en los delete de los pasos 2 y 3 porque un lector que encuentre
+  -- un delete filtrado por dueño y el siguiente no, tiene que rederivar la
+  -- discusión entera para saber que el segundo también es seguro.
+  with d as (delete from tratamientos
+              where importacion_id = p_importacion and user_id = v_user
+             returning 1)
   select count(*) into n_trat from d;
 
-  with d as (delete from vacunas where importacion_id = p_importacion returning 1)
+  with d as (delete from vacunas
+              where importacion_id = p_importacion and user_id = v_user
+             returning 1)
   select count(*) into n_vac from d;
 
   -- ---------- 2. LAS MASCOTAS, UNA POR UNA ----------
@@ -112,10 +145,19 @@ begin
     delete from duenos
      where importacion_id = p_importacion
        and user_id = v_user
-       -- user_id filtra las mascotas: sin él, RLS no ve una mascota ajena
-       -- colgada de este tutor (la subconsulta corre security invoker), lo
-       -- borra creyéndolo sin mascotas, y la cascada se lleva la mascota de
-       -- la otra clínica. Es el otro extremo de la cadena de F3 de 013.
+       -- El user_id de esta subconsulta no previene nada que RLS no esté
+       -- previniendo ya: filtrar por cuenta ESCONDE una mascota ajena igual
+       -- que RLS la esconde, hace el `not exists` más restrictivo, no menos.
+       -- Va escrito acá y no en los otros count del archivo porque este es el
+       -- delete cuya cascada llega a historias_clinicas y a citas: el que un
+       -- lector tiene que poder auditar sin ir a buscar las políticas.
+       --
+       -- Lo que de verdad garantiza que no haya una mascota de otra clínica
+       -- colgada de este tutor es 013_aplicar_importacion.sql:226-228 —
+       -- rechaza un dueno_id que no sea de la cuenta al crear la mascota— más
+       -- RLS, que no deja reapuntar una mascota ajena. Si eso alguna vez se
+       -- rompe, el arreglo NO es este predicado: es contar las mascotas con
+       -- una función security definer que las vea todas.
        and not exists (select 1 from mascotas
                         where mascotas.dueno_id = duenos.id
                           and mascotas.user_id = v_user)
@@ -129,8 +171,20 @@ begin
     v_campo := v_item->>'campo';
 
     if v_item->>'tabla' = 'duenos' and v_campo in ('cedula','direccion','telefono2') then
-      execute format('update duenos set %I = $1 where id = $2 and user_id = $3', v_campo)
-        using v_item->>'antes', (v_item->>'id')::bigint, v_user;
+      begin
+        execute format('update duenos set %I = $1 where id = $2 and user_id = $3', v_campo)
+          using v_item->>'antes', (v_item->>'id')::bigint, v_user;
+      exception when unique_violation then
+        -- Mismo freno que 013_aplicar_importacion.sql al completar la cédula.
+        -- El valor que se restaura es el que había antes, y si era '' puede
+        -- chocar contra otro cliente de la cuenta que también lo tenga en '':
+        -- idx_duenos_user_cedula (011:95-97) es parcial solo contra null, un
+        -- '' sí entra al índice. Sin este handler el deshacer ENTERO se cae
+        -- con un 23505 ilegible, y se cae siempre —el estado nunca avanza—,
+        -- así que esa importación no se podría deshacer nunca más y los datos
+        -- quedan atrapados. Se salta ese campo y el deshacer sigue.
+        continue;
+      end;
 
     elsif v_item->>'tabla' = 'mascotas' and v_campo in ('edad_anios','edad_meses') then
       -- NOT NULL default 0: restaurar null reventaría. El valor anterior
@@ -149,7 +203,16 @@ begin
       continue;
     end if;
 
-    n_restaurados := n_restaurados + 1;
+    -- Solo cuenta si el update de verdad tocó una fila. Si la clínica borró
+    -- ese cliente o esa mascota a mano entre el import y el deshacer —importa
+    -- en octubre, borra un cliente en marzo, deshace en abril— el update
+    -- afecta 0 filas sin error, y sumar acá haría que `campos_restaurados`
+    -- prometa un dato devuelto que ya no existe. Ese número se guarda en
+    -- resumen.deshecho y la pantalla de historial lo lee para decir "Devolví
+    -- N datos a como estaban": inflado, es una afirmación falsa a la clínica.
+    -- `found` no sirve para esto: `execute` no lo actualiza.
+    get diagnostics v_filas = row_count;
+    n_restaurados := n_restaurados + v_filas;
   end loop;
 
   -- ---------- 5. CERRAR ----------

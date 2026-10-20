@@ -66,15 +66,26 @@ begin
   if v_estado is null then
     raise exception 'La importación % no existe o no es de esta cuenta', v_imp;
   end if;
-  -- El freno es solo contra los dos estados de deshecho, no contra cualquier
-  -- estado distinto de 'en_curso'. El spec parte archivos grandes en varias
-  -- tandas con el mismo importacion_id: cada tanda cierra en 'listo', así que
-  -- una guarda v_estado <> 'en_curso' frenaría la segunda tanda contra sí
-  -- misma. Los estados de deshecho sí son terminales: restaurar v_anteriores
-  -- encima de lo que la clínica escribió después del primer deshacer le
-  -- borraría datos propios sin posibilidad de recuperación.
+  -- Los dos estados de deshecho se miran aparte para poder decir "ya se
+  -- deshizo" y no un "ya se cerró" genérico, que es lo que la clínica
+  -- necesita leer: restaurar v_anteriores encima de lo que ella escribió
+  -- después del primer deshacer le borraría datos propios sin recuperación.
   if v_estado in ('deshecho', 'deshecho_parcial') then
     raise exception 'La importación % ya se deshizo', v_imp;
+  end if;
+  -- Y una importación que ya cerró por cualquier motivo tampoco se vuelve a
+  -- aplicar. Este es el freno de la base contra un doble envío. No hay
+  -- "tandas" que esta guarda pueda frenar contra sí mismas: paso4Escribir.jsx
+  -- abre una fila nueva de `importaciones` en cada intento (su línea 48) y
+  -- escribir.js manda el plan completo en un solo RPC (su línea 148, el único
+  -- llamador del repo), así que toda llamada legítima llega sobre una fila
+  -- recién creada en 'en_curso' y acá no estorba. Sin la guarda, reaplicar un
+  -- plan sobre una fila en 'listo' vuelve a crear los tutores y las mascotas
+  -- —ni crear_tutores ni crear_mascotas deduplican— e infla los contadores de
+  -- resumen.escrito. Si algún día el plan se parte en varios envíos sobre el
+  -- mismo importacion_id, esto se cambia por un id de envío; no se quita.
+  if v_estado <> 'en_curso' then
+    raise exception 'La importación % ya se cerró (estado %)', v_imp, v_estado;
   end if;
 
   -- ---------- 1. TUTORES NUEVOS ----------
@@ -96,22 +107,25 @@ begin
       returning id into v_id;
     exception when unique_violation then
       -- HUECO CONOCIDO DE DUPLICACIÓN (no se tapa acá):
-      -- Si la respuesta HTTP de una tanda se pierde después del commit,
-      -- la clínica reenvía el mismo JSON y crear_tutores no tiene dedup:
-      -- el tutor entra otra vez. Peor: este handler inserta el duplicado
-      -- igualmente sin cédula y lo reporta como 'omitidos por cédula
-      -- repetida', no como 'esto ya se hizo', así que el único índice que
-      -- podía frenarlo está neutralizado. No se corrige aquí porque la
-      -- función no puede distinguir un reintento de una tanda nueva: el
-      -- JSON no trae id de tanda y agregarlo cambiaría dos tareas futuras
-      -- en curso. El tapón va en el navegador: contar
-      -- `select count(*) from duenos where importacion_id = X` antes de
-      -- reenviar. (Revisión 2026-10-17)
+      -- Si la respuesta HTTP se pierde después del commit, la clínica vuelve
+      -- a correr el asistente y crear_tutores no tiene dedup: el tutor entra
+      -- otra vez. Peor: este handler inserta el duplicado igualmente sin
+      -- cédula y lo reporta como 'omitidos por cédula repetida', no como
+      -- 'esto ya se hizo', así que el único índice que podía frenarlo queda
+      -- neutralizado. Y no es solo de tutores: crear_mascotas tampoco
+      -- deduplica, y ahí no hay ningún índice único que ni siquiera lo
+      -- intente.
       --
-      -- Y no es solo de tutores: crear_mascotas tampoco tiene dedup, y ahí
-      -- no hay ningún índice único que ni siquiera lo intente. El tapón del
-      -- navegador tiene que contar las dos tablas por importacion_id, no
-      -- solo duenos, o tapa la mitad del hueco.
+      -- La guarda de v_estado de arriba NO alcanza contra este caso: el
+      -- segundo intento abre una fila nueva de `importaciones` en 'en_curso'
+      -- (paso4Escribir.jsx:48), así que llega limpia. Por la misma razón el
+      -- conteo de `yaEscribio()` (escribir.js:105) tampoco lo tapa: cuenta
+      -- por importacion_id, y sobre un id recién nacido siempre da 0/0 —
+      -- sirve contra un doble envío de la MISMA fila, no contra volver a
+      -- correr el asistente. Lo que hoy frena el duplicado es que el paso 3
+      -- recalcula el plan contra la base y empareja por cédula/nombre/
+      -- teléfono. Cerrarlo acá pide un id de envío adentro del JSON, y eso es
+      -- decisión del frontend; se está viendo aparte. (Revisión 2026-10-19)
       --
       -- idx_duenos_user_cedula (011) es único por cuenta. Si el archivo
       -- trae una cédula que ya es de otro cliente, lo que NO puede pasar
@@ -159,9 +173,14 @@ begin
 
     for v_campo, v_valor in select key, value from jsonb_each_text(v_item->'campos') loop
       -- Lista blanca y no "lo que venga": el nombre del campo entra en un
-      -- format() y de ahí a SQL. Y telefono NO está — es NOT NULL, siempre
-      -- tiene algo, así que completarlo es imposible por definición. Si el
-      -- archivo trae otro número, el paso 3 lo avisa y no lo pisa.
+      -- format() y de ahí a SQL. Y telefono NO está, por decisión y no por
+      -- imposibilidad: es NOT NULL, pero sí puede quedar en '' —este mismo
+      -- archivo lo escribe así unas líneas arriba, en el coalesce del insert
+      -- de tutores nuevos— y un '' es un hueco perfectamente completable. No
+      -- se completa porque un teléfono es el canal de contacto: si el archivo
+      -- trae otro número, el paso 3 lo avisa y la clínica decide a mano. Ese
+      -- aviso del paso 3 no es código muerto; es el único lugar donde se le
+      -- dice "traés un teléfono para esta persona y no lo estoy escribiendo".
       if v_campo not in ('cedula', 'direccion', 'telefono2') then
         raise exception 'Campo no completable en duenos: %', v_campo;
       end if;
@@ -254,9 +273,12 @@ begin
     end if;
 
     for v_campo, v_valor in select key, value from jsonb_each_text(v_item->'campos') loop
-      -- especie NO está: es NOT NULL, una mascota que ya existe siempre
-      -- tiene especie, no hay vacío que llenar. (El spec la lista por
-      -- error; el razonamiento es el mismo que para duenos.telefono.)
+      -- especie NO está, y por decisión, igual que duenos.telefono: es NOT
+      -- NULL pero nada le impide estar en ''. Queda afuera porque el import
+      -- nunca la deja así —crear_mascotas la escribe sin coalesce, así que
+      -- una mascota sin especie resuelta ni entra— y completarla después
+      -- sería adivinar perro o gato sobre una ficha que ya existe. (El spec
+      -- la lista como completable; es un error del spec.)
       if v_campo not in ('raza', 'fecha_nacimiento', 'edad_anios', 'edad_meses') then
         raise exception 'Campo no completable en mascotas: %', v_campo;
       end if;
@@ -269,14 +291,35 @@ begin
       -- registro al que nunca le pusieron la edad.
       if v_antes is null or v_antes = ''
          or (v_campo in ('edad_anios', 'edad_meses') and v_antes = '0') then
-        execute format('update mascotas set %I = $1 where id = $2 and user_id = $3', v_campo)
-          using (case when v_campo in ('edad_anios', 'edad_meses')
-                          then coalesce(v_valor, '0')
-                      -- fecha_nacimiento: misma razón que en crear_mascotas.
-                      -- '' no pasa el check de 011:74 y revienta el import.
-                      when v_campo = 'fecha_nacimiento'
-                          then nullif(v_valor, '')
-                      else v_valor end), v_id, v_user;
+        -- Dos `execute` y no un `case` con todos los campos adentro: en
+        -- `execute ... using`, el tipo de cada $n lo pone la expresión que se
+        -- le pasa, y un `case` tiene UN solo tipo de salida. Estaba con las
+        -- cuatro columnas en el mismo `case`, todas las ramas de texto, así
+        -- que $1 salía text — y edad_anios/edad_meses son integer
+        -- (001_init.sql:25-26). Postgres no convierte text a integer en
+        -- contexto de asignación: el update se cae con 42804 y, como acá no
+        -- hay handler, se lleva el import entero. Y es la rama que más
+        -- importa, porque es la que motivó 011: completarle la fecha de
+        -- nacimiento y las dos edades a una mascota que ya estaba registrada
+        -- con 0 y 0. Las edades van por su propio execute con ::int afuera del
+        -- `case`, igual que el ::int con el que 014_deshacer_importacion.sql
+        -- las restaura — esa asimetría era el bug.
+        --
+        -- Razonado contra el esquema y las reglas de coerción, no corrido: no
+        -- hay Postgres a mano. Partido así da lo mismo si plpgsql tipa $1 por
+        -- la expresión o si lo infiriera del destino; las dos lecturas quedan
+        -- correctas, y eso es justo la razón de partirlo en vez de castear
+        -- adentro del `case`.
+        if v_campo in ('edad_anios', 'edad_meses') then
+          execute format('update mascotas set %I = $1 where id = $2 and user_id = $3', v_campo)
+            using coalesce(v_valor, '0')::int, v_id, v_user;
+        else
+          execute format('update mascotas set %I = $1 where id = $2 and user_id = $3', v_campo)
+            -- fecha_nacimiento: misma razón que en crear_mascotas.
+            -- '' no pasa el check de 011:74 y revienta el import.
+            using (case when v_campo = 'fecha_nacimiento' then nullif(v_valor, '')
+                        else v_valor end), v_id, v_user;
+        end if;
         v_anteriores := v_anteriores || jsonb_build_object(
           'tabla', 'mascotas', 'id', v_id, 'campo', v_campo, 'antes', v_antes);
         v_toco := true;
@@ -364,21 +407,26 @@ begin
   end loop;
 
   -- ---------- 7. CERRAR EL REGISTRO ----------
-  -- `anteriores` se acumula con ||, no se pisa: una segunda tanda tiene que
-  -- AGREGAR sus entradas a las de la primera para que deshacer pueda iterar
-  -- el registro completo. `= v_anteriores` borra lo de las tandas previas.
+  -- `anteriores` se agrega con ||, no se pisa: `= v_anteriores` reemplazaría
+  -- el array entero, y lo que haya ahí es lo único con lo que deshacer puede
+  -- devolver un campo completado a como estaba. Con la guarda de v_estado de
+  -- arriba, una importación entra acá una sola vez y el array está vacío,
+  -- así que hoy el || y el = darían lo mismo: se escribe || porque el que lo
+  -- pise el día que eso cambie no se va a enterar hasta que alguien pida
+  -- Deshacer y no vuelva nada.
   --
-  -- Los contadores del resumen se suman al valor que ya estaba: el || de
-  -- jsonb reemplaza claves repetidas con el valor del lado derecho, así que
-  -- sin la suma el resumen refleja solo la última tanda. Se lee el valor
-  -- acumulado con (resumen->'escrito'->>'clave')::int y se suma lo de esta
-  -- tanda. `omitidos` es un array y también se acumula con ||. Las dos
-  -- columnas son `not null default` en 012:31 y 012:36, así que ningún || de
-  -- acá puede anular la columna.
+  -- Los contadores se suman al valor que ya estaba por la misma razón: el ||
+  -- de jsonb reemplaza una clave repetida con el valor del lado derecho, así
+  -- que escribirlos pelados sería pisar y no acumular. Se lee el acumulado
+  -- con (resumen->'escrito'->>'clave')::int y se le suma lo de esta llamada;
+  -- `omitidos` es un array y también se agrega con ||. Las dos columnas son
+  -- `not null default` en 012:31 y 012:36, así que ningún || de acá puede
+  -- anular la columna.
   --
-  -- El `return` de abajo devuelve los números de ESTA tanda, no el acumulado.
-  -- El navegador lleva su propio total sumando las respuestas de cada tanda:
-  -- devolver el acumulado acá y el parcial allá era la fuente de confusión.
+  -- El `return` de abajo devuelve los números de ESTA llamada. Hoy coinciden
+  -- con el acumulado —una llamada por fila— y es a propósito que no se lea el
+  -- resumen para armarlo: leer el acumulado acá y el parcial allá era la
+  -- fuente de confusión.
   update importaciones
      set estado     = 'listo',
          anteriores = anteriores || v_anteriores,
@@ -416,9 +464,10 @@ begin
 
   -- Los números salen de la base, no de la predicción del paso 3. Es la
   -- diferencia entre "esto hice" y "esto creía que iba a hacer".
-  -- Este retorno es el de ESTA tanda, no el acumulado: el navegador suma las
-  -- respuestas de cada tanda por su cuenta; leer el resumen acumulado y este
-  -- retorno como si fueran lo mismo daría el doble en la segunda tanda.
+  -- Son los contadores de ESTA llamada y no una lectura del resumen que se
+  -- acaba de escribir: si algún día el mismo importacion_id recibe más de una
+  -- llamada, devolver el acumulado acá y el parcial en la pantalla daría el
+  -- doble en la segunda.
   return jsonb_build_object(
     'importacion_id',       v_imp,
     'tutores_creados',      n_tut_nuevos,
