@@ -272,25 +272,38 @@ once archivos donde caben diez es cero, y la alternativa —bloquear la fila
 de la mascota en cada subida— es complejidad real por un problema
 imaginario en una clínica donde sube archivos una persona a la vez.
 
-### Pendiente de verificar antes de escribir la migración
+### Verificado el 2026-10-20
 
-La documentación de Supabase muestra `fileSizeLimit: '1MB'` y
-`allowedMimeTypes: ['image/*']` por el cliente de JavaScript, pero **no
-documenta los nombres de columna para ponerlos por SQL**.
-
-Correr en el SQL Editor antes de escribir la capa 3:
+La documentación de Supabase solo muestra `fileSizeLimit: '1MB'` y
+`allowedMimeTypes: ['image/*']` por el cliente de JavaScript, y no
+documenta los nombres de columna para ponerlos por SQL. Se consultó el
+esquema del proyecto directamente:
 
 ```sql
 select column_name, data_type
 from information_schema.columns
-where table_schema = 'storage' and table_name = 'buckets'
-order by ordinal_position;
+where table_schema = 'storage' and table_name = 'buckets';
 ```
 
-Si existen `file_size_limit` y `allowed_mime_types`, la capa 3 va en la
-migración. Si no, se configura a mano en el dashboard y **la migración lo
-dice en un comentario**, en vez de llevar un SQL que no corre. Las capas 1
-y 2 no dependen de esto.
+Las dos columnas existen: **`file_size_limit` es `bigint`** (bytes, no la
+cadena `'5MB'` del cliente JS) y **`allowed_mime_types` es un arreglo**.
+La capa 3 va en la migración:
+
+```sql
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('documentos', 'documentos', false, 5242880, array['application/pdf'])
+on conflict (id) do nothing;
+```
+
+`5242880` es el mismo número que el `check` de `peso_bytes`. Los dos
+límites tienen que moverse juntos; si se separan, el que rechaza primero
+decide, y el mensaje que ve la clínica cambia según cuál sea.
+
+**Un detalle de la misma consulta:** `storage.buckets` tiene una columna
+`type` de tipo `USER-DEFINED` — las versiones nuevas de Supabase distinguen
+buckets estándar de buckets analíticos. El insert de arriba no la nombra, o
+sea que toma el default, que es el estándar. Es lo que se quiere; se deja
+dicho para que nadie lo "complete" después pensando que faltaba.
 
 ### Cómo se abre un PDF: URL firmada
 
@@ -493,19 +506,52 @@ invisibles.
 Efecto secundario bueno: después de correr el barrido, el número baja a la
 vista. Ahí se comprueba que el barrido funcionó.
 
-### Pendiente de verificar antes de escribir la función
+### Verificado el 2026-10-20 (y lo que quedó sin verificar)
 
-`storage.objects` guarda el tamaño dentro de una columna `metadata` de tipo
-`jsonb`, pero el nombre exacto de la llave no está verificado en este
-proyecto. Correr en el SQL Editor:
+`select metadata from storage.objects limit 1` devolvió **cero filas**: no
+hay un solo objeto en el storage del proyecto. Así que la forma del
+`metadata` no se pudo mirar con un dato real.
 
-```sql
-select metadata from storage.objects limit 1;
+Lo que sí se pudo: listar las columnas de `storage.objects`, que no
+necesita filas.
+
+```
+id, bucket_id, name, owner, created_at, updated_at, last_accessed_at,
+metadata (jsonb), path_tokens (ARRAY), version, owner_id,
+user_metadata (jsonb), archived_at, is_delete_marker, is_versioned
 ```
 
-Si el tamaño viene como `metadata->>'size'`, la suma es directa. Si viene
-con otro nombre, se ajusta. La migración no se escribe antes de esta
-consulta.
+**Ninguna columna guarda el tamaño.** Queda confirmado que está dentro de
+`metadata`, y que no hay una alternativa mejor escondida. La Storage API lo
+escribe como `metadata->>'size'`.
+
+**Cómo se verifica sin poder verificarlo hoy:** la suma se escribe con
+`(metadata->>'size')::bigint`, y la primera prueba manual de la sección 9
+—subir un PDF y mirar el Admin— lo comprueba. Si la llave fuera otra, la
+columna "Espacio" muestra 0 con un archivo de 2 MB adentro, y eso se ve de
+una. El riesgo está acotado a una celda de una pantalla que solo mira el
+dueño, y la prueba que lo detecta ya está en el plan.
+
+### Dos hallazgos de esa misma consulta
+
+**`path_tokens` es un arreglo.** `path_tokens[1]` es el `user_id` directo.
+La suma por clínica lo usa en vez de `storage.foldername(name)`: es la
+misma información sin llamar a una función por fila.
+
+**El proyecto tiene versionado de objetos** — `archived_at`,
+`is_delete_marker`, `is_versioned`. Un barrido o una suma ingenuos
+contarían marcadores de borrado y versiones archivadas como si fueran
+archivos. No lo son.
+
+Las dos consultas de la sección 7 y el barrido de la sección 6 filtran:
+
+```sql
+where coalesce(is_delete_marker, false) = false
+  and archived_at is null
+```
+
+Sin ese filtro, la columna "Espacio" cobraría de más y el barrido
+intentaría borrar cosas que no son archivos.
 
 ---
 
