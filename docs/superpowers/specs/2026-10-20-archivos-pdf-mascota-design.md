@@ -232,15 +232,32 @@ faltante.
 
 ## 4. El bucket
 
-```sql
-insert into storage.buckets (id, name, public)
-values ('documentos', 'documentos', false)
-on conflict (id) do nothing;
-```
+Privado, y el `insert` que va en la migración es **el de la sección 5**
+(`file_size_limit` y `allowed_mime_types` incluidos), no uno más corto. Se
+dice acá porque un `insert ... on conflict (id) do nothing` que se corra
+primero sin los límites deja el bucket creado **sin ellos**, y el segundo
+no los agrega: el `do nothing` no actualiza nada. La capa 3 quedaría
+apagada sin un solo error.
 
-Privado. Las cuatro políticas son copia literal de `001_init.sql:135-149`
-con `'documentos'` en lugar de `'mascotas'`: misma carpeta
-`{user_id}/...`, mismo `(storage.foldername(name))[1] = auth.uid()::text`.
+Las cuatro políticas salen de `001_init.sql:135-149` con `'documentos'` en
+lugar de `'mascotas'`: misma carpeta `{user_id}/...`, mismo
+`(storage.foldername(name))[1] = auth.uid()::text`.
+
+**Con una diferencia en la de `insert`:** lleva también
+`public.esta_activo()`. Sin eso, el bloqueo de la sección 3 tapa la fila
+pero no los bytes — una clínica vencida sigue subiendo objetos al bucket
+que el dueño paga, y lo único que falla es el insert posterior. Cada
+objeto queda huérfano hasta el barrido. Es el mismo argumento de la
+sección 3, aplicado a la capa donde el archivo de verdad pesa.
+
+Las otras tres no la llevan, y es a propósito: la que cuesta plata es la
+de subir. `select` sin la cláusula no abre nada nuevo, porque para pedir
+una URL firmada hay que saber la `ruta`, y la ruta vive en una fila que
+`own_rows_archivos_mascota` ya le esconde a la clínica vencida. Y `delete`
+tiene que seguir andando sin mirar la suscripción: ahí pasa el rollback de
+la sección 6 —el `.remove()` del objeto cuyo insert acaba de fallar, que
+es precisamente lo que pasa cuando la clínica está vencida— y ahí pasa el
+barrido. Una capa que impide limpiar deja basura, no la evita.
 
 Ruta de cada objeto: `{user_id}/{mascota_id}/{timestamp}-{aleatorio}.pdf`.
 
