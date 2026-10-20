@@ -133,7 +133,7 @@ export function textoRestaurados(d) {
  * "escribiendo 0 y 0" mientras escribe 74 es falso.
  *
  * `tutores_a_completar` y `mascotas_a_completar` cuentan TUTORES y MASCOTAS,
- * no campos: plan.js:597-599 los saca del largo de `completar_tutores` y
+ * no campos: plan.js:615-617 los saca del largo de `completar_tutores` y
  * `completar_mascotas`, que se acumulan una entrada por id del existente. Acá
  * decían "2 datos de tutores", y dos tutores con tres campos en blanco cada
  * uno son seis datos, no dos. El paso 3 ya lo dice bien ("Ya existen: 2

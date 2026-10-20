@@ -180,6 +180,15 @@ export function emparejarTutor(idx, tutor) {
 
   // 3. Mismo nombre, teléfono distinto. El caso real de la base de La
   //    Huella: dos "Teofilo Arboleda" que son Rueda y Pinzón.
+  //
+  //    Con tres o más homónimos en la base, la pregunta ofrece solo
+  //    `candidatos[0]`: la respuesta es "es la misma que ÉSTA" o "es otra",
+  //    y no "¿cuál de las tres?". La clínica puede contestar "es otra" y
+  //    arreglar el duplicado después en el mostrador, así que no se pierde
+  //    nada, pero contesta de más. No se amplió porque cambiar la duda a
+  //    una lista toca también la pantalla del paso 3, y el piloto no lo
+  //    ejercita: tiene dos homónimas, y una está en el archivo y la otra en
+  //    la base, con lo que `candidatos` trae una sola.
   return { certeza: 'duda', existente: candidatos[0], motivo: 'nombre_tel_distinto' };
 }
 
@@ -451,6 +460,15 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
       const k = sinTildes(masc.raza ?? '');
       // `clave: k` viaja en el grupo y no se recalcula en la pantalla: es
       // la misma llave con la que `decisiones.especies` va a volver.
+      //
+      // Las mascotas sin raza caen todas en la misma llave, `''`, así que
+      // una sola respuesta decide la especie de todas. Es a propósito y no
+      // un descuido: el grupo lleva `mascotas` con los nombres, la pantalla
+      // los lista —los primeros seis— y dice en voz alta que una respuesta
+      // las tapa a todas (paso3Revisar.jsx:296-301). Partirlo en una
+      // pregunta por mascota sería más preciso y más largo, y la celda
+      // vacía no trae ni un indicio para diferenciarlas: cada pregunta
+      // tendría la misma información que ésta, repetida.
       if (!especies.has(k)) especies.set(k, { clave: k, raza: masc.raza ?? '', cuantas: 0, mascotas: [] });
       const g = especies.get(k);
       g.cuantas += 1;

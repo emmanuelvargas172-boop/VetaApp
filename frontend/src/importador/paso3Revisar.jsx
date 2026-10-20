@@ -125,8 +125,8 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
       <h3 style={{ margin: 0, fontSize: 15 }}>3 · Qué va a pasar</h3>
       {/* Con respuestas pendientes los números están incompletos, y siempre
           hacia abajo: el tutor que quedó en una duda sin contestar no entra,
-          y con él se quedan afuera sus mascotas (plan.js:352) y los eventos
-          de esas mascotas (plan.js:444). Si no se dijera, la clínica leería
+          y con él se quedan afuera sus mascotas (plan.js:453) y los eventos
+          de esas mascotas (plan.js:555). Si no se dijera, la clínica leería
           como definitivo un número que va a subir solo en cuanto conteste. */}
       <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
         Todavía no escribí nada. Esto es lo que voy a hacer si confirmás.
@@ -247,7 +247,7 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
           <div style={{ marginTop: 8, display: 'flex', gap: 14, fontSize: 13 }}>
             {/* Ninguna de las dos viene marcada, y es a propósito: mientras
                 `decisiones.dudas[d.id]` sea undefined, armarPlan cuenta este
-                caso como sin contestar (plan.js:332-337) y el botón de confirmar
+                caso como sin contestar (plan.js:345-361) y el botón de confirmar
                 no existe. Pintar una opción marcada de entrada diría que ya
                 está decidido cuando no lo está, y además dejaría la pantalla
                 sin salida: en React, clickear un radio que ya está checked no
@@ -284,7 +284,7 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
           {/* La raza en blanco cae acá con `clave` y `raza` vacías
               (clasificar() devuelve raza:null con la celda vacía,
               normalizar.js:166, y armarPlan agrupa por esa clave vacía,
-              plan.js:451-454). Sin este caso aparte la pantalla decía, literal,
+              plan.js:460-472). Sin este caso aparte la pantalla decía, literal,
               `No sé qué es ""`.
 
               Va con su propio texto y no con el de una raza desconocida
@@ -306,7 +306,7 @@ export default function Paso3Revisar({ columnas, onAtras, onListo }) {
             </p>
           )}
           {/* Igual que las dudas: ninguna viene marcada. Mientras
-              `decisiones.especies[e.clave]` sea undefined, plan.js:449-454 deja
+              `decisiones.especies[e.clave]` sea undefined, plan.js:458-472 deja
               la raza en la lista de preguntas y el botón no existe — un
               "Perro" marcado de entrada sería una pantalla que dice decidido
               lo que no está, y sin salida por el onChange que no dispara. */}

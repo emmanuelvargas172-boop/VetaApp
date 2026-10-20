@@ -281,7 +281,7 @@ describe('textoVaAEscribir', () => {
     expect(lineas).toContain('1 tutor');
     expect(lineas).toContain('1 mascota');
     // "tutor al que le completo datos" y no "dato de tutor": el contador
-    // cuenta tutores, no campos (plan.js:597-599 usa el largo de
+    // cuenta tutores, no campos (plan.js:615-617 usa el largo de
     // `completar_tutores`, una entrada por id del existente). Dos tutores con
     // tres campos en blanco cada uno son seis datos, y la pantalla decía dos.
     expect(lineas).toContain('1 tutor al que le completo datos');
