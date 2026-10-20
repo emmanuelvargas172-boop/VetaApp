@@ -129,4 +129,30 @@ describe('agrupar', () => {
     const v = agrupar(estado, filas).eventos.find((e) => e.tipo === 'vacuna');
     expect(v).toMatchObject({ nombre: 'Anual', fecha: '2026-07-14', proxima: '2027-07-14', notas: null });
   });
+
+  // Un 29 de febrero sumándole 1 al año da un día que no existe. Es la única
+  // fecha del calendario que lo hace, y el archivo piloto es de una clínica
+  // que lleva años: tener una vacuna puesta un 29 de febrero es cuestión de
+  // tiempo, no un caso inventado.
+  //
+  // Lo que se exige acá es que la fecha exista. Qué pasa después con una que
+  // no existe depende del motor —V8 rueda '2025-02-29T12:00:00' a Mar 1, y la
+  // especificación dice que el parseo ISO falle, así que otro motor puede dar
+  // Invalid Date y dejar el badge de Historias.jsx:186-196 en "Invalid Date"
+  // sin avisar nunca de la vacuna—, y esa incertidumbre es justo la razón de
+  // no escribirla. La columna es `text` (001_init.sql:55), así que Postgres
+  // no la ataja.
+  it('un 29 de febrero no produce una próxima dosis que no existe', () => {
+    const { estado, filas } = leer([['Ana', 'Max', '3000000011', '', '', '', '', '29/02/2024']]);
+    const v = agrupar(estado, filas).eventos.find((e) => e.tipo === 'vacuna');
+    expect(v.fecha).toBe('2024-02-29');
+    expect(v.proxima).toBe('2025-03-01');
+  });
+
+  // Los años no bisiestos no se tocan: el 28 de febrero sigue cayendo en 28.
+  it('el 28 de febrero sigue dando el 28 del año siguiente', () => {
+    const { estado, filas } = leer([['Ana', 'Max', '3000000011', '', '', '', '', '28/02/2026']]);
+    const v = agrupar(estado, filas).eventos.find((e) => e.tipo === 'vacuna');
+    expect(v.proxima).toBe('2027-02-28');
+  });
 });

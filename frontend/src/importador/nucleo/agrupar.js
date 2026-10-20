@@ -95,7 +95,26 @@ export function agrupar(estado, filas) {
     // inventarle un antecedente clínico a un animal.
     if (r.ultima_vacuna) {
       const [a, m, d] = r.ultima_vacuna.split('-').map(Number);
-      const prox = `${a + 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      // El año se suma con Date.UTC y no pegando `a + 1` al mes y al día,
+      // porque hay una fecha del calendario a la que eso le da un día que no
+      // existe: un 29 de febrero sumándole 1 al año da 2025-02-29.
+      //
+      // Lo único que se puede afirmar de un día inexistente es que no existe.
+      // Qué pasa después depende del motor: V8 rueda '2025-02-29T12:00:00' a
+      // Mar 1 —verificado—, pero la especificación dice que el parseo ISO
+      // falle, así que otro motor puede devolver Invalid Date. Ahí el badge de
+      // Historias.jsx:186-196 cae en la última rama y la clínica lee "Invalid
+      // Date" en la ficha, y lo peor es lo que NO pasa: esa vacuna no entra en
+      // ninguna de las ventanas de días, así que el recordatorio no sale nunca
+      // y el animal se queda sin refuerzo sin que nadie se entere.
+      //
+      // Postgres no lo ataja: proxima_dosis es `text` (001_init.sql:55).
+      //
+      // Date.UTC con mes 1 y día 29 de un año no bisiesto rueda a marzo por
+      // definición, y es la respuesta correcta para un refuerzo anual: un día
+      // tarde no tiene consecuencia clínica, y una fecha inválida sí. UTC y no
+      // hora local para que el `toISOString` no se corra de día por el huso.
+      const prox = new Date(Date.UTC(a + 1, m - 1, d)).toISOString().slice(0, 10);
       // nombre: 'Anual' porque la columna "última vacuna" solo trae la
       // fecha. vacunas.nombre es NOT NULL en Postgres, así que algo tiene
       // que ir; 'Anual' es lo que la clínica registra para la polivalente
