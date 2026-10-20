@@ -291,6 +291,17 @@ const routes = [
           `[api] la mascota ${id} se borró pero quedaron ${archivos.length} objetos huérfanos:`,
           borrado.error.message
         );
+      } else {
+        // `.remove()` devuelve éxito aunque no haya borrado todos los objetos
+        // de la lista: los que no estaban en Storage —o los que la política
+        // negó— simplemente no aparecen en `data`. No hay error. Se avisa
+        // cuántos se quedaron para que el barrido los encuentre.
+        const borrados = (borrado.data || []).length;
+        if (borrados < archivos.length) {
+          console.warn(
+            `[api] mascota ${id}: se pidió borrar ${archivos.length} objetos, Storage confirmó ${borrados}`
+          );
+        }
       }
     }
 
@@ -309,19 +320,38 @@ const routes = [
       .order('created_at', { ascending: false })) },
 
   { m: 'POST', re: /^\/archivos$/, fn: async ({ body }) => {
-    const file = (typeof FormData !== 'undefined' && body instanceof FormData)
-      ? body.get('archivo')
-      : body?.archivo;
+    // `parseMascotaBody` ya estableció el patrón: un getter `g` que sabe si
+    // el body es FormData o un objeto plano, y lee el campo correcto en cada
+    // caso. Sin él, `body?.cuantos_hay` y los demás campos siempre son
+    // `undefined` cuando el llamador manda FormData — body.get() no es lo
+    // mismo que body.campo.
+    const isFD = typeof FormData !== 'undefined' && body instanceof FormData;
+    const g = (k) => (isFD ? body.get(k) : body?.[k]);
+
+    const file = g('archivo');
+
+    // `cuantos_hay` ausente no es lo mismo que cero: cero archivos existentes
+    // es un estado válido del sistema; campo no enviado indica un llamador
+    // que no conoce la interfaz. Se valida igual que `mascota_id` y `tipo`.
+    const cuantosRaw = g('cuantos_hay');
+    if (cuantosRaw == null || cuantosRaw === '') throw apiError('Falta indicar cuántos archivos tiene la mascota');
 
     // El chequeo del frontend corre ACÁ y no solo en el componente, para
     // que ninguna pantalla futura pueda saltárselo. Es la capa que da el
     // mensaje útil; las otras dos (el check de la tabla y el límite del
     // bucket) solo rechazan.
-    const veredicto = revisarArchivo(file, Number(body?.cuantos_hay) || 0);
+    const veredicto = revisarArchivo(file, Number(cuantosRaw));
     if (!veredicto.ok) throw apiError(veredicto.motivo);
 
-    if (!body?.mascota_id) throw apiError('Falta decir de qué mascota es el archivo');
-    if (!body?.tipo) throw apiError('Falta elegir qué tipo de documento es');
+    const mascotaIdRaw = g('mascota_id');
+    if (!mascotaIdRaw) throw apiError('Falta decir de qué mascota es el archivo');
+    // Se coerciona a número aquí y no en el insert: si el valor no es un
+    // entero válido, Postgres lo rechaza con un error de tipo crudo en inglés.
+    // Fallando aquí se da un mensaje claro antes de tocar el bucket.
+    const mascotaId = Number(mascotaIdRaw);
+    if (!Number.isFinite(mascotaId) || mascotaId <= 0) throw apiError('El identificador de mascota no es válido');
+
+    if (!g('tipo')) throw apiError('Falta elegir qué tipo de documento es');
 
     // PRIMERO el bucket, DESPUÉS la fila. El orden es la decisión central
     // de todo esto.
@@ -331,20 +361,23 @@ const routes = [
     // existe: la lista lo muestra, la clínica lo clickea, y no abre nada.
     // Nadie puede distinguir eso de un bug.
     //
-    // En este orden, lo que queda si algo falla es un objeto sin fila: no
-    // se ve en ninguna pantalla, no le miente a nadie, y el barrido de
-    // huérfanos lo encuentra. Se falla hacia el huérfano, nunca hacia la
-    // fila mentirosa.
-    const ruta = await subirDocumento(file, body.mascota_id);
+    // En este orden lo que queda si algo falla es un objeto sin fila: no se
+    // ve en ninguna pantalla, no le miente a nadie, y el barrido de huérfanos
+    // lo encuentra. Se falla hacia el huérfano. Excepción no contemplada: si
+    // el insert se confirma pero la respuesta se pierde (timeout, corte de
+    // red), `unwrap` lanza, el catch borra el objeto, y la fila queda apuntando
+    // a nada — exactamente el estado que este orden intenta evitar. Es un
+    // caso de borde, no el flujo normal; el trade-off sigue valiendo.
+    const ruta = await subirDocumento(file, mascotaId);
 
     try {
       return unwrap(await supabase.from('archivos_mascota').insert({
-        mascota_id:      body.mascota_id,
+        mascota_id:      mascotaId,
         ruta,
         nombre:          file.name,
-        tipo:            body.tipo,
-        descripcion:     body.descripcion || null,
-        fecha_documento: body.fecha_documento || null,
+        tipo:            g('tipo'),
+        descripcion:     g('descripcion') || null,
+        fecha_documento: g('fecha_documento') || null,
         peso_bytes:      file.size,
       }).select('*').single());
     } catch (err) {
@@ -356,9 +389,15 @@ const routes = [
       // Si el `.remove()` también falla no se dice nada a la clínica: su
       // problema es el insert, y es el que se le va a mostrar. El huérfano
       // queda para el barrido, que es exactamente para lo que existe.
+      //
+      // `.remove()` puede devolver éxito con `data` vacío si el objeto ya
+      // no existía o si la política lo negó sin error. Se avisa en consola
+      // para que el barrido lo encuentre; no se lanza nada extra.
       const limpieza = await supabase.storage.from('documentos').remove([ruta]);
       if (limpieza.error) {
         console.warn('[api] quedó un objeto huérfano en documentos:', ruta, limpieza.error.message);
+      } else if (!limpieza.data || limpieza.data.length === 0) {
+        console.warn('[api] rollback sin confirmación de borrado — posible huérfano en documentos:', ruta);
       }
 
       // El trigger y los checks de 015 levantan nombres secos. Acá se
@@ -400,8 +439,19 @@ const routes = [
     // Y si el objeto se borra pero la fila no, la clínica ve un archivo
     // que no abre — malo, pero visible, y se arregla volviendo a darle
     // "Borrar". Es el modo de falla que se puede reintentar.
+    //
+    // Asimetría de `.remove()`: devuelve `{ error: null }` aunque no haya
+    // borrado nada — el objeto ya no existía o la política lo negó. Esos
+    // casos no aparecen como error; el objeto ausente simplemente no está en
+    // `data`. El check de `borrado.error` captura fallos de red y de
+    // autenticación, pero no el "borré cero objetos". En ese caso la fila
+    // tampoco se borra: se avisa en consola y se lanza igual, para que el
+    // botón "Borrar" siga siendo reintentable y el barrido lo encuentre.
     const borrado = await supabase.storage.from('documentos').remove([fila.ruta]);
     if (borrado.error) throw apiError(borrado.error.message);
+    if (!borrado.data || borrado.data.length === 0) {
+      console.warn('[api] DELETE /archivos: Storage reportó éxito sin borrar el objeto — posible huérfano:', fila.ruta);
+    }
 
     unwrap(await supabase.from('archivos_mascota').delete().eq('id', id));
     return { mensaje: 'Archivo eliminado' };
