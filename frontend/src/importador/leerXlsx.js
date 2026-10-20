@@ -76,10 +76,23 @@ export function celda(c) {
     // librería.
     if (c.v == null) return '';
 
-    // toFixed(0) y no String(): String(1e21) devuelve "1e+21". Ninguna
-    // cédula llega a eso, pero el día que una celda traiga un número
-    // enorme, "1e+21" normalizado a dígitos es basura silenciosa.
-    if (Number.isInteger(c.v)) return c.v.toFixed(0);
+    // toFixed(0) para que el entero salga con todos sus dígitos y sin coma
+    // decimal, que es lo que espera el replace(/\D/g,'') de filas.js:65:
+    // "1000000200.0" ahí se vuelve 10000002000, un cero de más en una cédula.
+    //
+    // El `>= 1e21` no es paranoia de más: acá decía que toFixed(0) protegía de
+    // la notación científica, y NO protege. toFixed está especificado para
+    // devolver ToString(x) cuando x >= 10^21, así que (1e21).toFixed(0) da
+    // "1e+21" igual que String(1e21) —verificado— y "1e+21" sin los no-dígitos
+    // es "121". El comentario viejo le decía al próximo lector que ese borde
+    // estaba cubierto cuando seguía abierto; ahora se ataja a mano.
+    //
+    // Arriba de 2^53 el valor ya lo perdió SheetJS y no hay nada que hacer
+    // desde este lado: BigInt() de un entero así devuelve lo que llegó, no lo
+    // que había en la celda.
+    if (Number.isInteger(c.v)) {
+      return Math.abs(c.v) >= 1e21 ? BigInt(c.v).toString() : c.v.toFixed(0);
+    }
 
     // Un precio con centavos no hay ninguno hoy, pero puede llegar, y
     // truncarlo en silencio sería peor: se escribe tal cual y el núcleo

@@ -171,8 +171,16 @@ export function clasificar(estado, razaCruda) {
   return { especie: null, raza };
 }
 
-// Cuántos campos útiles trae una fila. Es el criterio para decidir cuál
-// gana cuando la misma mascota aparece dos veces.
+// Cuántos campos útiles trae una fila.
+//
+// NO es el criterio de desempate, y decía que sí. Cuando la misma mascota
+// aparece dos veces decide agrupar(), campo por campo (agrupar.js:60-65), que
+// conserva más dato que elegir una fila entera y tirar la otra. Esta función
+// no la importa nadie: el único consumidor en el repo es su propio test.
+//
+// Se deja porque el plan la pide, pero el comentario viejo era una trampa: el
+// día que alguien quiera cambiar el desempate iba a editar esto —porque el
+// comentario le decía que acá estaba— y no iba a cambiar nada.
 export const riqueza = (r) => [
   r.cedula, r.tutor, r.direccion, r.tel1, r.tel2, r.mascota, r.raza,
   r.nacimiento, r.tipo_bano, r.costo, r.observaciones, r.ultima_vacuna, r.ultima_desp,

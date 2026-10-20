@@ -98,25 +98,46 @@ export async function abrirImportacion({ archivo, hoja, mapeo }) {
  * plan duplica la base entera: el plan se calculó contra la foto de antes
  * de escribir, y 013 no deduplica crear_tutores ni crear_mascotas.
  *
- * Cuenta las DOS tablas y no solo `duenos`: un archivo que solo le agrega
- * mascotas a clientes que ya existían escribe 0 dueños y N mascotas.
- * Contar solo dueños diría "no escribió nada" y duplicaría cada mascota.
+ * Cuenta las CUATRO tablas que llevan `importacion_id` (012:50), y no solo
+ * `duenos` y `mascotas`. Dos razones encadenadas:
+ *
+ *  - Un archivo que solo le agrega mascotas a clientes que ya existían
+ *    escribe 0 dueños y N mascotas. Contar solo dueños diría "no escribió
+ *    nada" y duplicaría cada mascota.
+ *  - Y un archivo cuyos tutores Y mascotas ya existen —el segundo archivo de
+ *    la misma clínica, el que trae las visitas del mes— escribe 0 dueños, 0
+ *    mascotas y N tratamientos. Con dos tablas, una importación con 74 baños
+ *    adentro se reportaba como "no escribió nada": marcarFallida la cerraba
+ *    en 'fallido' contradiciendo sus propias filas, y el reintento pasaba el
+ *    tapón. No duplicaba —013 deduplica eventos por mascota+tipo+fecha— pero
+ *    el estado de la fila mentía sobre su contenido, y de ahí viene que la
+ *    fila 'fallido' lleve botón de Deshacer (Importaciones.jsx:39-42).
+ *
+ * Las cuatro tienen `id` (001_init.sql:50, :75) y las cuatro van con
+ * `head: true`, así que esto son cuatro conteos y cero filas bajadas.
  */
 export async function yaEscribio(importacionId) {
-  const [d, m] = await Promise.all([
-    supabase.from('duenos')
-      .select('id', { count: 'exact', head: true })
-      .eq('importacion_id', importacionId),
-    supabase.from('mascotas')
-      .select('id', { count: 'exact', head: true })
-      .eq('importacion_id', importacionId),
+  const cuenta = (tabla) => supabase.from(tabla)
+    .select('id', { count: 'exact', head: true })
+    .eq('importacion_id', importacionId);
+
+  const [d, m, t, v] = await Promise.all([
+    cuenta('duenos'), cuenta('mascotas'), cuenta('tratamientos'), cuenta('vacunas'),
   ]);
 
   reventar(d.error, 'No se pudo verificar si la importación ya había escrito');
   reventar(m.error, 'No se pudo verificar si la importación ya había escrito');
+  reventar(t.error, 'No se pudo verificar si la importación ya había escrito');
+  reventar(v.error, 'No se pudo verificar si la importación ya había escrito');
 
-  return { duenos: d.count ?? 0, mascotas: m.count ?? 0 };
+  return {
+    duenos: d.count ?? 0, mascotas: m.count ?? 0,
+    tratamientos: t.count ?? 0, vacunas: v.count ?? 0,
+  };
 }
+
+/** Si alguno de los cuatro contadores de `yaEscribio` trae algo. */
+const escribioAlgo = (ya) => !!(ya.duenos || ya.mascotas || ya.tratamientos || ya.vacunas);
 
 /**
  * El paso 4. Una llamada, una transacción: o entra todo o no entra nada.
@@ -126,12 +147,13 @@ export async function aplicar(importacionId, envio, resumen) {
   // el resumen porque si la llamada anterior ya entró, esta fila no se
   // toca más.
   const ya = await yaEscribio(importacionId);
-  if (ya.duenos || ya.mascotas) {
+  if (escribioAlgo(ya)) {
     throw new Error(
       `La importación ${importacionId} ya entró: tiene ${ya.duenos} ` +
-      `clientes y ${ya.mascotas} mascotas colgadas. No la vuelvo a mandar ` +
-      'para no duplicarte la base. Mirá el historial de importaciones; si ' +
-      'quedó a medias, deshacela desde ahí y volvé a subir el archivo.',
+      `clientes, ${ya.mascotas} mascotas y ${ya.tratamientos + ya.vacunas} ` +
+      'eventos colgados. No la vuelvo a mandar para no duplicarte la base. ' +
+      'Mirá el historial de importaciones; si quedó a medias, deshacela ' +
+      'desde ahí y volvé a subir el archivo.',
     );
   }
 
@@ -150,9 +172,32 @@ export async function aplicar(importacionId, envio, resumen) {
   });
 
   if (error) {
+    // Acá NO se puede afirmar "no entró nada", y eso es lo que decía.
+    //
+    // El fallo de transporte y el de Postgres llegan por el mismo `error`:
+    // supabase-js no los distingue. El caso peligroso es el que describe la
+    // cabecera de este archivo —Postgres commiteó y lo que se perdió fue la
+    // respuesta—, y ahí "no entró nada: podés volver a intentar" era falso
+    // palabra por palabra, y era además la frase que empujaba al segundo
+    // intento. Tercera aparición de la misma clase de defecto en esta rama.
+    //
+    // Entonces se le pregunta a la base antes de hablar. Si el conteo también
+    // falla, `ya` queda en null y se usa el mensaje prudente: no se cambia
+    // una afirmación falsa por otra.
+    const ya = await yaEscribio(importacionId).catch(() => null);
+    if (ya && escribioAlgo(ya)) {
+      throw new Error(
+        `Se perdió la respuesta de la importación ${importacionId}, pero SÍ ` +
+        `entró: quedaron escritos ${ya.duenos} clientes, ${ya.mascotas} ` +
+        `mascotas y ${ya.tratamientos + ya.vacunas} eventos. NO vuelvas a ` +
+        'subir el archivo. Mirá el historial de importaciones, y si quedó a ' +
+        'medias deshacela desde ahí.',
+      );
+    }
     throw new Error(
       `No se pudo escribir la importación ${importacionId}: ${error.message}. ` +
-      'No entró nada: podés volver a intentar.',
+      'Si fue un corte de conexión puede que igual haya entrado: antes de ' +
+      'volver a subir el archivo, mirá el historial de importaciones.',
     );
   }
 
@@ -184,11 +229,12 @@ export async function marcarFallida(importacionId, mensaje, resumen = {}) {
     // paso. Mejor dejar la fila como la dejó Postgres: el tapón de
     // `aplicar` ya frena el reintento y el historial muestra lo que entró.
     const ya = await yaEscribio(importacionId);
-    if (ya.duenos || ya.mascotas) {
+    if (escribioAlgo(ya)) {
       console.warn(
         `[importador] la importación ${importacionId} sí escribió ` +
-        `(${ya.duenos} clientes, ${ya.mascotas} mascotas): no la marco como ` +
-        'fallida. Se perdió la respuesta, no la escritura.',
+        `(${ya.duenos} clientes, ${ya.mascotas} mascotas, ` +
+        `${ya.tratamientos + ya.vacunas} eventos): no la marco como fallida. ` +
+        'Se perdió la respuesta, no la escritura.',
       );
       return;
     }

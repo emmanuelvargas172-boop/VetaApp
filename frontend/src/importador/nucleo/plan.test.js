@@ -73,6 +73,31 @@ describe('emparejarTutor', () => {
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 9 } });
   });
 
+  // El caso que ningún fixture tenía, y es el de la mitad de la base real: la
+  // ficha que escribió la clínica a mano.
+  //
+  // Todos los demás tests de acá ponen el teléfono del existente ya
+  // normalizado ('573000000011'), que es la forma que escribe el PROPIO
+  // importador. Lo que hay en una ficha tecleada a mano es lo que la persona
+  // escribió: parseDuenoBody (api/axios.js:132) le hace un trim() y nada más.
+  // Comparando el texto crudo, '310 483 5862' y '573000000202' son distintos,
+  // así que este camino no se disparaba nunca para esos clientes: caía en
+  // 'duda', y el paso 3 trae "es otra persona" premarcado.
+  it('el mismo número tecleado a mano y normalizado en el archivo es el mismo', () => {
+    const idx = indexar({ ...vacia, duenos: [
+      { id: 9, nombre: 'Ana Gómez', telefono: '310 483 5862', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000202' });
+    expect(r).toMatchObject({ certeza: 'misma', existente: { id: 9 } });
+  });
+
+  // El otro lado: que normalizar no vuelva iguales a dos números distintos.
+  it('dos números distintos siguen siendo distintos después de normalizar', () => {
+    const idx = indexar({ ...vacia, duenos: [
+      { id: 9, nombre: 'Ana Gómez', telefono: '310 483 5862', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573109999999' });
+    expect(r).toMatchObject({ certeza: 'duda', motivo: 'nombre_tel_distinto' });
+  });
+
   // El caso real de la base de La Huella: dos "Teofilo Arboleda" que son dos
   // personas distintas (Araque y Casimiro Carvajalino).
   it('mismo nombre con teléfono distinto: pregunta', () => {
@@ -539,6 +564,67 @@ describe('armarPlan · misma persona con dos claves en el archivo (hallazgo 4)',
       raza: 'Poodle', fecha_nacimiento: '2018-07-26',
     });
     expect(p.envio.completar_mascotas[0].campos.edad_anios).toBe(8);
+  });
+
+  // ---------- LA OTRA MITAD: EL TUTOR NUEVO ----------
+  // Los cuatro tests de arriba usan `existenteCon7`, así que todos prueban el
+  // caso del tutor que YA EXISTE: las dos claves resuelven a `id:7` y el dedup
+  // por destino las junta. Con el tutor NUEVO el destino es la propia clave
+  // del archivo, así que las dos claves daban dos destinos distintos y no se
+  // juntaba nada. Nadie lo veía porque no había fixture con la base vacía.
+  //
+  // Y es el escenario del piloto, no uno de borde: base vacía, formulario
+  // donde la cédula es opcional, gente con varias visitas.
+
+  it('la misma persona NUEVA con dos claves entra una sola vez', () => {
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesNuevoPerro, vacia, sinDecidir, HOY);
+    expect(p.envio.crear_tutores).toHaveLength(1);
+    // La cédula la traía solo una de las dos claves, y no se pierde.
+    expect(p.envio.crear_tutores[0].cedula).toBe('1000000001');
+  });
+
+  it('la misma persona NUEVA con dos claves trae un solo perro y un solo baño', () => {
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesNuevoPerro, vacia, sinDecidir, HOY);
+    // Sin esto, el mismo perro quedaba colgado de cada ficha duplicada y el
+    // mismo baño se escribía dos veces: el dedup de eventos va por destino y
+    // el de 013 por mascota_id, y los dos eran distintos en cada rama.
+    expect(p.envio.crear_mascotas).toHaveLength(1);
+    expect(p.envio.tratamientos).toHaveLength(1);
+  });
+
+  // Los campos se juntan en las dos direcciones: la clave que se descarta
+  // puede ser justo la que traía un dato que la otra no tiene.
+  it('la persona NUEVA se queda con los campos de las dos claves', () => {
+    const p = armarPlan(nuevoEstado(), agrupadoDosClavesCompletarTutor, vacia, sinDecidir, HOY);
+    expect(p.envio.crear_tutores).toHaveLength(1);
+    expect(p.envio.crear_tutores[0]).toMatchObject({
+      cedula: '1000000001',        // de la primera clave
+      direccion: 'Calle 5',        // de la primera clave
+      telefono2: '573000000055',   // de la SEGUNDA clave
+    });
+  });
+
+  // El límite del arreglo, y es el que importa: la regla del encabezado dice
+  // que duplicar se arregla y unir no. Sin teléfono, dos personas distintas
+  // con el mismo nombre se colapsarían en una sola ficha con el historial de
+  // dos animales adentro. Entonces sin teléfono no se junta nada.
+  it('dos personas nuevas con el mismo nombre y sin teléfono NO se juntan', () => {
+    const sinTel = {
+      tutores: new Map([
+        ['n:ana gomez|', {
+          clave: 'n:ana gomez|', nombre: 'Ana Gómez', cedula: null,
+          tel1: null, tel2: null, direccion: null, origen: ['Hoja1:2'],
+        }],
+        ['c:1000000009', {
+          clave: 'c:1000000009', nombre: 'Ana Gómez', cedula: '1000000009',
+          tel1: null, tel2: null, direccion: null, origen: ['Hoja1:5'],
+        }],
+      ]),
+      mascotas: new Map(),
+      eventos: [],
+    };
+    const p = armarPlan(nuevoEstado(), sinTel, vacia, sinDecidir, HOY);
+    expect(p.envio.crear_tutores).toHaveLength(2);
   });
 });
 

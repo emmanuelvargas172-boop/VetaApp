@@ -27,7 +27,8 @@ const tabla = (filas) => ({
 // select de columnas, el select con count para el tapón del reintento, y
 // el update del resumen.
 const fromQueCuenta = ({
-  duenos = 0, mascotas = 0, orden = null, update = null, errorUpdate = null,
+  duenos = 0, mascotas = 0, tratamientos = 0, vacunas = 0,
+  orden = null, update = null, errorUpdate = null,
 } = {}) => (t) => ({
   select: (cols, opts) => {
     if (opts?.count) {
@@ -36,7 +37,12 @@ const fromQueCuenta = ({
       // El mock lo exige para que quitarlo del código ponga el test rojo en
       // vez de dejar producción bajando la base completa para contarla.
       if (!opts.head) throw new Error('el select con count tiene que pedir head: true');
-      const n = t === 'duenos' ? duenos : mascotas;
+      // Por tabla, y revienta con una tabla que no conoce. Antes era
+      // `t === 'duenos' ? duenos : mascotas`, así que al agregar tratamientos
+      // y vacunas las dos habrían devuelto el conteo de mascotas y los tests
+      // nuevos habrían pasado por el motivo equivocado.
+      const n = { duenos, mascotas, tratamientos, vacunas }[t];
+      if (n === undefined) throw new Error(`el mock no sabe contar la tabla ${t}`);
       return { eq: () => Promise.resolve({ count: n, error: null }) };
     }
     const p = Promise.resolve({ data: [], error: null });
@@ -141,6 +147,59 @@ describe('aplicar', () => {
 
     await expect(aplicar(42, {}, {})).rejects.toThrow(/importación 42/);
   });
+
+  // El defecto que estos tests no veían: el mensaje de error AFIRMABA
+  // "No entró nada: podés volver a intentar". El fallo de transporte y el de
+  // Postgres llegan por el mismo `error`, así que una respuesta perdida
+  // después del commit imprimía esa frase palabra por palabra cuando sí había
+  // entrado todo — y es la frase que empuja al segundo intento.
+  it('si se perdió la respuesta pero sí escribió, no dice que no entró nada', async () => {
+    // El primer conteo es el tapón de la entrada y tiene que ver cero, o
+    // `aplicar` ni llama al rpc. El segundo es el de después del error.
+    // Por tabla y no por número de llamada: entre los dos conteos va el
+    // update del resumen, que también pasa por from().
+    let conteos = 0;
+    mock.from.mockImplementation((t) => (t === 'importaciones' || conteos++ < 4
+      ? fromQueCuenta({})(t)
+      : fromQueCuenta({ duenos: 53, mascotas: 61 })(t)));
+    mock.rpc.mockResolvedValue({ data: null, error: { message: 'Failed to fetch' } });
+
+    const err = await aplicar(42, {}, {}).catch((e) => e);
+    expect(err.message).toMatch(/SÍ entró/);
+    expect(err.message).toMatch(/53 clientes/);
+    expect(err.message).not.toMatch(/No entró nada/);
+  });
+
+  // Y el otro lado: si de verdad no hay filas, tampoco se promete que no
+  // entró nada. No se sabe —el conteo puede estar leyendo una base a la que
+  // la escritura todavía no llegó— así que se manda a mirar el historial.
+  it('si no ve filas, no promete que no entró nada: manda a mirar el historial', async () => {
+    mock.from.mockImplementation(fromQueCuenta({}));
+    mock.rpc.mockResolvedValue({ data: null, error: { message: 'Failed to fetch' } });
+
+    const err = await aplicar(42, {}, {}).catch((e) => e);
+    expect(err.message).not.toMatch(/No entró nada/);
+    expect(err.message).toMatch(/historial de importaciones/);
+  });
+
+  // Si el conteo también falla, no se cambia una afirmación falsa por otra:
+  // el `catch(() => null)` deja el mensaje prudente y no revienta con un
+  // error distinto al que de verdad pasó.
+  it('si el conteo de después del error también falla, igual sale el error original', async () => {
+    // Se cuenta por tabla y no por número de llamada: entre los dos conteos
+    // va el update del resumen, que también pasa por from().
+    let conteos = 0;
+    mock.from.mockImplementation((t) => (t === 'importaciones' || conteos++ < 4
+      ? fromQueCuenta({})(t)
+      : {
+        select: () => ({
+          eq: () => Promise.resolve({ count: null, error: { message: 'sin red' } }),
+        }),
+      }));
+    mock.rpc.mockResolvedValue({ data: null, error: { message: 'Failed to fetch' } });
+
+    await expect(aplicar(42, {}, {})).rejects.toThrow(/Failed to fetch/);
+  });
 });
 
 describe('aplicar · tapón del reintento', () => {
@@ -174,24 +233,56 @@ describe('yaEscribio', () => {
   // La pantalla del paso 4 también la llama directo para poder decir
   // cuántas filas ya entraron, así que es interfaz pública y no un detalle
   // de `aplicar`.
-  it('cuenta por importacion_id y devuelve las dos tablas', async () => {
+  it('cuenta por importacion_id y devuelve las cuatro tablas', async () => {
     const filtros = [];
+    const cuantas = { duenos: 7, mascotas: 9, tratamientos: 74, vacunas: 13 };
     mock.from.mockImplementation((t) => ({
       select: (cols, opts) => ({
         eq: (col, val) => {
           filtros.push(`${t}.${col}=${val}`);
-          return Promise.resolve({ count: t === 'duenos' ? 7 : 9, error: null });
+          return Promise.resolve({ count: cuantas[t], error: null });
         },
       }),
     }));
 
     const r = await yaEscribio(42);
 
-    expect(r).toEqual({ duenos: 7, mascotas: 9 });
+    expect(r).toEqual({ duenos: 7, mascotas: 9, tratamientos: 74, vacunas: 13 });
     // El filtro es por importacion_id y no por user_id: el aislamiento
     // entre clínicas lo hace RLS, y ponerlo también acá sería un segundo
     // lugar donde se puede equivocar.
-    expect(filtros).toEqual(['duenos.importacion_id=42', 'mascotas.importacion_id=42']);
+    //
+    // Las cuatro tablas y no dos: las cuatro llevan importacion_id (012:50),
+    // y contando solo duenos y mascotas un archivo cuyos tutores y mascotas
+    // ya existen daba 0 y 0 con 74 baños adentro.
+    expect(filtros).toEqual([
+      'duenos.importacion_id=42', 'mascotas.importacion_id=42',
+      'tratamientos.importacion_id=42', 'vacunas.importacion_id=42',
+    ]);
+  });
+
+  // El caso que motivó contar cuatro tablas: el segundo archivo de la misma
+  // clínica, el que trae las visitas del mes sobre clientes y mascotas que ya
+  // están. Escribe 0 dueños, 0 mascotas y N tratamientos.
+  it('una importación que solo escribió eventos no se reporta como vacía', async () => {
+    mock.from.mockImplementation(fromQueCuenta({ tratamientos: 74 }));
+    const r = await yaEscribio(42);
+    expect(r).toEqual({ duenos: 0, mascotas: 0, tratamientos: 74, vacunas: 0 });
+  });
+
+  // Y el efecto de arriba donde importa: marcarFallida no puede cerrar en
+  // 'fallido' una fila que tiene 74 baños colgados. Antes sí lo hacía, y el
+  // estado de la fila contradecía sus propias filas.
+  it('marcarFallida no marca fallida una que solo escribió eventos', async () => {
+    let actualizo = false;
+    mock.from.mockImplementation((t) => ({
+      ...fromQueCuenta({ vacunas: 13 })(t),
+      update: () => { actualizo = true; return { eq: () => Promise.resolve({ error: null }) }; },
+    }));
+
+    await marcarFallida(42, 'se cayó el wifi', { filas: 54 });
+
+    expect(actualizo).toBe(false);
   });
 
   // Supabase devuelve `count: null` cuando la tabla no tiene filas que
@@ -204,7 +295,9 @@ describe('yaEscribio', () => {
     mock.from.mockImplementation(() => ({
       select: () => ({ eq: () => Promise.resolve({ count: null, error: null }) }),
     }));
-    expect(await yaEscribio(42)).toEqual({ duenos: 0, mascotas: 0 });
+    expect(await yaEscribio(42)).toEqual({
+      duenos: 0, mascotas: 0, tratamientos: 0, vacunas: 0,
+    });
   });
 });
 

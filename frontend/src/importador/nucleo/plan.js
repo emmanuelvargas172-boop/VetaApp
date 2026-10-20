@@ -22,8 +22,42 @@
 
 import { sinTildes, aviso } from './normalizar.js';
 import { edadDesde } from '../../utils/edad.js';
+import { normalizarTelefonoCO } from '../../utils/whatsapp.js';
 
 const vacio = (v) => v === null || v === undefined || String(v).trim() === '';
+
+/**
+ * Si dos teléfonos son el mismo número.
+ *
+ * Normalizados y no como texto, porque los dos lados vienen en formatos
+ * distintos y acá se comparaba crudo:
+ *  - `tutor.tel1` sale del archivo por telefonos() → normalizarTelefonoCO, que
+ *    devuelve con indicativo: '310 483 5862' → '573000000202'.
+ *  - `duenos.telefono` es lo que alguien tecleó en la ficha. parseDuenoBody
+ *    (api/axios.js:132) le hace un trim() y nada más, así que en la base vive
+ *    '310 483 5862' tal cual.
+ *
+ * Son el mismo número y el === decía que no. Costaba dos cosas, las dos sobre
+ * clientes reales: el camino 2 de emparejarTutor no se disparaba nunca para un
+ * cliente creado a mano —caía en 'duda', y el paso 3 trae "es otra persona"
+ * premarcado, así que contestar rápido duplicaba la ficha—; y completarTutor
+ * avisaba "ya tiene el teléfono 3000000202, el archivo trae 573000000202",
+ * que es un aviso falso por cliente encima de la lista donde viven los avisos
+ * que sí importan.
+ *
+ * Los tests no lo veían porque todos los fixtures ponen el teléfono del
+ * existente ya normalizado, que es la forma que escribe el propio importador.
+ * El caso que faltaba es la fila que no escribió el importador.
+ *
+ * Un fijo de 7 u 8 dígitos normaliza a null y esto devuelve false. No es una
+ * regresión: tutor.tel1 pasó por la misma función, así que un fijo nunca llega
+ * acá —llega vacío— y la comparación no corre.
+ */
+const telIgual = (a, b) => {
+  const na = normalizarTelefonoCO(a);
+  const nb = normalizarTelefonoCO(b);
+  return !!na && !!nb && na === nb;
+};
 
 // Los tipos válidos para tratamientos.tipo (001_init.sql:78):
 //   check (tipo in ('vacunacion','desparasitacion','bano','consulta'))
@@ -140,7 +174,7 @@ export function emparejarTutor(idx, tutor) {
   //  cada cliente. Si el que existe tiene OTRA cédula sí se pregunta: dos
   //  personas con el mismo nombre que comparten teléfono son una familia.
   const mismoTel = candidatos.find((d) =>
-    !vacio(d.telefono) && !vacio(tutor.tel1) && String(d.telefono) === String(tutor.tel1)
+    telIgual(d.telefono, tutor.tel1)
     && (vacio(d.cedula) || vacio(tutor.cedula) || String(d.cedula) === String(tutor.cedula)));
   if (mismoTel) return { certeza: 'misma', existente: mismoTel, motivo: 'nombre_y_telefono' };
 
@@ -186,7 +220,7 @@ const completarTutor = (estado, existente, tutor) => {
       `${tutor.tel1}. No lo escribo desde acá: hay que ponerlo a mano en ` +
       `la ficha del cliente.`);
   } else if (!vacio(tutor.tel1) && !vacio(existente.telefono)
-      && String(tutor.tel1) !== String(existente.telefono)) {
+      && !telIgual(tutor.tel1, existente.telefono)) {
     aviso(estado, ctxDe(tutor.origen),
       `${existente.nombre} ya tiene el teléfono ${existente.telefono}. ` +
       `El archivo trae ${tutor.tel1}. Dejo el que ya estaba.`);
@@ -198,9 +232,17 @@ const completarTutor = (estado, existente, tutor) => {
 /**
  * Los campos de `mascotas` que este archivo puede completar.
  *
- * `especie` NO está, aunque el spec la liste: es NOT NULL, una mascota que
- * ya existe siempre tiene especie, no hay vacío que llenar. Mismo
- * razonamiento que `duenos.telefono`.
+ * `especie` NO está, aunque el spec la liste, y queda afuera por decisión y
+ * no por imposibilidad —acá decía que una mascota que ya existe "siempre
+ * tiene especie, no hay vacío que llenar", y es falso: la columna es NOT NULL
+ * pero nada le impide estar en ''. Queda afuera porque el import nunca la
+ * deja así (crear_mascotas la escribe sin coalesce, así que una mascota sin
+ * especie resuelta ni entra) y completarla después sería adivinar perro o
+ * gato sobre una ficha que ya existe, que es justo lo que clasificar() existe
+ * para no hacer: la especie decide la dosis.
+ *
+ * Mismo razonamiento que `duenos.telefono`, y la versión de verdad de los dos
+ * está en 013_aplicar_importacion.sql, en las listas blancas.
  *
  * `edad_anios`/`edad_meses` solo se tocan si el archivo trae fecha de
  * nacimiento —ahí la edad deja de ser un dato tecleado y pasa a ser una
@@ -252,6 +294,30 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
   // (a) Map para acumular completar_tutores por id del existente: la misma
   // persona con dos claves en el archivo no debe producir dos entradas.
   const completarTutoresMap = new Map();
+  // (a2) Identidad del tutor NUEVO dentro del archivo, independiente de si la
+  // fila traía cédula.
+  //
+  // El dedup (a) de acá abajo acumula por id del existente, y el (b) de
+  // mascotas por destino resuelto. Los dos cubren al tutor que YA EXISTE y
+  // ninguno cubría al nuevo: agrupar() da `c:<cédula>` o `n:<nombre>|<tel>`
+  // según lo que trajera la fila (agrupar.js:13-14), así que la misma persona
+  // puede llegar con dos claves, y si las dos son nuevas el destino de cada
+  // una es su propia clave —`ref:c:109…` y `ref:n:ana gomez|57310…`— y no
+  // colapsan. Resultado: la persona creada dos veces, su perro creado dos
+  // veces (uno colgado de cada ficha) y el mismo baño escrito dos veces,
+  // porque el dedup de eventos usa el destino y el de 013 usa mascota_id.
+  //
+  // Es el escenario del piloto, no uno hipotético: base vacía, formulario
+  // donde la cédula es opcional, y gente con varias visitas. Quien puso la
+  // cédula en una visita y la dejó en blanco en otra entraba dos veces en la
+  // PRIMERA importación.
+  //
+  // Exige tel1. Sin teléfono, dos personas distintas con el mismo nombre se
+  // colapsarían en una sola ficha, y unir mal es lo único que este módulo no
+  // se permite (ver la regla del encabezado). Con nombre Y teléfono iguales la
+  // decisión ya está tomada en dos lugares más del importador: es la propia
+  // clave de respaldo de agrupar() y es el camino 2 de emparejarTutor.
+  const nuevosPorIdentidad = new Map();
   const mascotasDe = new Map();
   for (const m of agrupado.mascotas.values()) {
     if (!mascotasDe.has(m.tutor)) mascotasDe.set(m.tutor, []);
@@ -307,18 +373,38 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
       }
       destinoTutor.set(tutor.clave, { id: m.existente.id });
     } else {
-      envio.crear_tutores.push({
-        ref: tutor.clave,
-        nombre: tutor.nombre,
-        // NOT NULL. La base real tiene una fila sin ningún número usable, y
-        // esa persona entra igual: con el botón de WhatsApp apagado, no
-        // afuera de la base.
-        telefono: tutor.tel1 ?? '',
-        telefono2: vacio(tutor.tel2) ? null : tutor.tel2,
-        cedula: vacio(tutor.cedula) ? null : tutor.cedula,
-        direccion: vacio(tutor.direccion) ? null : tutor.direccion,
-      });
-      destinoTutor.set(tutor.clave, { ref: tutor.clave });
+      const ident = vacio(tutor.tel1) ? null : `${sinTildes(tutor.nombre)}|${tutor.tel1}`;
+      const yaNuevo = ident ? nuevosPorIdentidad.get(ident) : null;
+
+      if (yaNuevo) {
+        // Campo por campo y solo donde falte, igual que agrupar(): la clave
+        // que se descarta puede ser justo la que traía la cédula, y elegir una
+        // fila entera perdería el dato de la otra.
+        if (!yaNuevo.cedula    && !vacio(tutor.cedula))    yaNuevo.cedula    = tutor.cedula;
+        if (!yaNuevo.telefono2 && !vacio(tutor.tel2))      yaNuevo.telefono2 = tutor.tel2;
+        if (!yaNuevo.direccion && !vacio(tutor.direccion)) yaNuevo.direccion = tutor.direccion;
+        // Las dos claves apuntan al MISMO ref. Con eso el dedup (b) de
+        // mascotas y el de eventos ya funcionan sin tocar nada más.
+        destinoTutor.set(tutor.clave, { ref: yaNuevo.ref });
+      } else {
+        const entrada = {
+          ref: tutor.clave,
+          nombre: tutor.nombre,
+          // NOT NULL. La base real tiene una fila sin ningún número usable, y
+          // esa persona entra igual: con el botón de WhatsApp apagado, no
+          // afuera de la base.
+          telefono: tutor.tel1 ?? '',
+          telefono2: vacio(tutor.tel2) ? null : tutor.tel2,
+          cedula: vacio(tutor.cedula) ? null : tutor.cedula,
+          direccion: vacio(tutor.direccion) ? null : tutor.direccion,
+        };
+        envio.crear_tutores.push(entrada);
+        // Se guarda la referencia al mismo objeto que está en el array, no una
+        // copia: los campos que complete una clave posterior tienen que salir
+        // en el envío.
+        if (ident) nuevosPorIdentidad.set(ident, entrada);
+        destinoTutor.set(tutor.clave, { ref: tutor.clave });
+      }
     }
   }
 
@@ -335,6 +421,13 @@ export function armarPlan(estado, agrupado, existentes, decisiones = {}, hoy = n
   // → dos entradas en crear_mascotas para el mismo perro. 013 no tiene dedup
   // en crear_mascotas ni índice único, así que el perro se crearía dos veces
   // y todos sus eventos se escribirían dos veces.
+  //
+  // "Destino resuelto" es la parte que hace el trabajo, y sola no alcanzaba:
+  // el destino de un tutor NUEVO es su propia clave de archivo, así que dos
+  // claves de la misma persona daban dos destinos y este Map no colapsaba
+  // nada. Lo que las junta es (a2), que hace que las dos claves compartan el
+  // `ref`. Este comentario decía que (b) cubría el caso y cubría solo la mitad
+  // —la del tutor que ya existía—, que es justo la mitad que los tests tenían.
   //
   // Guarda la entrada misma y no su `ref`: volver a buscarla con
   // crear_mascotas.find() sería recorrer el array entero por cada mascota

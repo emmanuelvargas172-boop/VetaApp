@@ -18,6 +18,20 @@ describe('celda', () => {
     expect(celda({ t: 'n', v: 1000000001 })).toBe('1000000001');
   });
 
+  // Este test es la mitad que el de arriba prometía y no cubría. El código
+  // decía que toFixed(0) atajaba la notación científica, y no la ataja:
+  // (1e21).toFixed(0) devuelve "1e+21" igual que String(1e21), porque toFixed
+  // está especificado para delegar en ToString arriba de 10^21. El núcleo
+  // normaliza las cédulas con replace(/\D/g,'') (filas.js:65), así que
+  // "1e+21" llegaría a la base como la cédula "121".
+  //
+  // Ninguna cédula ni ningún costo llega a 10^21. El test está porque el
+  // comentario afirmaba que el borde estaba cubierto, y un lector que confíe
+  // en eso no lo vuelve a mirar.
+  it('un entero de 22 dígitos no sale en notación científica', () => {
+    expect(celda({ t: 'n', v: 1e21 })).toBe('1000000000000000000000');
+  });
+
   // El caso del costo. 40000.0 mal escrito queda "400000": diez veces más
   // caro, en la columna de la que vive la peluquería.
   it('un costo entero sale sin decimal', () => {
