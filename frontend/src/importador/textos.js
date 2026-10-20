@@ -90,10 +90,15 @@ export function textoDeshecho(d) {
  * deshacer, se devuelve al valor que tenía antes.
  *
  * Devuelve '' cuando no hubo ninguno, así el llamador no tiene que mirar el
- * número. Y tolera que el contador no exista: el objeto que 014:162-165 deja
- * guardado en `resumen.deshecho` NO incluye `campos_restaurados` —solo lo trae
- * la respuesta de la llamada—, y el historial lee de ahí cuando la fila se
- * deshizo hace meses.
+ * número.
+ *
+ * El `?? 0` y el `?.` son guardas, no el caso normal: 014 guarda
+ * `campos_restaurados` en `resumen.deshecho` igual que lo devuelve, así que el
+ * historial lo lee bien aunque la fila se haya deshecho hace meses. Cubren dos
+ * cosas que igual pasan: un `deshecho` que no existe (la fila nunca se
+ * deshizo), y una fila deshecha antes de que la función guardara el contador.
+ * En los dos, no saber el número es motivo para callarse; sin el guarda la
+ * frase saldría igual, diciendo "Devolví undefined datos a como estaban".
  */
 export function textoRestaurados(d) {
   const c = d?.campos_restaurados ?? 0;

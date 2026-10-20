@@ -172,15 +172,18 @@ export default function Importaciones() {
         const est = ESTADOS[imp.estado] ?? { texto: imp.estado, tono: 'neutral' };
         const a = accion[imp.id];
         // El resultado del deshacer, de las dos fuentes posibles. `accion` es
-        // el de este rato; `resumen.deshecho` es el que 014:162-165 dejó
+        // el de este rato; `resumen.deshecho` es el que 014:171-175 dejó
         // guardado, y es el único que queda después de recargar la página. Sin
         // leerlo, una fila "Deshecha en parte" vuelve del reload con la
         // etiqueta amarilla y sin decir qué conservó — y esa fila existe
         // precisamente porque dejó mascotas en la base. Es el caso de uso
         // número uno de esta pantalla.
         //
-        // El guardado NO trae `campos_restaurados` ni `estado`: de ahí que el
-        // panel se condicione a `desh` y no a `desh.estado`.
+        // Los cinco contadores están en las dos fuentes. Lo único que el
+        // guardado NO trae es `estado` —la fila ya lo tiene en su propia
+        // columna—, y de ahí dos cosas: el panel se condiciona a `desh` y no a
+        // `desh.estado`, y `a.estado` sirve justo para distinguir una fuente de
+        // la otra acá arriba.
         const desh = (a && a.estado) ? a : (imp.resumen?.deshecho ?? null);
         const conservadas = desh?.conservadas ? textoConservadas(desh.conservadas) : [];
         const borrado = desh ? textoDeshecho(desh) : [];

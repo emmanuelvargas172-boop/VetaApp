@@ -222,13 +222,28 @@ describe('textoRestaurados', () => {
     expect(textoRestaurados({ campos_restaurados: 1 })).toBe('Devolví 1 dato a como estaba.');
   });
 
-  // El jsonb que 014:162-165 guarda en resumen.deshecho no trae este
-  // contador. El historial lee de ahí para las filas viejas, y ahí no se
-  // puede afirmar nada sobre campos restaurados: se calla.
+  // Los tres casos en que el número no se sabe: cero de verdad, un objeto
+  // sin la llave (una fila deshecha antes de que 014 la guardara) y un
+  // `deshecho` que no existe porque la fila nunca se deshizo. No saber el
+  // número es motivo para callarse, no para escribir "undefined".
   it('sin el contador no dice nada', () => {
     expect(textoRestaurados({ campos_restaurados: 0 })).toBe('');
     expect(textoRestaurados({})).toBe('');
     expect(textoRestaurados(null)).toBe('');
+  });
+
+  // El caso del reload, con el objeto tal cual queda en `resumen.deshecho`
+  // (014:171-175) — sin `estado`, que vive en su propia columna. Es el que
+  // falla si alguien vuelve a sacar `campos_restaurados` del jsonb que se
+  // guarda: la pantalla de historial pasaría a decir "de este archivo no
+  // quedaba nada en la base" de una importación cuyos datos sí se revirtieron.
+  it('lee el contador del objeto guardado, no solo del que devuelve la llamada', () => {
+    const guardado = {
+      mascotas_borradas: 0, tutores_borrados: 0,
+      tratamientos: 0, vacunas: 0,
+      campos_restaurados: 2, conservadas: [],
+    };
+    expect(textoRestaurados(guardado)).toBe('Devolví 2 datos a como estaban.');
   });
 });
 

@@ -156,12 +156,22 @@ begin
   -- Un deshacer que dejó mascotas atrás tiene que poder distinguirse de uno
   -- completo, o seis meses después nadie entiende por qué siguen ahí esos
   -- tres clientes.
+  --
+  -- El objeto que se guarda tiene que llevar los MISMOS contadores que el que
+  -- se devuelve abajo. La pantalla muestra la respuesta de la llamada solo
+  -- mientras la clínica sigue en la pantalla; en cuanto recarga, lee esta fila
+  -- y nada más. Un contador que esté en la respuesta y no acá se puede decir
+  -- bien hoy y mal mañana: `campos_restaurados` faltaba, y una importación que
+  -- solo completó datos pasaba de "Devolví 2 datos a como estaban" a "de este
+  -- archivo no quedaba nada en la base" al apretar F5 — que es falso, esos
+  -- datos sí estaban y sí se revirtieron.
   update importaciones
      set estado = case when jsonb_array_length(v_conservadas) > 0
                        then 'deshecho_parcial' else 'deshecho' end,
          resumen = resumen || jsonb_build_object('deshecho', jsonb_build_object(
                      'mascotas_borradas', n_mas, 'tutores_borrados', n_duenos,
                      'tratamientos', n_trat, 'vacunas', n_vac,
+                     'campos_restaurados', n_restaurados,
                      'conservadas', v_conservadas)),
          cerrado_en = now()
    where id = p_importacion and user_id = v_user;
