@@ -27,13 +27,20 @@ video/muestras/
 video/herramientas/.venv/
 video/herramientas/voces/
 
-# Bases de clientes de las clínicas. El CSV que exporta la veterinaria y el SQL
-# que sale de armar-sql.mjs traen cédulas, teléfonos y direcciones de casa de
-# personas reales: no son clientes nuestros, son clientes de ella. Eso no entra
-# a la historia de un repo, y de git no se saca fácil una vez entró.
+# Bases de clientes de las clínicas. El .xlsx que la veterinaria baja de Google
+# Sheets, el CSV convertido y el SQL que sale de armar-sql.mjs traen cédulas,
+# teléfonos y direcciones de casa de personas reales: no son clientes nuestros,
+# son clientes de ella. Eso no entra a la historia de un repo, y de git no se
+# saca fácil una vez entró.
+#
+# El .xlsx es el que importa ahora: el .csv era un paso intermedio del script de
+# Python, y la pantalla nueva lee el .xlsx directo. Es el archivo que la clínica
+# manda por WhatsApp y el que termina en Descargas.
 #
 # Se listan extensiones y no la carpeta entera porque el script sí se versiona
 # (es código); los datos que entran y salen de él, no.
+importar/*.xlsx
+importar/*.xls
 importar/*.csv
 importar/*.sql
 importar/revisar.md
