@@ -12,9 +12,9 @@
 #     "26/07/2018" o "2018-07-26" según el idioma de la cuenta, y hay que
 #     adivinar cuál número es el día. Acá no hay nada que adivinar.
 #
-#   · LA CÉDULA es `float`: 1000000200.0. Escrita en crudo queda
-#     "1000000200.0", y el importador —que normaliza a solo dígitos— la
-#     lee como 10000002000. Un cero de más. Esa cédula no identifica a
+#   · LA CÉDULA es `float`: 1000000004.0. Escrita en crudo queda
+#     "1000000004.0", y el importador —que normaliza a solo dígitos— la
+#     lee como 10000000040. Un cero de más. Esa cédula no identifica a
 #     nadie, y el índice único de 011 la deja pasar porque es otro texto.
 #
 #   · EL COSTO también es `float`: 40000.0 → "400000". Diez veces más

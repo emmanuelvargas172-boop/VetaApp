@@ -97,7 +97,7 @@ export function pesos(estado, valor, ctx) {
   return n;
 }
 
-// "3000000200-3000000201", "3000000202 - 3000000203", "" → [tel1, tel2].
+// "3000000043-3000000045", "3000000010 - 3000000028", "" → [tel1, tel2].
 // Valida con la MISMA función que usa la app para armar el enlace de
 // WhatsApp, así no hay dos ideas de qué es un número válido.
 export function telefonos(estado, valor, ctx) {

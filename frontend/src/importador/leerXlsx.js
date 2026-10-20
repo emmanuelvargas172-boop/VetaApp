@@ -78,7 +78,7 @@ export function celda(c) {
 
     // toFixed(0) para que el entero salga con todos sus dígitos y sin coma
     // decimal, que es lo que espera el replace(/\D/g,'') de filas.js:65:
-    // "1000000200.0" ahí se vuelve 10000002000, un cero de más en una cédula.
+    // "1000000004.0" ahí se vuelve 10000000040, un cero de más en una cédula.
     //
     // El `>= 1e21` no es paranoia de más: acá decía que toFixed(0) protegía de
     // la notación científica, y NO protege. toFixed está especificado para

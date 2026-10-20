@@ -96,7 +96,7 @@ describe('tipoBano', () => {
 
 describe('sinTildes', () => {
   it('normaliza tildes, mayúsculas y espacios de sobra', () => {
-    expect(sinTildes('  Ángel  Ardila ')).toBe('angel ardila');
+    expect(sinTildes('  Ángel  Pinzón ')).toBe('angel pinzon');
   });
 });
 

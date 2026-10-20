@@ -101,9 +101,9 @@ reales del archivo al lado — "Columna 7" no le dice nada a nadie:
 
 ```
 Columna del archivo            →  Campo en VetaApp        Ejemplo
-Nombre y apellidos del Tutor   →  Nombre del dueño   ✓    "Hector Fabio Arboleda"
-Cedula                         →  Cédula             ✓    "1000000200"
-Contacto telefonos (2)         →  Teléfono           ✓    "3000000200 - 3000000201"
+Nombre y apellidos del Tutor   →  Nombre del dueño   ✓    "German Ana Villamizar"
+Cedula                         →  Cédula             ✓    "1000000004"
+Contacto telefonos (2)         →  Teléfono           ✓    "3000000043 - 3000000045"
 Raza                           →  Raza               ✓    "Poodle"
 Otras observaciones            →  No importar        ▾    "Muy nervioso con el secador"
 ```
@@ -129,8 +129,8 @@ No voy a importar     3 filas → mirá por qué
 
 ⚠ Fila 35: el teléfono dice "0". WhatsApp le va a quedar apagado.
 
-❓ "Eulalia Ruth Trujillo" ya existe con el teléfono 3000000202.
-   El archivo trae otra con el teléfono 3000000203.
+❓ "Teofilo Arboleda Rueda" ya existe con el teléfono 3000000010.
+   El archivo trae otra con el teléfono 3000000028.
    [ Es la misma ]   [ Son dos personas distintas ]
 ```
 
@@ -273,8 +273,8 @@ Solo escribe donde hay vacío:
 algo, así que completarlo es imposible por definición. Si el archivo trae
 otro número, no lo cambia — lo avisa en el paso 3:
 
-> ⚠ Yolanda Zambrano ya tiene el teléfono 3000000204. El archivo trae
-> 3000000205. Dejo el que ya estaba.
+> ⚠ Jorge Rueda ya tiene el teléfono 3000000021. El archivo trae
+> 3000000001. Dejo el que ya estaba.
 
 `edad_anios` / `edad_meses` solo se tocan si el archivo trae **fecha de
 nacimiento**, porque ahí la edad deja de ser un dato tecleado y pasa a ser
@@ -502,13 +502,13 @@ El núcleo es funciones puras.
 
 | Caso | Entrada → esperado |
 |---|---|
-| Teléfono doble | `"3000000200 - 3000000201"` → dos números separados |
+| Teléfono doble | `"3000000043 - 3000000045"` → dos números separados |
 | Teléfono basura | `"0"` → `null`, sin reventar |
 | Fecha ISO | `"2018-07-26"` → `2018-07-26` |
 | Fecha d/m/Y | `"26/07/2018"` → `2018-07-26` |
 | Costo sucio | `"88.000 sí 72"` → `88000` |
 | Costo sucio | `"$60.000 c/u"` → `60000` |
-| Cédula float | `"1000000200.0"` → `1000000200`, **no** `10000002000` |
+| Cédula float | `"1000000004.0"` → `1000000004`, **no** `10000000040` |
 | Especie escrita | `"Gato"` → especie `gato`, raza `null` |
 | Vacuna imposible | nacimiento posterior a la vacuna → entra **sin** fecha |
 | Fila sin nombres | no se importa, **pero aparece en los avisos** |

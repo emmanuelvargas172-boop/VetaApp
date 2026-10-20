@@ -22,16 +22,16 @@ const vacia = { duenos: [], mascotas: [], tratamientos: [], vacunas: [] };
 const sinDecidir = { dudas: {}, especies: {} };
 
 describe('nombresSeParecen', () => {
-  it('"Eulalia Ruth Trujillo" y "Ana Araque" son parecidos', () => {
-    expect(nombresSeParecen('Eulalia Ruth Trujillo', 'Ana Araque')).toBe(true);
+  it('"Teofilo Arboleda Rueda" y "Ana Rueda" son parecidos', () => {
+    expect(nombresSeParecen('Teofilo Arboleda Rueda', 'Ana Rueda')).toBe(true);
   });
 
   it('las tildes y las mayúsculas no cuentan', () => {
-    expect(nombresSeParecen('Teofilo Quintanilla', 'Anselmo Zambrano')).toBe(true);
+    expect(nombresSeParecen('CLARA PINZÓN', 'clara pinzon')).toBe(true);
   });
 
-  it('"Ana Araque" y "Pedro Gómez" no se parecen en nada', () => {
-    expect(nombresSeParecen('Ana Araque', 'Pedro Gómez')).toBe(false);
+  it('"Ana Rueda" y "Pedro Gómez" no se parecen en nada', () => {
+    expect(nombresSeParecen('Ana Rueda', 'Pedro Gómez')).toBe(false);
   });
 
   // "de", "la", "y" están en medio mundo. Si contaran, cualquier par de
@@ -51,8 +51,8 @@ describe('nombresSeParecen', () => {
 describe('emparejarTutor', () => {
   it('misma cédula, nombre parecido: es la misma persona', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000022', cedula: '1000000001' }] });
-    const r = emparejarTutor(idx, { nombre: 'Ana Araque', cedula: '1000000001', tel1: '573000000000' });
+      { id: 7, nombre: 'Teofilo Arboleda Rueda', telefono: '573000000022', cedula: '1000000001' }] });
+    const r = emparejarTutor(idx, { nombre: 'Ana Rueda', cedula: '1000000001', tel1: '573000000000' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 7 } });
   });
 
@@ -61,7 +61,7 @@ describe('emparejarTutor', () => {
   // alguien que no es su dueño.
   it('misma cédula, nombre completamente distinto: pregunta', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000022', cedula: '1000000001' }] });
+      { id: 7, nombre: 'Teofilo Arboleda Rueda', telefono: '573000000022', cedula: '1000000001' }] });
     const r = emparejarTutor(idx, { nombre: 'Pedro Castaño', cedula: '1000000001', tel1: null });
     expect(r).toMatchObject({ certeza: 'duda', motivo: 'cedula_otro_nombre' });
   });
@@ -80,26 +80,26 @@ describe('emparejarTutor', () => {
   // normalizado ('573000000011'), que es la forma que escribe el PROPIO
   // importador. Lo que hay en una ficha tecleada a mano es lo que la persona
   // escribió: parseDuenoBody (api/axios.js:132) le hace un trim() y nada más.
-  // Comparando el texto crudo, '310 483 5862' y '573000000202' son distintos,
+  // Comparando el texto crudo, '300 000 0010' y '573000000010' son distintos,
   // así que este camino no se disparaba nunca para esos clientes: caía en
   // 'duda', y el paso 3 trae "es otra persona" premarcado.
   it('el mismo número tecleado a mano y normalizado en el archivo es el mismo', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 9, nombre: 'Ana Gómez', telefono: '310 483 5862', cedula: null }] });
-    const r = emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000202' });
+      { id: 9, nombre: 'Ana Gómez', telefono: '300 000 0010', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000010' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 9 } });
   });
 
   // El otro lado: que normalizar no vuelva iguales a dos números distintos.
   it('dos números distintos siguen siendo distintos después de normalizar', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 9, nombre: 'Ana Gómez', telefono: '310 483 5862', cedula: null }] });
+      { id: 9, nombre: 'Ana Gómez', telefono: '300 000 0010', cedula: null }] });
     const r = emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573109999999' });
     expect(r).toMatchObject({ certeza: 'duda', motivo: 'nombre_tel_distinto' });
   });
 
   // El caso real de la base de La Huella: dos "Teofilo Arboleda" que son dos
-  // personas distintas (Araque y Casimiro Carvajalino).
+  // personas distintas (Rueda y Pinzón).
   it('mismo nombre con teléfono distinto: pregunta', () => {
     const idx = indexar({ ...vacia, duenos: [
       { id: 9, nombre: 'Teofilo Arboleda', telefono: '573000000022', cedula: null }] });

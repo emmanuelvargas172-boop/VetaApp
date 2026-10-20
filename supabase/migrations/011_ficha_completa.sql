@@ -9,12 +9,12 @@
 --
 --   · la CÉDULA del tutor. Es el campo con el que ella identifica a un
 --     cliente — su propio formulario lo pide primero. `duenos` solo tenía
---     nombre, y en esa base ya hay dos "Teofilo Arboleda" distintas (Araque y
---     Casimiro Carvajalino). Sin cédula no hay forma de decidir si dos filas
---     son la misma persona, ni al importar ni después en el mostrador.
+--     nombre, y en esa base ya hay dos "Teofilo Arboleda" distintas (Rueda y
+--     Pinzón). Sin cédula no hay forma de decidir si dos filas son la
+--     misma persona, ni al importar ni después en el mostrador.
 --
 --   · el SEGUNDO TELÉFONO. Buena parte de las filas trae dos números en
---     una sola celda ("3000000200-3000000201"). Guardarlos pegados rompe
+--     una sola celda ("3000000043-3000000045"). Guardarlos pegados rompe
 --     `normalizarTelefonoCO`, que decide por el largo del número: 20
 --     dígitos no son un celular, así que devuelve null, el enlace de
 --     WhatsApp no se arma y el botón queda apagado sin que se vea por qué.
@@ -86,7 +86,7 @@ end $$;
 -- primera. En Postgres dos NULL no son iguales para un índice único, pero
 -- el filtro lo deja explícito y además achica el índice.
 --
--- OJO: el índice compara el texto tal cual. "1.095.826.077" y "1000000200"
+-- OJO: el índice compara el texto tal cual. "1.000.000.004" y "1000000004"
 -- son dos filas distintas para él. Por eso la cédula se normaliza a solo
 -- dígitos antes de insertar — lo hace `axios.js` en POST/PUT /duenos y el
 -- importador en `importar/armar-sql.mjs`. No se pone un check de formato

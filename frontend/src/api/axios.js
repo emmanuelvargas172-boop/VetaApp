@@ -132,7 +132,7 @@ function parseDuenoBody(body = {}) {
   if ('telefono'  in body) out.telefono  = t(body.telefono);
   if ('direccion' in body) out.direccion = t(body.direccion) || null;
   // Solo dígitos: el índice único de 011 compara el texto tal cual, así que
-  // "1.095.826.077" y "1000000200" serían dos tutores distintos para la
+  // "1.000.000.004" y "1000000004" serían dos tutores distintos para la
   // base aunque sean la misma persona.
   if ('cedula'    in body) out.cedula    = String(body.cedula ?? '').replace(/\D/g, '') || null;
   if ('telefono2' in body) {

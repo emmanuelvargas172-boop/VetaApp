@@ -150,13 +150,13 @@ describe('pesos', () => {
 
 describe('telefonos', () => {
   it('separa los dos números pegados con guion', () => {
-    expect(telefonos(nuevoEstado(), '3000000200-3000000201', ctx))
-      .toEqual(['573000000200', '573000000201']);
+    expect(telefonos(nuevoEstado(), '3000000043-3000000045', ctx))
+      .toEqual(['573000000043', '573000000045']);
   });
 
   it('separa con espacios alrededor del guion', () => {
-    expect(telefonos(nuevoEstado(), '3000000202 - 3000000203', ctx))
-      .toEqual(['573000000202', '573000000203']);
+    expect(telefonos(nuevoEstado(), '3000000010 - 3000000028', ctx))
+      .toEqual(['573000000010', '573000000028']);
   });
 
   // Dato real de la hoja. Tiene que avisar y NO reventar: este tutor
@@ -168,8 +168,8 @@ describe('telefonos', () => {
   });
 
   it('no duplica cuando el mismo número viene dos veces', () => {
-    expect(telefonos(nuevoEstado(), '3000000200 / 3000000200', ctx))
-      .toEqual(['573000000200', null]);
+    expect(telefonos(nuevoEstado(), '3000000043 / 3000000043', ctx))
+      .toEqual(['573000000043', null]);
   });
 });
 
@@ -186,7 +186,7 @@ describe('tipoBano', () => {
 
 describe('sinTildes', () => {
   it('normaliza tildes, mayúsculas y espacios de sobra', () => {
-    expect(sinTildes('  Ángel  Ardila ')).toBe('angel ardila');
+    expect(sinTildes('  Ángel  Pinzón ')).toBe('angel pinzon');
   });
 });
 
@@ -337,7 +337,7 @@ export function pesos(estado, valor, ctx) {
   return n;
 }
 
-// "3000000200-3000000201", "3000000202 - 3000000203", "" → [tel1, tel2].
+// "3000000043-3000000045", "3000000010 - 3000000028", "" → [tel1, tel2].
 // Valida con la MISMA función que usa la app para armar el enlace de
 // WhatsApp, así no hay dos ideas de qué es un número válido.
 export function telefonos(estado, valor, ctx) {
@@ -870,10 +870,10 @@ const leer = (grilla, estado = nuevoEstado()) =>
 
 describe('leerFilas', () => {
   it('lee una fila completa', () => {
-    const { filas } = leer([['Ana Gómez', 'Max', '3000000200', '1000000200', 'Poodle', '26/07/2018', '', '']]);
+    const { filas } = leer([['Ana Gómez', 'Max', '3000000043', '1000000004', 'Poodle', '26/07/2018', '', '']]);
     expect(filas[0]).toMatchObject({
-      tutor: 'Ana Gómez', mascota: 'Max', tel1: '573000000200',
-      cedula: '1000000200', raza: 'Poodle', especie: 'perro', nacimiento: '2018-07-26',
+      tutor: 'Ana Gómez', mascota: 'Max', tel1: '573000000043',
+      cedula: '1000000004', raza: 'Poodle', especie: 'perro', nacimiento: '2018-07-26',
     });
   });
 
@@ -886,7 +886,7 @@ describe('leerFilas', () => {
   // Una fila con teléfono y costo pero sin nombres es una visita que se
   // cobró. No se importa, pero NO se desaparece en silencio.
   it('descarta la fila sin nombres pero la avisa', () => {
-    const { estado, filas } = leer([['', '', '3000000200', '', '', '', '', '']]);
+    const { estado, filas } = leer([['', '', '3000000043', '', '', '', '', '']]);
     expect(filas).toHaveLength(0);
     expect(estado.avisos[0].texto).toContain('sin nombres');
     // 'descarte' y no 'dato': el paso 3 cuenta estos aparte para poder
@@ -933,8 +933,8 @@ describe('formatoDeFechasRoto', () => {
 describe('agrupar', () => {
   it('une al mismo tutor por cédula aunque el nombre esté escrito distinto', () => {
     const { estado, filas } = leer([
-      ['Ana Gómez',  'Max',  '3000000200', '1000000200', 'Poodle', '', '', ''],
-      ['ana gomez',  'Luna', '3000000200', '1000000200', 'Pug',    '', '', ''],
+      ['Ana Gómez',  'Max',  '3000000043', '1000000004', 'Poodle', '', '', ''],
+      ['ana gomez',  'Luna', '3000000043', '1000000004', 'Pug',    '', '', ''],
     ]);
     const { tutores, mascotas } = agrupar(estado, filas);
     expect(tutores.size).toBe(1);
@@ -945,16 +945,16 @@ describe('agrupar', () => {
   // Pasó de verdad: hay dos "Teofilo Arboleda" en la base de La Huella.
   it('NO une dos tutores del mismo nombre con teléfonos distintos', () => {
     const { estado, filas } = leer([
-      ['Teofilo Arboleda', 'Max',  '3000000202', '', '', '', '', ''],
-      ['Teofilo Arboleda', 'Luna', '3000000203', '', '', '', '', ''],
+      ['Teofilo Arboleda', 'Max',  '3000000010', '', '', '', '', ''],
+      ['Teofilo Arboleda', 'Luna', '3000000028', '', '', '', '', ''],
     ]);
     expect(agrupar(estado, filas).tutores.size).toBe(2);
   });
 
   it('la dirección más larga gana porque dice más del mismo lugar', () => {
     const grilla = [
-      ['Ana', 'Max', '3000000200', '1000000200', '', '', '', ''],
-      ['Ana', 'Max', '3000000200', '1000000200', '', '', '', ''],
+      ['Ana', 'Max', '3000000043', '1000000004', '', '', '', ''],
+      ['Ana', 'Max', '3000000043', '1000000004', '', '', '', ''],
     ];
     const estado = nuevoEstado();
     const filas = leerFilas(estado, { grilla, mapa: { ...MAPA, direccion: 8 }, hoja: 'Hoja1' });
@@ -967,23 +967,23 @@ describe('agrupar', () => {
   // "Noah" y "Noah Emiliano" son dos perros. Decisión del dueño.
   it('no junta dos mascotas con nombres parecidos del mismo tutor', () => {
     const { estado, filas } = leer([
-      ['Ángela', 'Noah',          '3000000200', '', '', '', '', ''],
-      ['Ángela', 'Noah Emiliano', '3000000200', '', '', '', '', ''],
+      ['Ángela', 'Noah',          '3000000043', '', '', '', '', ''],
+      ['Ángela', 'Noah Emiliano', '3000000043', '', '', '', '', ''],
     ]);
     expect(agrupar(estado, filas).mascotas.size).toBe(2);
   });
 
   it('cada fila con fecha de servicio es un baño distinto', () => {
     const { estado, filas } = leer([
-      ['Ana', 'Max', '3000000200', '', '', '', '12/09/2026', ''],
-      ['Ana', 'Max', '3000000200', '', '', '', '19/09/2026', ''],
+      ['Ana', 'Max', '3000000043', '', '', '', '12/09/2026', ''],
+      ['Ana', 'Max', '3000000043', '', '', '', '19/09/2026', ''],
     ]);
     const banos = agrupar(estado, filas).eventos.filter((e) => e.t === 'bano');
     expect(banos).toHaveLength(2);
   });
 
   it('la vacuna queda con la próxima dosis un año después', () => {
-    const { estado, filas } = leer([['Ana', 'Max', '3000000200', '', '', '', '', '14/07/2026']]);
+    const { estado, filas } = leer([['Ana', 'Max', '3000000043', '', '', '', '', '14/07/2026']]);
     const v = agrupar(estado, filas).eventos.find((e) => e.tipo === 'vacuna');
     expect(v).toMatchObject({ fecha: '2026-07-14', proxima: '2027-07-14' });
   });
@@ -1510,11 +1510,11 @@ Esto es lo que la tarea 9 (`plan.js`) tiene que armar y lo que la tarea 10 (`esc
 {
   "importacion_id": 7,
   "crear_tutores": [
-    { "ref": "t0", "nombre": "Ana Gómez", "telefono": "573000000200",
-      "telefono2": null, "cedula": "1000000200", "direccion": "Calle 1 #2-3" }
+    { "ref": "t0", "nombre": "Ana Gómez", "telefono": "573000000043",
+      "telefono2": null, "cedula": "1000000004", "direccion": "Calle 1 #2-3" }
   ],
   "completar_tutores": [
-    { "id": 41, "campos": { "cedula": "1000000200", "direccion": "Calle 1 #2-3" } }
+    { "id": 41, "campos": { "cedula": "1000000004", "direccion": "Calle 1 #2-3" } }
   ],
   "crear_mascotas": [
     { "ref": "m0", "tutor_ref": "t0", "tutor_id": null, "nombre": "Max",
@@ -2328,7 +2328,7 @@ La capa que no se comparte con el script de terminal. Es el gemelo en navegador 
 
 Tres datos dependen de eso, y los tres fallan en silencio:
 
-- **La cédula es un número.** Escrita mal queda `"1000000200.0"`, el importador normaliza a solo dígitos y la lee como `10000002000` — un cero de más. Esa cédula no identifica a nadie, y el índice único de `011` la deja pasar porque es otro texto.
+- **La cédula es un número.** Escrita mal queda `"1000000004.0"`, el importador normaliza a solo dígitos y la lee como `10000000040` — un cero de más. Esa cédula no identifica a nadie, y el índice único de `011` la deja pasar porque es otro texto.
 - **El costo es un número.** `40000.0` escrito mal queda `"400000"`. Diez veces más caro, en la columna de la que vive la peluquería.
 - **Las fechas son fechas, no texto.** En un CSV salen `26/07/2018` o `2018-07-26` según el idioma de la cuenta de Google, y hay que adivinar cuál número es el día. Acá no hay nada que adivinar.
 
@@ -2380,11 +2380,11 @@ describe('celda', () => {
     expect(celda(undefined)).toBe('');
   });
 
-  // El caso de la cédula. 1000000200 escrito como "1000000200.0" lo lee el
-  // importador —que normaliza a solo dígitos— como 10000002000: un cero de
+  // El caso de la cédula. 1000000004 escrito como "1000000004.0" lo lee el
+  // importador —que normaliza a solo dígitos— como 10000000040: un cero de
   // más, y una cédula que no identifica a nadie.
   it('un entero grande no sale con decimal ni en notación científica', () => {
-    expect(celda({ t: 'n', v: 1000000200 })).toBe('1000000200');
+    expect(celda({ t: 'n', v: 1000000004 })).toBe('1000000004');
   });
 
   // El caso del costo. 40000.0 mal escrito queda "400000": diez veces más
@@ -2508,7 +2508,7 @@ describe('leerLibro', () => {
     const ws = XLSX.utils.aoa_to_sheet(
       // Medianoche local y no UTC: en Colombia (UTC-5) un Date.UTC se
       // convierte al día anterior y el test pasaría a fallar por el huso.
-      [['Nacimiento', 'Cedula'], [new Date(2018, 6, 26), 1000000200]],
+      [['Nacimiento', 'Cedula'], [new Date(2018, 6, 26), 1000000004]],
       { cellDates: true },
     );
     const wb = XLSX.utils.book_new();
@@ -2516,7 +2516,7 @@ describe('leerLibro', () => {
     const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 
     const { grilla } = leerHoja(leerLibro(bytes), 'Hoja1');
-    expect(grilla[0]).toEqual(['2018-07-26', '1000000200']);
+    expect(grilla[0]).toEqual(['2018-07-26', '1000000004']);
   });
 
   it('dice en español que el archivo no es un Excel', () => {
@@ -2838,7 +2838,7 @@ Los eventos también hacen falta, y por lo mismo: sin ellos, subir el mismo arch
   // Lo que el paso 3 tiene que preguntar. Hasta que no estén todas
   // resueltas, el botón de Confirmar no existe.
   dudas: [{
-    id: 'tutor:c:1000000200',
+    id: 'tutor:c:1000000004',
     clase: 'tutor',
     motivo: 'nombre_tel_distinto' | 'cedula_otro_nombre',
     archivo: { nombre, tel1, cedula, direccion, mascotas: ['Max'] },
@@ -2868,7 +2868,7 @@ Los eventos también hacen falta, y por lo mismo: sin ellos, subir el mismo arch
 ```js
 {
   // Por cada duda.id: 'misma' une, 'distinta' crea una nueva.
-  dudas:   { 'tutor:n:Teofilo Quintanilla': 'distinta' },
+  dudas:   { 'tutor:n:Casimiro Bustamante rueda': 'distinta' },
   // Por cada raza que clasificar() no reconoció. La pantalla la deja en
   // 'perro' marcada de entrada: en la base real 51 de 54 son perros.
   especies: { 'criollo': 'perro' },
@@ -2893,7 +2893,7 @@ const HOY = new Date(2026, 9, 15); // 15/10/2026, fijo para que la edad no cambi
 const delArchivo = (over = {}) => ({
   tutores: new Map([['t1', {
     clave: 't1', nombre: 'Ana Gómez', cedula: null, direccion: null,
-    tel1: '573000000200', tel2: null, origen: ['Hoja1:2'], ...over.tutor,
+    tel1: '573000000043', tel2: null, origen: ['Hoja1:2'], ...over.tutor,
   }]]),
   mascotas: new Map([['m1', {
     clave: 'm1', tutor: 't1', nombre: 'Max', especie: 'perro',
@@ -2906,16 +2906,16 @@ const vacia = { duenos: [], mascotas: [], tratamientos: [], vacunas: [] };
 const sinDecidir = { dudas: {}, especies: {} };
 
 describe('nombresSeParecen', () => {
-  it('"Eulalia Ruth Trujillo" y "Ana Araque" son parecidos', () => {
-    expect(nombresSeParecen('Eulalia Ruth Trujillo', 'Ana Araque')).toBe(true);
+  it('"Teofilo Arboleda Rueda" y "Ana Rueda" son parecidos', () => {
+    expect(nombresSeParecen('Teofilo Arboleda Rueda', 'Ana Rueda')).toBe(true);
   });
 
   it('las tildes y las mayúsculas no cuentan', () => {
-    expect(nombresSeParecen('Teofilo Quintanilla', 'Anselmo Zambrano')).toBe(true);
+    expect(nombresSeParecen('CLARA PINZÓN', 'clara pinzon')).toBe(true);
   });
 
-  it('"Ana Araque" y "Pedro Gómez" no se parecen en nada', () => {
-    expect(nombresSeParecen('Ana Araque', 'Pedro Gómez')).toBe(false);
+  it('"Ana Rueda" y "Pedro Gómez" no se parecen en nada', () => {
+    expect(nombresSeParecen('Ana Rueda', 'Pedro Gómez')).toBe(false);
   });
 
   // "de", "la", "y" están en medio mundo. Si contaran, cualquier par de
@@ -2928,8 +2928,8 @@ describe('nombresSeParecen', () => {
 describe('emparejarTutor', () => {
   it('misma cédula, nombre parecido: es la misma persona', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000202', cedula: '1000000200' }] });
-    const r = emparejarTutor(idx, { nombre: 'Ana Araque', cedula: '1000000200', tel1: '573000000000' });
+      { id: 7, nombre: 'Teofilo Arboleda Rueda', telefono: '573000000010', cedula: '1000000004' }] });
+    const r = emparejarTutor(idx, { nombre: 'Ana Rueda', cedula: '1000000004', tel1: '573000000000' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 7 } });
   });
 
@@ -2938,31 +2938,31 @@ describe('emparejarTutor', () => {
   // alguien que no es su dueño.
   it('misma cédula, nombre completamente distinto: pregunta', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 7, nombre: 'Eulalia Ruth Trujillo', telefono: '573000000202', cedula: '1000000200' }] });
-    const r = emparejarTutor(idx, { nombre: 'Pedro Castaño', cedula: '1000000200', tel1: null });
+      { id: 7, nombre: 'Teofilo Arboleda Rueda', telefono: '573000000010', cedula: '1000000004' }] });
+    const r = emparejarTutor(idx, { nombre: 'Pedro Castaño', cedula: '1000000004', tel1: null });
     expect(r).toMatchObject({ certeza: 'duda', motivo: 'cedula_otro_nombre' });
   });
 
   it('mismo nombre y mismo teléfono, sin cédulas: es la misma', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 9, nombre: 'Ana Gómez', telefono: '573000000200', cedula: null }] });
-    const r = emparejarTutor(idx, { nombre: 'ana gomez', cedula: null, tel1: '573000000200' });
+      { id: 9, nombre: 'Ana Gómez', telefono: '573000000043', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'ana gomez', cedula: null, tel1: '573000000043' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 9 } });
   });
 
   // El caso real de la base de La Huella: dos "Teofilo Arboleda" que son dos
-  // personas distintas (Araque y Casimiro Carvajalino).
+  // personas distintas (Rueda y Pinzón).
   it('mismo nombre con teléfono distinto: pregunta', () => {
     const idx = indexar({ ...vacia, duenos: [
-      { id: 9, nombre: 'Teofilo Arboleda', telefono: '573000000202', cedula: null }] });
-    const r = emparejarTutor(idx, { nombre: 'Teofilo Arboleda', cedula: null, tel1: '573000000203' });
+      { id: 9, nombre: 'Teofilo Arboleda', telefono: '573000000010', cedula: null }] });
+    const r = emparejarTutor(idx, { nombre: 'Teofilo Arboleda', cedula: null, tel1: '573000000028' });
     expect(r).toMatchObject({ certeza: 'duda', motivo: 'nombre_tel_distinto' });
   });
 
   it('nadie parecido: es alguien nuevo', () => {
     const idx = indexar({ ...vacia, duenos: [
       { id: 9, nombre: 'Otra Persona', telefono: '573100000000', cedula: null }] });
-    expect(emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000200' }))
+    expect(emparejarTutor(idx, { nombre: 'Ana Gómez', cedula: null, tel1: '573000000043' }))
       .toMatchObject({ certeza: 'nueva', existente: null });
   });
 
@@ -2977,7 +2977,7 @@ describe('armarPlan · una cuenta vacía', () => {
     const p = armarPlan(nuevoEstado(), delArchivo(), vacia, sinDecidir, HOY);
 
     expect(p.envio.crear_tutores).toEqual([{
-      ref: 't1', nombre: 'Ana Gómez', telefono: '573000000200',
+      ref: 't1', nombre: 'Ana Gómez', telefono: '573000000043',
       telefono2: null, cedula: null, direccion: null,
     }]);
     expect(p.envio.crear_mascotas).toEqual([{
@@ -3042,13 +3042,13 @@ describe('armarPlan · completar sin pisar', () => {
 
   it('completa la cédula vacía y deja la dirección que ya estaba', () => {
     const a = delArchivo({
-      tutor: { cedula: '1000000200', direccion: 'LA DEL ARCHIVO', tel1: '573999999999' },
+      tutor: { cedula: '1000000004', direccion: 'LA DEL ARCHIVO', tel1: '573999999999' },
     });
     const p = armarPlan(nuevoEstado(), a, yaExiste, sinDecidir, HOY);
 
     expect(p.envio.crear_tutores).toHaveLength(0);
     expect(p.envio.completar_tutores).toEqual([
-      { id: 7, campos: { cedula: '1000000200' } },
+      { id: 7, campos: { cedula: '1000000004' } },
     ]);
   });
 
@@ -3058,7 +3058,7 @@ describe('armarPlan · completar sin pisar', () => {
   // número nuevo entró.
   it('no cambia el teléfono y lo avisa', () => {
     const e = nuevoEstado();
-    const a = delArchivo({ tutor: { tel1: '573000000200' } });
+    const a = delArchivo({ tutor: { tel1: '573000000043' } });
     const p = armarPlan(e, a, yaExiste, sinDecidir, HOY);
 
     expect(JSON.stringify(p.envio.completar_tutores)).not.toContain('telefono"');
@@ -3090,9 +3090,9 @@ describe('armarPlan · completar sin pisar', () => {
 
   it('nada que completar es completar_tutores vacío, no un objeto sin campos', () => {
     const lleno = { ...vacia, duenos: [{ id: 7, nombre: 'Ana Gómez',
-      telefono: '573000000200', telefono2: '573000000001',
-      cedula: '1000000200', direccion: 'Ya' }] };
-    const a = delArchivo({ tutor: { cedula: '1000000200' } });
+      telefono: '573000000043', telefono2: '573000000001',
+      cedula: '1000000004', direccion: 'Ya' }] };
+    const a = delArchivo({ tutor: { cedula: '1000000004' } });
     const p = armarPlan(nuevoEstado(), a, lleno, sinDecidir, HOY);
 
     expect(p.envio.completar_tutores).toHaveLength(0);
@@ -3102,7 +3102,7 @@ describe('armarPlan · completar sin pisar', () => {
 
 describe('armarPlan · los dudosos', () => {
   const dosAnas = { ...vacia, duenos: [
-    { id: 9, nombre: 'Ana Gómez', telefono: '573000000202', cedula: null,
+    { id: 9, nombre: 'Ana Gómez', telefono: '573000000010', cedula: null,
       telefono2: null, direccion: null }] };
 
   it('devuelve la duda y no manda nada de ese tutor hasta que la contesten', () => {
@@ -3111,9 +3111,9 @@ describe('armarPlan · los dudosos', () => {
     expect(p.dudas).toHaveLength(1);
     expect(p.dudas[0]).toMatchObject({
       clase: 'tutor', motivo: 'nombre_tel_distinto',
-      existente: { id: 9, telefono: '573000000202' },
+      existente: { id: 9, telefono: '573000000010' },
     });
-    expect(p.dudas[0].archivo).toMatchObject({ nombre: 'Ana Gómez', tel1: '573000000200' });
+    expect(p.dudas[0].archivo).toMatchObject({ nombre: 'Ana Gómez', tel1: '573000000043' });
     // La mascota tampoco: no se sabe de quién es.
     expect(p.envio.crear_tutores).toHaveLength(0);
     expect(p.envio.crear_mascotas).toHaveLength(0);
@@ -3185,7 +3185,7 @@ describe('armarPlan · subir dos veces el mismo archivo', () => {
   // historial duplicado e informe de caja con el doble de servicios.
   it('la segunda vez no entra nada: 0 para crear y 0 para completar', () => {
     const yaTodo = {
-      duenos: [{ id: 7, nombre: 'Ana Gómez', telefono: '573000000200',
+      duenos: [{ id: 7, nombre: 'Ana Gómez', telefono: '573000000043',
                  telefono2: null, cedula: null, direccion: null }],
       mascotas: [{ id: 70, dueno_id: 7, nombre: 'Max', raza: 'Poodle',
                    fecha_nacimiento: '2018-07-26', edad_anios: 8, edad_meses: 2 }],
@@ -3229,7 +3229,7 @@ describe('armarPlan · subir dos veces el mismo archivo', () => {
   // se sabe a qué mascota pegarlo.
   it('el evento de una mascota sin resolver no se manda', () => {
     const dosAnas = { ...vacia, duenos: [{ id: 9, nombre: 'Ana Gómez',
-      telefono: '573000000202', cedula: null, telefono2: null, direccion: null }] };
+      telefono: '573000000010', cedula: null, telefono2: null, direccion: null }] };
     const a = delArchivo({ eventos: unBano });
     const p = armarPlan(nuevoEstado(), a, dosAnas, sinDecidir, HOY);
     expect(p.envio.tratamientos).toHaveLength(0);
@@ -3294,8 +3294,8 @@ const palabras = (nombre) => sinTildes(nombre).split(' ').filter((p) => p.length
  *
  * Una palabra compartida alcanza, y a propósito: esto NO se usa para
  * emparejar. Se usa solo cuando la cédula ya dijo que son el mismo, para
- * distinguir "Eulalia Ruth Trujillo" / "Ana Araque" —el mismo cliente escrito
- * de dos formas— de "Ana Araque" / "Pedro Castaño", que con la misma cédula
+ * distinguir "Teofilo Arboleda Rueda" / "Ana Rueda" —el mismo cliente escrito
+ * de dos formas— de "Ana Rueda" / "Pedro Castaño", que con la misma cédula
  * es una cédula mal tecleada y hay que preguntar.
  */
 export function nombresSeParecen(a, b) {
@@ -3377,7 +3377,7 @@ export function emparejarTutor(idx, tutor) {
   if (mismoTel) return { certeza: 'misma', existente: mismoTel, motivo: 'nombre_y_telefono' };
 
   // 3. Mismo nombre, teléfono distinto. El caso real de la base de La
-  //    Huella: dos "Teofilo Arboleda" que son Araque y Casimiro Carvajalino.
+  //    Huella: dos "Teofilo Arboleda" que son Rueda y Pinzón.
   return { certeza: 'duda', existente: candidatos[0], motivo: 'nombre_tel_distinto' };
 }
 
@@ -4193,8 +4193,8 @@ const ENCABEZADOS = [
 ];
 
 const GRILLA = [
-  ['2026-09-12 10:18:00', 'Hector Fabio Arboleda', '1000000200', '3000000200 - 3000000201', 'Max', 'Poodle', ''],
-  ['2026-09-13 09:02:00', 'Eulalia Ruth Trujillo',     '',           '3000000202',               'Luna', 'Criollo', 'Muy nerviosa'],
+  ['2026-09-12 10:18:00', 'German Ana Villamizar', '1000000004', '3000000043 - 3000000045', 'Max', 'Poodle', ''],
+  ['2026-09-13 09:02:00', 'Teofilo Arboleda Rueda',     '',           '3000000010',               'Luna', 'Criollo', 'Muy nerviosa'],
 ];
 
 describe('columnasConEjemplo', () => {
@@ -4743,7 +4743,7 @@ Lo que tiene que pasar:
 |---|---|
 | Las hojas | `Respuestas de formulario 1 · 54 filas con datos` — **54, no 155** |
 | El mapeo | `Nombre y apellidos del Tutor` → Nombre del dueño; `Cedula` → Cédula; `Contacto telefonos (2)` → Teléfono |
-| Los ejemplos | `"Jorge Enrique Pinzon"`, `"1000000200"` — **sin** el `.0` |
+| Los ejemplos | `"Luz Gómez Jorge Pinzón"`, `"1000000004"` — **sin** el `.0` |
 | `Otras observaciones` | `No importar` |
 | Mandar `Raza` a Cédula | la fila de `Cedula` se queda en `No importar` sola |
 | Poner el tutor en `No importar` | aparece "Falta decirme cuál columna es Nombre del dueño" y el botón se apaga |
@@ -4871,7 +4871,7 @@ const MAPA = { tutor: 0, mascota: 1, telefonos: 2, cedula: 3, raza: 4, nacimient
 
 const cols = (grilla) => ({ hoja: 'Hoja1', mapa: MAPA, encabezados: ENC, grilla });
 
-const UNA = [['Ana Gómez', 'Max', '3000000200', '1000000200', 'Poodle', '26/07/2018', '12/09/2026 10:18:00']];
+const UNA = [['Ana Gómez', 'Max', '3000000043', '1000000004', 'Poodle', '26/07/2018', '12/09/2026 10:18:00']];
 
 describe('calcular', () => {
   it('una fila limpia da un tutor, una mascota y un baño', () => {
@@ -4888,7 +4888,7 @@ describe('calcular', () => {
   // vuelve a creerle a esta pantalla.
   it('con todo ya en la base no propone crear nada', () => {
     const existentes = {
-      duenos: [{ id: 1, nombre: 'Ana Gómez', telefono: '573000000200', telefono2: null, cedula: '1000000200', direccion: 'Calle 1' }],
+      duenos: [{ id: 1, nombre: 'Ana Gómez', telefono: '573000000043', telefono2: null, cedula: '1000000004', direccion: 'Calle 1' }],
       mascotas: [{ id: 9, dueno_id: 1, nombre: 'Max', raza: 'Poodle', fecha_nacimiento: '2018-07-26', edad_anios: 8, edad_meses: 2 }],
       tratamientos: [{ mascota_id: 9, tipo: 'bano', fecha: '2026-09-12' }],
       vacunas: [],
@@ -4905,14 +4905,14 @@ describe('calcular', () => {
   it('cuenta las filas descartadas aparte de los avisos de dato', () => {
     const grilla = [
       ...UNA,
-      ['', '', '3000000202', '', '', '', '13/09/2026 09:02:00'],
+      ['', '', '3000000010', '', '', '', '13/09/2026 09:02:00'],
     ];
     const { estado } = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     expect(estado.avisos.filter((a) => a.clase === 'descarte')).toHaveLength(1);
   });
 
   it('una raza desconocida se pregunta, no se adivina', () => {
-    const grilla = [['Ana Gómez', 'Max', '3000000200', '', 'Criollo', '', '12/09/2026 10:18:00']];
+    const grilla = [['Ana Gómez', 'Max', '3000000043', '', 'Criollo', '', '12/09/2026 10:18:00']];
     const { plan } = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     expect(plan.especies).toHaveLength(1);
     expect(plan.especies[0].raza).toBe('Criollo');
@@ -4920,7 +4920,7 @@ describe('calcular', () => {
   });
 
   it('contestada la especie, deja de preguntar y la mascota entra', () => {
-    const grilla = [['Ana Gómez', 'Max', '3000000200', '', 'Criollo', '', '12/09/2026 10:18:00']];
+    const grilla = [['Ana Gómez', 'Max', '3000000043', '', 'Criollo', '', '12/09/2026 10:18:00']];
     const { plan } = calcular({
       columnas: cols(grilla), existentes: vacia, hoy: HOY,
       decisiones: { dudas: {}, especies: { criollo: 'gato' } },
@@ -4935,7 +4935,7 @@ describe('calcular', () => {
   // Correr dos veces sobre el mismo archivo no puede acumular avisos: el
   // estado se crea adentro de calcular, no afuera.
   it('dos corridas no comparten avisos', () => {
-    const grilla = [['Ana Gómez', 'Max', '3000000200', '', 'Poodle', '31/02/2026', '12/09/2026 10:18:00']];
+    const grilla = [['Ana Gómez', 'Max', '3000000043', '', 'Poodle', '31/02/2026', '12/09/2026 10:18:00']];
     const a = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     const b = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     expect(a.estado.avisos.length).toBe(b.estado.avisos.length);
@@ -4946,7 +4946,7 @@ describe('calcular', () => {
     // Doce filas con fechas que no son fechas: no es un dato suelto malo,
     // es la hoja equivocada.
     const grilla = Array.from({ length: 12 }, (_, i) => (
-      [`Tutor ${i}`, `Mascota ${i}`, '3000000200', '', 'Poodle', 'ayer', 'pasado mañana']
+      [`Tutor ${i}`, `Mascota ${i}`, '3000000043', '', 'Poodle', 'ayer', 'pasado mañana']
     ));
     const { estado } = calcular({ columnas: cols(grilla), existentes: vacia, decisiones: sinDecidir, hoy: HOY });
     expect(estado.fechasRotas).toBeGreaterThanOrEqual(10);
@@ -5500,10 +5500,10 @@ describe('textoOmitidos', () => {
   // cédula para siempre sin encontrar a nadie.
   it('dice de quién no pudo guardar la cédula y por qué', () => {
     const lineas = textoOmitidos([
-      { que: 'cedula_repetida', quien: 'Ana Gómez', valor: '1000000200' },
+      { que: 'cedula_repetida', quien: 'Ana Gómez', valor: '1000000004' },
     ]);
     expect(lineas[0]).toContain('Ana Gómez');
-    expect(lineas[0]).toContain('1000000200');
+    expect(lineas[0]).toContain('1000000004');
     expect(lineas[0]).toContain('ya la tenía otro cliente');
   });
 
@@ -6593,10 +6593,10 @@ Con el import hecho, en `/app/mascotas`:
 |---|---|
 | Una mascota con fecha de nacimiento | la edad calculada, no 0 |
 | Nube y Pinina (sin fecha) | sin edad, no "0 años"; la ficha no miente |
-| Diana Pinzon | sus dos mascotas, Noah y Noah Emiliano, separadas |
-| Clara Ines Villamizar | el botón de WhatsApp apagado, no un enlace roto |
+| La tutora de Noah y Noah Emiliano | sus dos mascotas separadas, no una sola |
+| El tutor cuyo teléfono es un fijo | el botón de WhatsApp apagado, no un enlace roto |
 | Un tutor con dos teléfonos | los dos se ven; el de WhatsApp es el primero |
-| Una cédula | `1000000200`, **sin** el `.0` y **sin** el cero de más |
+| Una cédula | `1000000004`, **sin** el `.0` y **sin** el cero de más |
 | `/app/recordatorios` | las próximas dosis de las 13 vacunas importadas |
 
 - [ ] **Step 8: Correr las migraciones en producción**

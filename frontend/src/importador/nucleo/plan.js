@@ -32,16 +32,16 @@ const vacio = (v) => v === null || v === undefined || String(v).trim() === '';
  * Normalizados y no como texto, porque los dos lados vienen en formatos
  * distintos y acá se comparaba crudo:
  *  - `tutor.tel1` sale del archivo por telefonos() → normalizarTelefonoCO, que
- *    devuelve con indicativo: '310 483 5862' → '573000000202'.
+ *    devuelve con indicativo: '300 000 0010' → '573000000010'.
  *  - `duenos.telefono` es lo que alguien tecleó en la ficha. parseDuenoBody
  *    (api/axios.js:132) le hace un trim() y nada más, así que en la base vive
- *    '310 483 5862' tal cual.
+ *    '300 000 0010' tal cual.
  *
  * Son el mismo número y el === decía que no. Costaba dos cosas, las dos sobre
  * clientes reales: el camino 2 de emparejarTutor no se disparaba nunca para un
  * cliente creado a mano —caía en 'duda', y el paso 3 trae "es otra persona"
  * premarcado, así que contestar rápido duplicaba la ficha—; y completarTutor
- * avisaba "ya tiene el teléfono 3000000202, el archivo trae 573000000202",
+ * avisaba "ya tiene el teléfono 3000000010, el archivo trae 573000000010",
  * que es un aviso falso por cliente encima de la lista donde viven los avisos
  * que sí importan.
  *
@@ -79,7 +79,7 @@ const palabras = (nombre) => sinTildes(nombre).split(' ').filter((p) => p.length
  * Si dos nombres pueden ser de la misma persona.
  *
  * Esto NO se usa para emparejar. Se usa solo cuando la cédula ya dijo que
- * son el mismo, para distinguir "Eulalia Ruth Trujillo" / "Ana Araque" —el
+ * son el mismo, para distinguir "Teofilo Arboleda Rueda" / "Ana Rueda" —el
  * mismo cliente escrito de dos formas— de "Pedro Gómez" / "Ana Gómez" —el
  * papá y la hija, no una misma persona con el nombre mal tecleado—.
  *
@@ -87,8 +87,8 @@ const palabras = (nombre) => sinTildes(nombre).split(' ').filter((p) => p.length
  * 2 palabras compartidas; si alguno trae solo una, alcanza con una.
  * Una sola coincidencia cuando los dos tienen varias palabras casi siempre
  * es el apellido de familia —"Pedro Gómez" y "Ana Gómez" comparten "Gomez"
- * pero son personas distintas—. Pedir dos deja pasar "Eulalia Ruth Trujillo" /
- * "Ana Araque" y manda a la familia al paso 3, que es donde la clínica
+ * pero son personas distintas—. Pedir dos deja pasar "Teofilo Arboleda Rueda" /
+ * "Ana Rueda" y manda a la familia al paso 3, que es donde la clínica
  * puede decidir.
  */
 export function nombresSeParecen(a, b) {
@@ -101,7 +101,7 @@ export function nombresSeParecen(a, b) {
   // coincidencia sola es casi siempre el apellido de familia: "Pedro
   // Gómez" y "Ana Gómez" con la misma cédula son el papá y la hija, no
   // un nombre escrito de dos formas. Pedir dos deja pasar "Teofilo Arboleda
-  // Araque" / "Ana Araque" —el mismo cliente— y manda a la familia al
+  // Rueda" / "Ana Rueda" —el mismo cliente— y manda a la familia al
   // paso 3, que es donde la clínica puede decidir.
   const exigidas = (pa.length >= 2 && pb.length >= 2) ? 2 : 1;
   return comunes >= exigidas;
@@ -179,7 +179,7 @@ export function emparejarTutor(idx, tutor) {
   if (mismoTel) return { certeza: 'misma', existente: mismoTel, motivo: 'nombre_y_telefono' };
 
   // 3. Mismo nombre, teléfono distinto. El caso real de la base de La
-  //    Huella: dos "Teofilo Arboleda" que son Araque y Casimiro Carvajalino.
+  //    Huella: dos "Teofilo Arboleda" que son Rueda y Pinzón.
   return { certeza: 'duda', existente: candidatos[0], motivo: 'nombre_tel_distinto' };
 }
 
