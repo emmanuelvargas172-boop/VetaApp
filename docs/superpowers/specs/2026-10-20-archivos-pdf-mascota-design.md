@@ -660,9 +660,31 @@ Separadas por lo que de verdad verifica cada una.
 - exactamente 5 MB → pasa
 - un byte más → falla, y el motivo nombra el tamaño y qué hacer
 - 0 bytes → falla
-- un `.jpg` renombrado a `.pdf` → falla (se mira `file.type`, no la extensión)
+- un archivo que el navegador reporta como `image/jpeg` → falla
 - con 9 archivos ya subidos → pasa; con 10 → falla, y el motivo dice que
   hay que borrar uno
+
+#### Corregido el 2026-10-20: el chequeo de tipo NO atrapa un renombrado
+
+La versión anterior de esta lista decía *"un `.jpg` renombrado a `.pdf` →
+falla (se mira `file.type`, no la extensión)"*. Es falso, y al revés de lo
+que pasa: el navegador **deriva** `File.type` de la extensión del nombre,
+no de los bytes. Un JPG renombrado a `.pdf` llega con
+`type === 'application/pdf'`, pasa `revisarArchivo`, y pasa también
+`allowed_mime_types` del bucket, porque la subida manda `contentType`
+tomado de ese mismo `file.type`.
+
+Lo que el chequeo sí atrapa es el caso real y frecuente: la clínica elige
+una foto del celular —`.jpg` de verdad, con nombre `.jpg`— y la pantalla
+se lo dice en vez de subirla a un bucket que solo muestra PDFs.
+
+Validar de verdad el contenido exigiría leer los primeros bytes y buscar
+`%PDF-`. No se hace, y el motivo es que no cambiaría nada: el archivo se
+entrega a la clínica por URL firmada y lo abre su propio visor, que falla
+solo y de forma obvia. Lo que no se puede hacer es que un comentario o un
+texto de pantalla afirme que la validación es de contenido. La prueba de
+arriba y el comentario de `limites.js` dicen exactamente lo que el
+chequeo hace: mira lo que el navegador reporta.
 
 `textoArchivo`:
 - con fecha y con descripción
