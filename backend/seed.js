@@ -20,7 +20,7 @@ db.exec(`PRAGMA foreign_keys = ON`);
 const iDueno = db.prepare(`INSERT INTO duenos (nombre, telefono, direccion) VALUES (?, ?, ?)`);
 
 const d1 = iDueno.run('María Fernanda Gómez', '3012847563', 'Cabecera del Llano').lastInsertRowid;
-const d2 = iDueno.run('Carlos Andrés Rueda',  '3156789234', 'Lagos del Cacique').lastInsertRowid;
+const d2 = iDueno.run('Carlos Teofilo Bustamante',  '3156789234', 'Lagos del Cacique').lastInsertRowid;
 const d3 = iDueno.run('Valentina Suárez',      '3187654321', 'El Jardín').lastInsertRowid;
 const d4 = iDueno.run('Andrés Felipe Torres',  '3209876543', 'Provenza').lastInsertRowid;
 const d5 = iDueno.run('Juliana Morales',        '3143217890', 'Cabecera').lastInsertRowid;

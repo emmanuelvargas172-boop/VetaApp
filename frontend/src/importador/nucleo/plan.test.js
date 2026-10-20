@@ -22,16 +22,16 @@ const vacia = { duenos: [], mascotas: [], tratamientos: [], vacunas: [] };
 const sinDecidir = { dudas: {}, especies: {} };
 
 describe('nombresSeParecen', () => {
-  it('"Teofilo Arboleda Rueda" y "Ana Rueda" son parecidos', () => {
-    expect(nombresSeParecen('Teofilo Arboleda Rueda', 'Ana Rueda')).toBe(true);
+  it('"Teofilo Arboleda Rueda" y "Teofilo Rueda" son parecidos', () => {
+    expect(nombresSeParecen('Teofilo Arboleda Rueda', 'Teofilo Rueda')).toBe(true);
   });
 
   it('las tildes y las mayúsculas no cuentan', () => {
     expect(nombresSeParecen('CLARA PINZÓN', 'clara pinzon')).toBe(true);
   });
 
-  it('"Ana Rueda" y "Pedro Gómez" no se parecen en nada', () => {
-    expect(nombresSeParecen('Ana Rueda', 'Pedro Gómez')).toBe(false);
+  it('"Teofilo Rueda" y "Pedro Gómez" no se parecen en nada', () => {
+    expect(nombresSeParecen('Teofilo Rueda', 'Pedro Gómez')).toBe(false);
   });
 
   // "de", "la", "y" están en medio mundo. Si contaran, cualquier par de
@@ -52,7 +52,7 @@ describe('emparejarTutor', () => {
   it('misma cédula, nombre parecido: es la misma persona', () => {
     const idx = indexar({ ...vacia, duenos: [
       { id: 7, nombre: 'Teofilo Arboleda Rueda', telefono: '573000000022', cedula: '1000000001' }] });
-    const r = emparejarTutor(idx, { nombre: 'Ana Rueda', cedula: '1000000001', tel1: '573000000000' });
+    const r = emparejarTutor(idx, { nombre: 'Teofilo Rueda', cedula: '1000000001', tel1: '573000000000' });
     expect(r).toMatchObject({ certeza: 'misma', existente: { id: 7 } });
   });
 

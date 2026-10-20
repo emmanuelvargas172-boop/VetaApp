@@ -140,7 +140,7 @@ describe('agrupar', () => {
     ];
     const estado = nuevoEstado();
     const filas = leerFilas(estado, { grilla, mapa: { ...MAPA, direccion: 8 }, hoja: 'Hoja1' });
-    filas[0].direccion = 'Calle 11 #20-30 Barrio Prueba';
+    filas[0].direccion = 'Calle 10 #20-30';
     filas[1].direccion = 'Calle 10 #20-30 Barrio Prueba';
     expect(agrupar(estado, filas).tutores.values().next().value.direccion)
       .toBe('Calle 10 #20-30 Barrio Prueba');

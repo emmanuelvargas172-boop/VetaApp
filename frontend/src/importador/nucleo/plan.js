@@ -79,7 +79,7 @@ const palabras = (nombre) => sinTildes(nombre).split(' ').filter((p) => p.length
  * Si dos nombres pueden ser de la misma persona.
  *
  * Esto NO se usa para emparejar. Se usa solo cuando la cédula ya dijo que
- * son el mismo, para distinguir "Teofilo Arboleda Rueda" / "Ana Rueda" —el
+ * son el mismo, para distinguir "Teofilo Arboleda Rueda" / "Teofilo Rueda" —el
  * mismo cliente escrito de dos formas— de "Pedro Gómez" / "Ana Gómez" —el
  * papá y la hija, no una misma persona con el nombre mal tecleado—.
  *
@@ -101,7 +101,7 @@ export function nombresSeParecen(a, b) {
   // coincidencia sola es casi siempre el apellido de familia: "Pedro
   // Gómez" y "Ana Gómez" con la misma cédula son el papá y la hija, no
   // un nombre escrito de dos formas. Pedir dos deja pasar "Teofilo Arboleda
-  // Rueda" / "Ana Rueda" —el mismo cliente— y manda a la familia al
+  // Rueda" / "Teofilo Rueda" —el mismo cliente— y manda a la familia al
   // paso 3, que es donde la clínica puede decidir.
   const exigidas = (pa.length >= 2 && pb.length >= 2) ? 2 : 1;
   return comunes >= exigidas;
