@@ -22,7 +22,7 @@ import api from '../api/axios';
 import { Card, Button, SectionHeader, EmptyState, iconBtnStyle } from './ui';
 import { IconFile, IconPlus, IconTrash, IconArrowRight } from './icons';
 import { TIPOS, textoArchivo, fmtBytes } from '../archivos/textos.js';
-import { revisarArchivo, MAX_POR_MASCOTA } from '../archivos/limites.js';
+import { revisarArchivo, MAX_POR_MASCOTA, MAX_BYTES, MOTIVO_CUPO } from '../archivos/limites.js';
 
 // Copiado de Historias.jsx:22-28. Mismo look en todos los formularios del
 // módulo: etiqueta en mayúscula pequeña y campo de altura fija.
@@ -149,7 +149,7 @@ export default function ArchivosMascota({ mascotaId, archivos, onCambio }) {
     <Card padding={0}>
       <SectionHeader
         title="Archivos"
-        subtitle={`${archivos.length} de ${MAX_POR_MASCOTA} · solo PDF, hasta 5 MB cada uno`}
+        subtitle={`${archivos.length} de ${MAX_POR_MASCOTA} · solo PDF, hasta ${fmtBytes(MAX_BYTES)} cada uno`}
       />
 
       {/* -------- formulario de subida -------- */}
@@ -237,8 +237,7 @@ export default function ArchivosMascota({ mascotaId, archivos, onCambio }) {
             tener que elegir un archivo para verlo. */}
         {lleno && (
           <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-muted)' }}>
-            Esta mascota ya tiene {MAX_POR_MASCOTA} documentos, que es el máximo.
-            Borrá uno para poder subir otro.
+            {MOTIVO_CUPO}
           </p>
         )}
 

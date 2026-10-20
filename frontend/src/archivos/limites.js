@@ -33,8 +33,12 @@ const mb = (bytes) => (bytes / 1048576).toFixed(1).replace('.', ',');
 /**
  * La frase del cupo, compartida con traducirErrorSql: tienen que decir lo mismo.
  * El lowercase 'b' en 'borrá' es lo que limites.test.js busca con toContain('borrá').
+ *
+ * Exportada porque la pantalla de archivos tiene que mostrar el aviso "está llena"
+ * sin que la clínica tenga que elegir un archivo primero, y una segunda copia en
+ * ArchivosMascota.jsx ya había divergido en la puntuación.
  */
-const MOTIVO_CUPO =
+export const MOTIVO_CUPO =
   `Esta mascota ya tiene ${MAX_POR_MASCOTA} documentos, que es el máximo; ` +
   `borrá uno para poder subir otro.`;
 
