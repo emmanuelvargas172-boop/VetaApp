@@ -282,12 +282,13 @@ create policy "documentos_delete_own"
 -- activar.
 --
 -- OJO CON LA VERSIÓN: `admin_listar_veterinarias()` existe en cuatro
--- migraciones distintas y la que está viva es la ÚLTIMA,
--- 007_pagos.sql:329-363, con ONCE columnas. Las de 002 y las intermedias
--- tienen ocho. Si se recrea sobre la versión vieja, Admin.jsx pierde el
--- selector de plan (:425), la insignia de prueba (:411-414) y el botón de
--- "+8 días" (:440), porque desaparecen `plan`, `prueba_hasta` y
--- `suscripcion_hasta` — y no falla nada: las celdas quedan en `undefined`.
+-- migraciones distintas y la que estaba viva hasta esta sección era la
+-- ÚLTIMA, 007_pagos.sql:329-363, con ONCE columnas. Las de 002 y las
+-- intermedias tienen ocho. Si se recrea sobre la versión vieja, Admin.jsx
+-- pierde el selector de plan (`CeldaPlan`), la insignia de prueba
+-- (`pruebaViva`) y el botón de "+8 días" (`extenderPrueba`), porque
+-- desaparecen `plan`, `prueba_hasta` y `suscripcion_hasta` — y no falla
+-- nada: las celdas quedan en `undefined`.
 --
 -- `drop function` primero porque `create or replace` no puede cambiar el
 -- tipo de retorno de una función que devuelve `table (...)`.
@@ -317,7 +318,12 @@ begin
       left join public.configuracion c on c.user_id = p.id
       left join (
         select o.path_tokens[1]::uuid as uid,
-               sum((o.metadata->>'size')::bigint) as bytes
+               -- `sum(bigint)` devuelve `numeric` en Postgres. La columna
+               -- declarada en `returns table` es `bigint`, y `return query`
+               -- rechaza el resultado completo si los tipos no son
+               -- binariamente coercibles entre sí (error 42804). El cast
+               -- explícito a `bigint` es obligatorio, no cosmético.
+               sum((o.metadata->>'size')::bigint)::bigint as bytes
           from storage.objects o
          -- GUARDA 1, y es la que evita que la función entera reviente.
          -- `path_tokens[1]::uuid` levanta `invalid input syntax for type
@@ -325,7 +331,7 @@ begin
          -- carpeta con forma de uuid. Un solo archivo suelto en la raíz
          -- de cualquier bucket —subido a mano desde el Dashboard— y el
          -- panel de Admin deja de cargar por completo.
-         where o.path_tokens[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+         where o.path_tokens[1] ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
          -- GUARDA 2: este proyecto tiene versionado de objetos
          -- (`archived_at`, `is_delete_marker`, `is_versioned` existen en
          -- storage.objects — verificado el 2026-10-20). Sin estos dos
@@ -342,11 +348,19 @@ end $$;
 -- NO lleva filtro por bucket, y es a propósito: la pregunta es cuánto
 -- cobra Supabase por esa cuenta, y Supabase cobra por todo —los PDFs de
 -- `documentos` y las fotos de `mascotas`—. Un filtro por 'documentos'
--- daría un número más chico que la factura.
+-- daría un número más chico que la factura. Nota: la Guarda 1 excluye
+-- objetos en la raíz de cualquier bucket (los que no tienen una carpeta
+-- con forma de uuid como primer segmento), así que el número es el espacio
+-- atribuible a una clínica, no la factura exacta de Supabase.
 --
--- Los permisos no se tocan: la función ya era `security definer` con el
--- chequeo de `es_admin()` adentro, y ese chequeo es lo único que la
--- protege. Ver 007_pagos.sql:300-322 para el día que faltó un revoke.
+-- El `drop function` anterior borra el ACL junto con la función, así que
+-- los permisos se reinstalan a continuación, idénticos a las cuatro
+-- migraciones anteriores (002_admin.sql, 004_planes.sql, 005_prueba.sql,
+-- 007_pagos.sql). `es_admin()` dentro del cuerpo es lo que realmente
+-- protege los datos. Ver 007_pagos.sql:300-322 para el día que faltó un
+-- revoke.
+revoke all on function public.admin_listar_veterinarias()    from anon, authenticated;
+grant execute on function public.admin_listar_veterinarias() to authenticated;
 
 
 -- ============================================================

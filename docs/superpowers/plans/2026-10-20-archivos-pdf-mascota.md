@@ -2074,7 +2074,12 @@ begin
       left join public.configuracion c on c.user_id = p.id
       left join (
         select o.path_tokens[1]::uuid as uid,
-               sum((o.metadata->>'size')::bigint) as bytes
+               -- `sum(bigint)` devuelve `numeric` en Postgres. La columna
+               -- declarada en `returns table` es `bigint`, y `return query`
+               -- rechaza el resultado completo si los tipos no son
+               -- binariamente coercibles entre sí (error 42804). El cast
+               -- explícito a `bigint` es obligatorio, no cosmético.
+               sum((o.metadata->>'size')::bigint)::bigint as bytes
           from storage.objects o
          -- GUARDA 1, y es la que evita que la función entera reviente.
          -- `path_tokens[1]::uuid` levanta `invalid input syntax for type
