@@ -2263,11 +2263,19 @@ t('null y vacío devuelven null',
 t('una URL que no es de storage devuelve null',
   rutaDesdeValor('https://drive.google.com/file/d/123/view') === null);
 
+// I1: `getPublicUrl` aplica encodeURI. Sin decodeURIComponent, un nombre
+// con %20 no coincide con el name crudo de Storage y se borraría.
+t('decodifica %20 de una URL pública',
+  rutaDesdeValor('https://xyz.supabase.co/storage/v1/object/public/mascotas/abc-123/ecografia.jpg%20(2)')
+  === 'abc-123/ecografia.jpg (2)');
+
 // ---------- rutasHuerfanas ----------
 const AHORA = new Date('2026-10-20T12:00:00Z');
 const hace = (min) => new Date(AHORA.getTime() - min * 60000).toISOString();
 
-const obj = (name, min) => ({ name, created_at: hace(min) });
+// Los archivos reales siempre tienen id. Se lo ponemos al helper para que
+// la guarda de carpetas (id == null) no los descarte.
+const obj = (name, min) => ({ name, id: 'fake-id', created_at: hace(min) });
 
 t('el objeto sin fila y viejo se borra',
   JSON.stringify(rutasHuerfanas([obj('u/7/huerfano.pdf', 180)], ['u/7/otro.pdf'], AHORA, 60))
@@ -2288,20 +2296,37 @@ t('justo en el borde de la gracia no se borra',
 t('un minuto más allá del borde sí se borra',
   rutasHuerfanas([obj('u/7/pasado.pdf', 61)], [], AHORA, 60).length === 1);
 
-// Una lista de conocidas con nulls adentro —una mascota sin foto— no puede
-// hacer que un objeto se vea huérfano ni reventar la comparación.
-t('los nulls de la lista de conocidas se ignoran',
-  rutasHuerfanas([obj('u/m.jpg', 180)], [null, undefined, '', 'u/m.jpg'], AHORA, 60).length === 0);
+// I2: los nulls de conocidas no protegen NI revientan. La lista no tiene
+// la ruta del objeto: si los nulls no se filtran el Set tiene basura pero
+// igual no hace match; si se filtran correctamente el objeto queda huérfano.
+t('los nulls de la lista de conocidas no protegen ni revientan',
+  rutasHuerfanas([obj('u/m.jpg', 180)], [null, undefined, ''], AHORA, 60).length === 1);
 
-// Un objeto sin created_at (no debería pasar, pero Storage es de otro) se
-// RESPETA, no se borra. Ante la duda, no se borra nada.
-t('un objeto sin fecha no se borra',
-  rutasHuerfanas([{ name: 'u/7/sinfecha.pdf' }], [], AHORA, 60).length === 0);
+// I2: un objeto con created_at: null se respeta. Sin la guarda `!created_at`,
+// `new Date(null)` = epoch 1970, que es muy viejo y se borraría.
+// El segundo objeto (viejo, con fila) discrimina: length === 1, no 0.
+t('un objeto con created_at null no se borra, pero uno con fecha y sin fila sí',
+  rutasHuerfanas(
+    [{ name: 'u/7/sinfecha.pdf', id: 'a', created_at: null }, obj('u/7/viejo.pdf', 180)],
+    [],
+    AHORA,
+    60,
+  ).length === 1);
 
-// Las carpetas que devuelve `list()` vienen con `id: null` y sin
-// `created_at` útil. No son archivos y no se pueden borrar.
-t('las carpetas no entran',
-  rutasHuerfanas([{ name: 'u', id: null }], [], AHORA, 60).length === 0);
+// I2: las carpetas que devuelve `list()` vienen con `id: null`. Con un
+// created_at viejo, borrar la guarda de id las pondría en la lista.
+t('las carpetas no entran aunque tengan created_at viejo',
+  rutasHuerfanas([{ name: 'u', id: null, created_at: hace(180) }], [], AHORA, 60).length === 0);
+
+// M5: los marcadores .emptyFolderPlaceholder del Dashboard tienen id y
+// created_at reales pero ninguna fila los nombra: no son huérfanos.
+t('el marcador de carpeta vacía no es huérfano',
+  rutasHuerfanas(
+    [{ name: 'u/7/.emptyFolderPlaceholder', id: 'abc', created_at: hace(180) }],
+    [],
+    AHORA,
+    60,
+  ).length === 0);
 
 console.log(`\n${ok} OK · ${mal} MAL`);
 if (mal > 0) process.exit(1);
@@ -2335,7 +2360,8 @@ Esperado: FAIL — `Cannot find module './huerfanos.ts'`.
 /** Lo que devuelve `storage.list()` de cada entrada, de lo que acá se usa. */
 export type ObjetoStorage = {
   name: string;
-  created_at?: string;
+  // La librería declara `created_at: string | null` ("null for folders").
+  created_at?: string | null;
   /** `list()` devuelve las carpetas con `id: null`. */
   id?: string | null;
 };
@@ -2353,7 +2379,8 @@ export type ObjetoStorage = {
  *
  * Sin esta conversión, ninguna URL coincidiría con ningún `name` de
  * Storage y el barrido concluiría que TODAS las fotos de TODAS las
- * clínicas son huérfanas. Son unas 50 fotos de pacientes que no vuelven.
+ * clínicas son huérfanas: todas las fotos de pacientes de todas las
+ * clínicas que pagan, sin posibilidad de restaurarlas.
  *
  * Lo que no se entiende devuelve `null`, y el llamador descarta los nulls.
  * Un valor raro en la columna —alguien pegó un link de Drive— tiene que
@@ -2371,8 +2398,14 @@ export function rutaDesdeValor(valor: string | null | undefined): string | null 
   const m = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/[^/]+\/(.+)$/.exec(valor);
   if (!m) return null;
 
-  // El `?token=` de las firmadas no es parte de la ruta.
-  return m[1].split('?')[0];
+  // `getPublicUrl` aplica `encodeURI`, `storage.list()` devuelve el `name`
+  // crudo. Sin decodificar, un nombre con espacio queda con %20 y no
+  // coincide. try/catch: valor corrupto que no se puede decodificar = null.
+  try {
+    return decodeURIComponent(m[1].split('?')[0]);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -2414,7 +2447,8 @@ export function rutasHuerfanas(
   return objetos
     .filter((o) => {
       // Las carpetas vienen con `id: null`. No son archivos.
-      if (o.id === null) return false;
+      // `== null` cubre tanto null como undefined.
+      if (o.id == null) return false;
       if (!o.name) return false;
       if (!o.created_at) return false;
 
@@ -2437,7 +2471,7 @@ export function rutasHuerfanas(
 cd supabase/functions/_compartido && node huerfanos.prueba.mjs
 ```
 
-Esperado: `13 OK · 0 MAL`.
+Esperado: `15 OK · 0 MAL`.
 
 - [ ] **Step 5: Escribir la edge function**
 
@@ -2627,12 +2661,42 @@ Deno.serve(async (req) => {
   try {
     // ---------- bucket documentos ----------
     const objDocs = await listarTodo(comoServidor.storage, 'documentos');
-    const { data: filasDocs, error: eDocs } = await comoServidor
-      .from('archivos_mascota').select('ruta');
-    if (eDocs) throw new Error(`archivos_mascota: ${eDocs.message}`);
+
+    // C1: paginamos con .range() + .order('id'). PostgREST silencia el
+    // truncamiento: devuelve 200 con las primeras N filas sin error.
+    // Antes de paginar pedimos el conteo exacto; al terminar, si trajimos
+    // menos filas de las que hay, tiramos antes de borrar nada.
+    // El modo simulación no puede detectar el truncamiento porque simula
+    // con la misma consulta recortada — solo la guarda de conteo protege.
+    const TAMANO_PAGINA_PG = 1000;
+
+    const { count: conteoDocsTotal, error: eContDocs } = await comoServidor
+      .from('archivos_mascota')
+      .select('ruta', { count: 'exact', head: true });
+    if (eContDocs) throw new Error(`archivos_mascota conteo: ${eContDocs.message}`);
+
+    const filasDocs: { ruta: string }[] = [];
+    for (let desde = 0; ; desde += TAMANO_PAGINA_PG) {
+      const { data, error } = await comoServidor
+        .from('archivos_mascota')
+        .select('ruta')
+        .order('id', { ascending: true })
+        .range(desde, desde + TAMANO_PAGINA_PG - 1);
+      if (error) throw new Error(`archivos_mascota: ${error.message}`);
+      const lote = data ?? [];
+      filasDocs.push(...lote);
+      if (lote.length < TAMANO_PAGINA_PG) break;
+    }
+
+    if (conteoDocsTotal !== null && filasDocs.length !== conteoDocsTotal) {
+      throw new Error(
+        `archivos_mascota: se esperaban ${conteoDocsTotal} filas, se trajeron ${filasDocs.length}. ` +
+        'Abortando antes de borrar nada.',
+      );
+    }
 
     const huerfanosDocs = rutasHuerfanas(
-      objDocs, (filasDocs ?? []).map((f) => f.ruta), ahora, MINUTOS_GRACIA,
+      objDocs, filasDocs.map((f) => f.ruta), ahora, MINUTOS_GRACIA,
     );
 
     // ---------- bucket mascotas (las fotos) ----------
@@ -2643,12 +2707,36 @@ Deno.serve(async (req) => {
     // resuelve adentro de `rutasHuerfanas`. Sin eso, ninguna foto
     // coincidiría y este barrido las borraría todas.
     const objFotos = await listarTodo(comoServidor.storage, 'mascotas');
-    const { data: filasFotos, error: eFotos } = await comoServidor
-      .from('mascotas').select('foto').not('foto', 'is', null);
-    if (eFotos) throw new Error(`mascotas: ${eFotos.message}`);
+
+    const { count: conteoFotosTotal, error: eContFotos } = await comoServidor
+      .from('mascotas')
+      .select('foto', { count: 'exact', head: true })
+      .not('foto', 'is', null);
+    if (eContFotos) throw new Error(`mascotas conteo: ${eContFotos.message}`);
+
+    const filasFotos: { foto: string }[] = [];
+    for (let desde = 0; ; desde += TAMANO_PAGINA_PG) {
+      const { data, error } = await comoServidor
+        .from('mascotas')
+        .select('foto')
+        .not('foto', 'is', null)
+        .order('id', { ascending: true })
+        .range(desde, desde + TAMANO_PAGINA_PG - 1);
+      if (error) throw new Error(`mascotas: ${error.message}`);
+      const lote = data ?? [];
+      filasFotos.push(...lote);
+      if (lote.length < TAMANO_PAGINA_PG) break;
+    }
+
+    if (conteoFotosTotal !== null && filasFotos.length !== conteoFotosTotal) {
+      throw new Error(
+        `mascotas: se esperaban ${conteoFotosTotal} filas, se trajeron ${filasFotos.length}. ` +
+        'Abortando antes de borrar nada.',
+      );
+    }
 
     const huerfanosFotos = rutasHuerfanas(
-      objFotos, (filasFotos ?? []).map((f) => f.foto), ahora, MINUTOS_GRACIA,
+      objFotos, filasFotos.map((f) => f.foto), ahora, MINUTOS_GRACIA,
     );
 
     // ---------- borrar ----------

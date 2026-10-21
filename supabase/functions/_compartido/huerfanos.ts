@@ -13,7 +13,9 @@
 /** Lo que devuelve `storage.list()` de cada entrada, de lo que acá se usa. */
 export type ObjetoStorage = {
   name: string;
-  created_at?: string;
+  // I5: la librería declara `created_at: string | null` con el comentario
+  // "null for folders". `string | undefined` es TS2322 bajo strict.
+  created_at?: string | null;
   /** `list()` devuelve las carpetas con `id: null`. */
   id?: string | null;
 };
@@ -31,7 +33,8 @@ export type ObjetoStorage = {
  *
  * Sin esta conversión, ninguna URL coincidiría con ningún `name` de
  * Storage y el barrido concluiría que TODAS las fotos de TODAS las
- * clínicas son huérfanas. Son unas 50 fotos de pacientes que no vuelven.
+ * clínicas son huérfanas: todas las fotos de pacientes de todas las
+ * clínicas que pagan, sin posibilidad de restaurarlas.
  *
  * Lo que no se entiende devuelve `null`, y el llamador descarta los nulls.
  * Un valor raro en la columna —alguien pegó un link de Drive— tiene que
@@ -49,8 +52,18 @@ export function rutaDesdeValor(valor: string | null | undefined): string | null 
   const m = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/[^/]+\/(.+)$/.exec(valor);
   if (!m) return null;
 
-  // El `?token=` de las firmadas no es parte de la ruta.
-  return m[1].split('?')[0];
+  // I1: `getPublicUrl` aplica `encodeURI` a la URL completa, pero
+  // `storage.list()` devuelve el `name` crudo. Sin decodificar, un
+  // archivo con un espacio o carácter no-ASCII en el nombre
+  // (`ecografia.jpg (2)`) quedaría con `%20` en la ruta extraída y
+  // no coincidiría con el `name` —se vería huérfano y se borraría.
+  // El `try/catch` es por si algún valor corrupto no se puede decodificar;
+  // en ese caso se devuelve null, que significa "no sé" y protege el archivo.
+  try {
+    return decodeURIComponent(m[1].split('?')[0]);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -92,8 +105,18 @@ export function rutasHuerfanas(
   return objetos
     .filter((o) => {
       // Las carpetas vienen con `id: null`. No son archivos.
-      if (o.id === null) return false;
+      // M1: `== null` cubre tanto `null` como `undefined`, por si la
+      // librería alguna vez omite la clave en vez de mandarla en null.
+      if (o.id == null) return false;
       if (!o.name) return false;
+      // M5: el Dashboard crea un objeto `.emptyFolderPlaceholder` al
+      // "crear carpeta". Tiene `id` y `created_at` reales pero ninguna
+      // fila lo nombra: el barrido lo lanzaría como huérfano y metería
+      // ruido en el reporte que hay que revisar a ojo. Se filtra acá
+      // —en `huerfanos.ts` y no en `index.ts`— porque "qué cuenta como
+      // huérfano" es la pregunta que este archivo contesta, y ahí se
+      // puede probar.
+      if (o.name.endsWith('.emptyFolderPlaceholder')) return false;
       if (!o.created_at) return false;
 
       const nacio = new Date(o.created_at).getTime();

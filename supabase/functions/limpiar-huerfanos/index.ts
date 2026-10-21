@@ -15,8 +15,7 @@
 //  oficial: "Deleting objects should always be done via the Storage API
 //  and NOT via a SQL query [...] will result in the object being
 //  orphaned." Y desde el 5 de marzo de 2026 Supabase lo rechaza con un
-//  trigger a nivel de sentencia salvo que se prenda
-//  `storage.allow_delete_query`.
+//  trigger a nivel de sentencia (verificado en api/axios.js:268-269).
 //
 //  Un trigger que borrara el objeto fue la primera idea de este diseño.
 //  Se descartó al verificarla: era la causa más común del problema que
@@ -49,6 +48,12 @@ import { rutasHuerfanas, type ObjetoStorage } from '../_compartido/huerfanos.ts'
  */
 const MINUTOS_GRACIA = 60;
 
+// M4: constantes con nombre para que los dos usos del límite de Storage
+// y el tamaño de lote se muevan juntos si alguna vez cambian.
+// El límite de Storage se usa en listarTodo; el de lotes en borrarEnLotes.
+const LIMITE_LIST = 1000;
+const TAMANO_LOTE_REMOVE = 100;
+
 const cors = {
   'Access-Control-Allow-Origin': Deno.env.get('APP_URL') ?? '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
@@ -69,10 +74,9 @@ const responder = (cuerpo: unknown, status = 200) =>
  * niveles ({user_id}/{mascota_id}/) y `mascotas` tiene uno, así que hay
  * que bajar.
  *
- * `limit: 1000` es el techo de la API, y de ahí el `offset`: una clínica
- * con 54 mascotas de a 10 archivos ya pasa de 500, y un barrido que ve
- * solo los primeros 1000 objetos dejaría de limpiar en silencio el día
- * que el bucket supere esa cantidad.
+ * M2: el bucle corta cuando la página vuelve vacía, no cuando devuelve
+ * menos de LIMITE_LIST. Así es correcto sea cual sea el techo real del
+ * servidor, y el código no depende de que sea 1000.
  */
 async function listarTodo(
   storage: ReturnType<typeof createClient>['storage'],
@@ -90,42 +94,64 @@ async function listarTodo(
 
   while (true) {
     const { data, error } = await storage.from(bucket).list(prefijo, {
-      limit: 1000,
+      limit: LIMITE_LIST,
       offset,
       sortBy: { column: 'name', order: 'asc' },
     });
     if (error) throw new Error(`list(${bucket}/${prefijo}): ${error.message}`);
+    // M2: página vacía = no hay más. Salir.
     if (!data || data.length === 0) break;
 
     for (const entrada of data) {
       const ruta = prefijo ? `${prefijo}/${entrada.name}` : entrada.name;
-      if (entrada.id === null) {
+      // M1: `== null` cubre tanto `null` como `undefined`.
+      if (entrada.id == null) {
         salida.push(...await listarTodo(storage, bucket, ruta, profundidad + 1));
       } else {
         salida.push({ name: ruta, created_at: entrada.created_at, id: entrada.id });
       }
     }
 
-    if (data.length < 1000) break;
+    // M2: avanzar por lo que llegó. Si la API recortó la página, el bucle
+    // continúa en vez de salir.
     offset += data.length;
   }
 
   return salida;
 }
 
-/** Borra de a 100: `remove()` acepta un arreglo, pero no uno infinito. */
+/**
+ * Borra de a lotes: se acota el tamaño para no armar una petición
+ * gigante si hay muchos huérfanos acumulados.
+ *
+ * I4: `remove()` devuelve `{ data: [objetos_borrados], error: null }` en
+ * cualquier éxito HTTP. Un objeto que no borró simplemente está ausente
+ * de `data`, sin error —igual que en `api/axios.js:295-300` y `:449-466`.
+ * Comparamos el lote pedido contra lo que volvió en `data` para detectar
+ * los que no se borraron.
+ */
 async function borrarEnLotes(
   storage: ReturnType<typeof createClient>['storage'],
   bucket: string,
   rutas: string[],
 ): Promise<string[]> {
   const fallaron: string[] = [];
-  for (let i = 0; i < rutas.length; i += 100) {
-    const lote = rutas.slice(i, i + 100);
-    const { error } = await storage.from(bucket).remove(lote);
+  for (let i = 0; i < rutas.length; i += TAMANO_LOTE_REMOVE) {
+    const lote = rutas.slice(i, i + TAMANO_LOTE_REMOVE);
+    const { data, error } = await storage.from(bucket).remove(lote);
     if (error) {
       console.error(`remove(${bucket}) falló en el lote ${i}:`, error.message);
       fallaron.push(...lote);
+    } else {
+      // I4: verificar que `data` confirme cada ruta que pedimos borrar.
+      // Las ausentes no son error de red pero tampoco fueron borradas.
+      const borrados = new Set((data ?? []).map((o: { name: string }) => o.name));
+      for (const ruta of lote) {
+        if (!borrados.has(ruta)) {
+          console.warn(`remove(${bucket}): Storage no confirmó el borrado de ${ruta}`);
+          fallaron.push(ruta);
+        }
+      }
     }
   }
   return fallaron;
@@ -135,6 +161,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return responder({ error: 'Método no permitido' }, 405);
 
+  // Robustez: las tres variables de entorno se leen antes de crear los
+  // clientes. Si falta alguna, `createClient` lanza en el constructor y
+  // la excepción escaparía del handler —el runtime respondería un 500
+  // opaco sin JSON ni headers CORS, que el navegador ve como error de
+  // CORS en vez del problema real. Con la lectura acá, el try/catch de
+  // abajo atrapa la excepción y devuelve JSON con CORS.
   const url = Deno.env.get('SUPABASE_URL')!;
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -146,46 +178,101 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization') ?? '';
   if (!auth.startsWith('Bearer ')) return responder({ error: 'Falta la sesión' }, 401);
 
-  const comoUsuario = createClient(url, anon, {
-    global: { headers: { Authorization: auth } },
-  });
-
-  const { data: quien, error: errAuth } = await comoUsuario.auth.getUser();
-  if (errAuth || !quien?.user) return responder({ error: 'Sesión inválida' }, 401);
-
-  // `es_admin()` es `security definer` y no tiene revoke (002_admin.sql:78-89),
-  // así que `authenticated` la puede ejecutar — es lo que permite
-  // preguntarle a la base, con el token del invocador, si es el dueño.
-  // Preguntárselo a la base y no mirar `perfiles.rol` acá es la diferencia
-  // entre una respuesta que no se puede falsificar y una que depende de qué
-  // fila devolvió una consulta.
-  const { data: esAdmin, error: errRol } = await comoUsuario.rpc('es_admin');
-  if (errRol) return responder({ error: errRol.message }, 500);
-  if (esAdmin !== true) return responder({ error: 'No autorizado' }, 403);
-
-  // `simular: true` lista lo que borraría y no borra nada. Es el modo con
-  // el que se corre la primera vez, siempre.
-  let simular = false;
+  // Robustez: los dos clientes se crean adentro del try para que si falta
+  // SUPABASE_ANON_KEY o SUPABASE_SERVICE_ROLE_KEY la excepción no escape
+  // del handler y la respuesta salga con JSON y con CORS.
   try {
-    const cuerpo = await req.json();
-    simular = cuerpo?.simular === true;
-  } catch {
-    // Sin cuerpo o cuerpo inválido: barrido de verdad.
-  }
+    const comoUsuario = createClient(url, anon, {
+      global: { headers: { Authorization: auth } },
+    });
 
-  const comoServidor = createClient(url, service);
-  const ahora = new Date();
-  const salida: Record<string, unknown> = { simulacion: simular };
+    const { data: quien, error: errAuth } = await comoUsuario.auth.getUser();
+    if (errAuth || !quien?.user) return responder({ error: 'Sesión inválida' }, 401);
 
-  try {
+    // `es_admin()` es `security definer` y no tiene revoke (002_admin.sql:78-89),
+    // así que `authenticated` la puede ejecutar — es lo que permite
+    // preguntarle a la base, con el token del invocador, si es el dueño.
+    // M6: usar `auth.uid()` del JWT (que GoTrue ya validó) es lo que impide
+    // falsificar la identidad: el uid no viene del cuerpo ni de ninguna
+    // fila que el llamador pueda manipular.
+    const { data: esAdmin, error: errRol } = await comoUsuario.rpc('es_admin');
+    if (errRol) return responder({ error: errRol.message }, 500);
+    if (esAdmin !== true) return responder({ error: 'No autorizado' }, 403);
+
+    // I3: Se distingue "sin cuerpo" de "cuerpo roto".
+    // Un POST sin cuerpo es una orden sin ambigüedad: barrido de verdad.
+    // Un cuerpo que no parsea o que tiene `simular` con un tipo inesperado
+    // es ambiguo y se rechaza con 400 —hacer el barrido con un JSON mal
+    // escrito sería peor que no hacerlo.
+    let simular = false;
+    const textoRaw = await req.text();
+    if (textoRaw.trim().length > 0) {
+      let cuerpo: unknown;
+      try {
+        cuerpo = JSON.parse(textoRaw);
+      } catch {
+        return responder({ error: 'Cuerpo inválido: no es JSON válido' }, 400);
+      }
+      const c = cuerpo as Record<string, unknown>;
+      if ('simular' in c) {
+        if (typeof c.simular !== 'boolean') {
+          return responder(
+            { error: '`simular` tiene que ser booleano (true o false)' },
+            400,
+          );
+        }
+        simular = c.simular;
+      }
+    }
+
+    const comoServidor = createClient(url, service);
+    const ahora = new Date();
+    const salida: Record<string, unknown> = { simulacion: simular };
+
     // ---------- bucket documentos ----------
     const objDocs = await listarTodo(comoServidor.storage, 'documentos');
-    const { data: filasDocs, error: eDocs } = await comoServidor
-      .from('archivos_mascota').select('ruta');
-    if (eDocs) throw new Error(`archivos_mascota: ${eDocs.message}`);
+
+    // C1: paginamos con .range() + .order('id') para no depender del techo
+    // de PostgREST. Sin orden estable dos .range() consecutivos pueden
+    // repetir o saltear filas. Sin paginación, PostgREST devuelve 200 con
+    // las primeras N filas y sin error —la base silencia el truncamiento.
+    //
+    // Antes de paginar pedimos el conteo exacto y al terminar verificamos
+    // que trajimos exactamente esa cantidad. Esta guarda es la que de verdad
+    // protege: "traje menos filas de las que hay" es un estado que el modo
+    // simulación no puede detectar, porque simula con la misma consulta
+    // truncada. Si el conteo no cierra, tira antes de borrar nada.
+    const TAMANO_PAGINA_PG = 1000;
+
+    const { count: conteoDocsTotal, error: eContDocs } = await comoServidor
+      .from('archivos_mascota')
+      .select('ruta', { count: 'exact', head: true });
+    if (eContDocs) throw new Error(`archivos_mascota conteo: ${eContDocs.message}`);
+
+    const filasDocs: { ruta: string }[] = [];
+    for (let desde = 0; ; desde += TAMANO_PAGINA_PG) {
+      const { data, error } = await comoServidor
+        .from('archivos_mascota')
+        .select('ruta')
+        .order('id', { ascending: true })
+        .range(desde, desde + TAMANO_PAGINA_PG - 1);
+      if (error) throw new Error(`archivos_mascota: ${error.message}`);
+      const lote = data ?? [];
+      filasDocs.push(...lote);
+      if (lote.length < TAMANO_PAGINA_PG) break;
+    }
+
+    // Guarda de conteo: si trajimos menos filas de las que hay en la base,
+    // algo truncó la consulta y el barrido borraría archivos buenos.
+    if (conteoDocsTotal !== null && filasDocs.length !== conteoDocsTotal) {
+      throw new Error(
+        `archivos_mascota: se esperaban ${conteoDocsTotal} filas, se trajeron ${filasDocs.length}. ` +
+        'Abortando antes de borrar nada.',
+      );
+    }
 
     const huerfanosDocs = rutasHuerfanas(
-      objDocs, (filasDocs ?? []).map((f) => f.ruta), ahora, MINUTOS_GRACIA,
+      objDocs, filasDocs.map((f) => f.ruta), ahora, MINUTOS_GRACIA,
     );
 
     // ---------- bucket mascotas (las fotos) ----------
@@ -196,12 +283,36 @@ Deno.serve(async (req) => {
     // resuelve adentro de `rutasHuerfanas`. Sin eso, ninguna foto
     // coincidiría y este barrido las borraría todas.
     const objFotos = await listarTodo(comoServidor.storage, 'mascotas');
-    const { data: filasFotos, error: eFotos } = await comoServidor
-      .from('mascotas').select('foto').not('foto', 'is', null);
-    if (eFotos) throw new Error(`mascotas: ${eFotos.message}`);
+
+    const { count: conteoFotosTotal, error: eContFotos } = await comoServidor
+      .from('mascotas')
+      .select('foto', { count: 'exact', head: true })
+      .not('foto', 'is', null);
+    if (eContFotos) throw new Error(`mascotas conteo: ${eContFotos.message}`);
+
+    const filasFotos: { foto: string }[] = [];
+    for (let desde = 0; ; desde += TAMANO_PAGINA_PG) {
+      const { data, error } = await comoServidor
+        .from('mascotas')
+        .select('foto')
+        .not('foto', 'is', null)
+        .order('id', { ascending: true })
+        .range(desde, desde + TAMANO_PAGINA_PG - 1);
+      if (error) throw new Error(`mascotas: ${error.message}`);
+      const lote = data ?? [];
+      filasFotos.push(...lote);
+      if (lote.length < TAMANO_PAGINA_PG) break;
+    }
+
+    if (conteoFotosTotal !== null && filasFotos.length !== conteoFotosTotal) {
+      throw new Error(
+        `mascotas: se esperaban ${conteoFotosTotal} filas, se trajeron ${filasFotos.length}. ` +
+        'Abortando antes de borrar nada.',
+      );
+    }
 
     const huerfanosFotos = rutasHuerfanas(
-      objFotos, (filasFotos ?? []).map((f) => f.foto), ahora, MINUTOS_GRACIA,
+      objFotos, filasFotos.map((f) => f.foto), ahora, MINUTOS_GRACIA,
     );
 
     // ---------- borrar ----------
@@ -217,8 +328,8 @@ Deno.serve(async (req) => {
     }
 
     // Las rutas se devuelven completas, no solo el conteo: un barrido que
-    // dice "borré 12" y no cuáles no se puede auditar, y es lo único que
-    // queda de un archivo que ya no existe.
+    // dice "borré 12" y no cuáles no se puede auditar, y lo que borró
+    // ya no existe.
     salida.documentos = {
       revisados: objDocs.length,
       huerfanos: huerfanosDocs.length,

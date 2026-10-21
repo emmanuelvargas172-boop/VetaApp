@@ -41,11 +41,23 @@ t('null y vacío devuelven null',
 t('una URL que no es de storage devuelve null',
   rutaDesdeValor('https://drive.google.com/file/d/123/view') === null);
 
+// I1: `getPublicUrl` aplica `encodeURI`, `storage.list()` devuelve el
+// `name` crudo. Un nombre con espacio (`ecografia.jpg (2)`) llega como
+// `%20` en la URL y sin decodificar no coincide —la foto se vería
+// huérfana y se borraría. Se compara contra la versión cruda, que es
+// lo que Storage devuelve y lo que hay que encontrar en el Set.
+t('decodifica %20 de una URL pública (I1)',
+  rutaDesdeValor('https://xyz.supabase.co/storage/v1/object/public/mascotas/abc-123/ecografia.jpg%20(2)')
+  === 'abc-123/ecografia.jpg (2)');
+
 // ---------- rutasHuerfanas ----------
 const AHORA = new Date('2026-10-20T12:00:00Z');
 const hace = (min) => new Date(AHORA.getTime() - min * 60000).toISOString();
 
-const obj = (name, min) => ({ name, created_at: hace(min) });
+// Los archivos reales de Storage siempre tienen un `id` uuid. Se lo
+// ponemos explícito al helper para que la guarda de carpetas (id == null)
+// no los descarte —ver M1 en huerfanos.ts.
+const obj = (name, min) => ({ name, id: 'fake-id', created_at: hace(min) });
 
 t('el objeto sin fila y viejo se borra',
   JSON.stringify(rutasHuerfanas([obj('u/7/huerfano.pdf', 180)], ['u/7/otro.pdf'], AHORA, 60))
@@ -66,20 +78,50 @@ t('justo en el borde de la gracia no se borra',
 t('un minuto más allá del borde sí se borra',
   rutasHuerfanas([obj('u/7/pasado.pdf', 61)], [], AHORA, 60).length === 1);
 
-// Una lista de conocidas con nulls adentro —una mascota sin foto— no puede
-// hacer que un objeto se vea huérfano ni reventar la comparación.
-t('los nulls de la lista de conocidas se ignoran',
-  rutasHuerfanas([obj('u/m.jpg', 180)], [null, undefined, '', 'u/m.jpg'], AHORA, 60).length === 0);
+// I2-nulls: Los nulls de la lista de conocidas no protegen NI revientan.
+// Antes el caso incluía 'u/m.jpg' en las conocidas, con lo cual el objeto
+// sobrevivía tanto con el filtro de nulls como sin él: borrar el
+// `.filter(r => !!r)` de huerfanos.ts no mataba la aserción.
+// Ahora la lista NO tiene la ruta del objeto: si los nulls no se filtran
+// correctamente el Set tiene basura y nada falla, pero si se filtran
+// el objeto de 180 min sin fila queda huérfano (length === 1).
+t('los nulls de la lista de conocidas no protegen ni revientan (I2)',
+  rutasHuerfanas([obj('u/m.jpg', 180)], [null, undefined, ''], AHORA, 60).length === 1);
 
-// Un objeto sin created_at (no debería pasar, pero Storage es de otro) se
-// RESPETA, no se borra. Ante la duda, no se borra nada.
-t('un objeto sin fecha no se borra',
-  rutasHuerfanas([{ name: 'u/7/sinfecha.pdf' }], [], AHORA, 60).length === 0);
+// I2-fecha: Un objeto con created_at: null se RESPETA, no se borra.
+// `!o.created_at` atapa tanto undefined como null. Sin esa guarda,
+// `new Date(null).getTime()` es 0 (epoch 1970), que está muy por debajo
+// del corte: el objeto saldría en la lista de huérfanos y se borraría.
+// Con la guarda presente, el objeto con null no supera el filtro y
+// length === 1 (solo el viejo con created_at real).
+// I5: `created_at?: string | null` en ObjetoStorage habilita este caso.
+t('un objeto con created_at null no se borra, pero uno con fecha y sin fila sí (I2)',
+  rutasHuerfanas(
+    [{ name: 'u/7/sinfecha.pdf', id: 'a', created_at: null }, obj('u/7/viejo.pdf', 180)],
+    [],
+    AHORA,
+    60,
+  ).length === 1);
 
-// Las carpetas que devuelve `list()` vienen con `id: null` y sin
-// `created_at` útil. No son archivos y no se pueden borrar.
-t('las carpetas no entran',
-  rutasHuerfanas([{ name: 'u', id: null }], [], AHORA, 60).length === 0);
+// I2-carpetas: Las carpetas vienen con `id: null`. No son archivos y no
+// se pueden borrar. El caso anterior no tenía created_at, así que la
+// carpeta caía en la guarda de `!created_at` de todas formas: borrar el
+// `if (o.id === null)` no mataba la aserción. Ahora la carpeta tiene
+// created_at viejo: si la guarda de id se borra, la carpeta sale en la
+// lista y length es 1, no 0.
+t('las carpetas no entran aunque tengan created_at viejo (I2)',
+  rutasHuerfanas([{ name: 'u', id: null, created_at: hace(180) }], [], AHORA, 60).length === 0);
+
+// M5: los marcadores `.emptyFolderPlaceholder` que crea el Dashboard al
+// "crear carpeta" tienen id y created_at reales, pero ninguna fila los
+// nombra. El barrido los ignoraría porque el filtro está acá.
+t('el marcador de carpeta vacía no es huérfano (M5)',
+  rutasHuerfanas(
+    [{ name: 'u/7/.emptyFolderPlaceholder', id: 'abc', created_at: hace(180) }],
+    [],
+    AHORA,
+    60,
+  ).length === 0);
 
 console.log(`\n${ok} OK · ${mal} MAL`);
 if (mal > 0) process.exit(1);

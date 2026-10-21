@@ -15,3 +15,11 @@ verify_jwt = false
 # el user_id sale del token, nunca del cuerpo del request.
 [functions.pago-iniciar]
 verify_jwt = true
+
+# limpiar-huerfanos borra archivos de todas las clínicas: exige sesión.
+# La autenticación real es doble: primero el JWT de Supabase (este flag),
+# después es_admin() con el uid del token ya validado por GoTrue.
+# verify_jwt = true es el default del CLI, pero se escribe explícito
+# porque es justamente la función donde el lector quiere ver la compuerta.
+[functions.limpiar-huerfanos]
+verify_jwt = true
