@@ -2990,14 +2990,14 @@ Correr las cuatro, desde la raíz del repo:
 ```bash
 cd "/Users/emmanuelvv/Desktop/CLAUDE PROYECTOS/VetaApp"
 grep -n "false" supabase/migrations/015_archivos_mascota.sql
-grep -c "documentos_select_own\|documentos_insert_own\|documentos_update_own\|documentos_delete_own" supabase/migrations/015_archivos_mascota.sql
+grep -c "documentos_read_own\|documentos_insert_own\|documentos_update_own\|documentos_delete_own" supabase/migrations/015_archivos_mascota.sql
 grep -n "\.remove(" frontend/src/api/axios.js
 grep -n "createSignedUrl" frontend/src/api/axios.js
 ```
 
 Esperado:
 1. Una línea con `false` dentro del `insert into storage.buckets` — es el `public`.
-2. Un número `>= 8` (cada política aparece en su `drop policy if exists` y en su `create policy`).
+2. Un número `>= 8` (cada política aparece en su `drop policy if exists` y en su `create policy`). **La de lectura se llama `documentos_read_own`, no `..._select_own`** — con el nombre equivocado el grep da 6, parece que falta una política, y el Step 4 haría borrar del párrafo una frase que el código sí cumple. Las cuatro están en `015:240-273`.
 3. Al menos tres usos de `.remove(` — el rollback del `POST /archivos`, el `DELETE /archivos/:id` y el borrado en bloque del `DELETE /mascotas/:id`.
 4. Una línea con `createSignedUrl(fila.ruta, 300)`.
 
