@@ -156,7 +156,8 @@ async function subirDocumento(file, mascotaId) {
     // .exe renombrado a .pdf reporta application/pdf de todas formas.
     // Lo que sí protege contra una subida que no pasa por este código —alguien
     // que llame supabase.storage.upload directo con F12— es el allowed_mime_types
-    // del bucket, definido en 015_archivos_mascota.sql:222.
+    // del bucket, que se fija en el `insert into storage.buckets` del bucket
+    // 'documentos', en 015_archivos_mascota.sql.
     contentType: 'application/pdf',
   });
   if (up.error) throw apiError(up.error.message);
