@@ -2087,7 +2087,7 @@ begin
          -- carpeta con forma de uuid. Un solo archivo suelto en la raíz
          -- de cualquier bucket —subido a mano desde el Dashboard— y el
          -- panel de Admin deja de cargar por completo.
-         where o.path_tokens[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+         where o.path_tokens[1] ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
          -- GUARDA 2: este proyecto tiene versionado de objetos
          -- (`archived_at`, `is_delete_marker`, `is_versioned` existen en
          -- storage.objects — verificado el 2026-10-20). Sin estos dos
