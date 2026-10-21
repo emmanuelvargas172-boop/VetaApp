@@ -11,10 +11,34 @@
 // archivo borrado de Storage no vuelve.
 
 const M = await import('./huerfanos.ts');
-const { rutaDesdeValor, rutasHuerfanas } = M;
+const { rutaDesdeValor, rutasHuerfanas, unirRuta } = M;
 
 let ok = 0, mal = 0;
 const t = (nombre, cond, extra = '') => { (cond ? ok++ : mal++); console.log(`${cond ? 'OK  ' : 'MAL '} ${nombre}${extra ? ' → ' + extra : ''}`); };
+
+// ---------- unirRuta ----------
+// I-3: el armado de la ruta de listarTodo (index.ts) vive ahora en
+// unirRuta. Una barra de más, una de menos o el prefijo omitido harían que
+// ningún objeto coincida con ninguna fila —el barrido vería todo como
+// huérfano—. Las cuatro aserciones de abajo cubren los casos que pueden
+// producir esa falla.
+
+// Raíz: prefijo vacío → el nombre pelado, sin barra inicial.
+t('unirRuta: prefijo vacío devuelve el nombre sin barra',
+  unirRuta('', 'archivo.pdf') === 'archivo.pdf');
+
+// Un nivel de profundidad.
+t('unirRuta: un nivel de prefijo',
+  unirRuta('user-123', 'mascota_456.jpg') === 'user-123/mascota_456.jpg');
+
+// Dos niveles de profundidad (el caso real del bucket documentos).
+t('unirRuta: dos niveles de prefijo',
+  unirRuta('user-123/7', '1760000000-x9f2.pdf') === 'user-123/7/1760000000-x9f2.pdf');
+
+// Nunca produce barra doble aunque el nombre empiece con barra (no pasa
+// en la práctica, pero la función tiene que ser robusta).
+t('unirRuta: nunca produce barra doble',
+  !unirRuta('user-123', 'archivo.pdf').includes('//'));
 
 // ---------- rutaDesdeValor ----------
 // `archivos_mascota.ruta` ya guarda la ruta pelada.
@@ -136,6 +160,19 @@ t('una fecha impareseable no se borra, y la huérfana de al lado sí (I2)',
     AHORA,
     60,
   ).length === 1);
+
+// M5: el comentario en huerfanos.ts:110 dice que `== null` cubre tanto
+// `null` como `undefined`. Esta aserción ejerce el caso `undefined`: la
+// librería podría omitir la clave `id` en vez de mandarla como null, y
+// el mutante `=== null` dejaría pasar carpetas/entradas sin id.
+// Con `== null` este objeto no llega a la lista → length === 0.
+t('un objeto con id undefined no se borra (M5)',
+  rutasHuerfanas(
+    [{ name: 'u', id: undefined, created_at: hace(180) }],
+    [],
+    AHORA,
+    60,
+  ).length === 0);
 
 console.log(`\n${ok} OK · ${mal} MAL`);
 if (mal > 0) process.exit(1);

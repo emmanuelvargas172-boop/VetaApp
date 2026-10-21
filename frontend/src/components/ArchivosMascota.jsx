@@ -307,7 +307,7 @@ export default function ArchivosMascota({ mascotaId, archivos, onCambio }) {
 
               {/* Botón de ícono para borrar — mismo patrón que las filas de
                   vacunas y de historia clínica en Historias.jsx. iconBtnStyle
-                  viene de ui.jsx:340. */}
+                  se importa de ui.jsx. */}
               <button
                 onClick={() => borrar(a)}
                 disabled={borrando === a.id}

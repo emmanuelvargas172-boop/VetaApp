@@ -51,7 +51,7 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
  *
  *  · `new Date('2023-04-18')` es medianoche UTC, que en Colombia (-05:00)
  *    es el 17 a las 19:00. La fecha se muestra un día antes.
- *    `Historias.jsx:195` ya parchea eso pegándole `'T12:00:00'`; acá el
+ *    `badgeProxDosis` (Historias.jsx) ya parchea eso pegándole `'T12:00:00'`; acá el
  *    problema no existe porque nunca se construye un Date.
  *
  *  · `toLocaleDateString('es-CO', …)` depende del ICU del motor, y la

@@ -42,9 +42,14 @@ export const MOTIVO_CUPO =
   `Esta mascota ya tiene ${MAX_POR_MASCOTA} documentos, que es el máximo; ` +
   `borrá uno para poder subir otro.`;
 
-/** La frase del tamaño sin el dato del archivo, para cuando el error viene de Postgres. */
+/**
+ * La frase del tamaño sin el dato del archivo, para cuando el error viene de Postgres.
+ * Usa mb(MAX_BYTES) en vez del literal "5" para que cualquier cambio en
+ * MAX_BYTES se refleje automáticamente en el mensaje y las pruebas fallen
+ * si se desincroniza.
+ */
 const MOTIVO_PESO_SIN_DATO =
-  'Ese PDF pasa de 5 MB, que es el máximo. Si lo escaneaste en color, ' +
+  `Ese PDF pasa de ${mb(MAX_BYTES)} MB, que es el máximo. Si lo escaneaste en color, ` +
   'volvé a escanearlo en blanco y negro.';
 
 /**
@@ -108,7 +113,9 @@ export function revisarArchivo(file, cuantosHay) {
   if (file.size > MAX_BYTES) {
     return {
       ok: false,
-      motivo: `Este PDF pesa ${mb(file.size)} MB y el máximo son 5. ` +
+      // mb(MAX_BYTES) en vez del literal "5": si se cambia MAX_BYTES el
+      // mensaje se actualiza solo y las pruebas de I-2 fallan si se olvida.
+      motivo: `Este PDF pesa ${mb(file.size)} MB y el máximo son ${mb(MAX_BYTES)}. ` +
               `Si lo escaneaste en color, volvé a escanearlo en blanco y negro.`,
     };
   }

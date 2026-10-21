@@ -39,7 +39,7 @@
 // ============================================================
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { rutasHuerfanas, type ObjetoStorage } from '../_compartido/huerfanos.ts';
+import { rutasHuerfanas, unirRuta, type ObjetoStorage } from '../_compartido/huerfanos.ts';
 
 /**
  * Cuántos minutos tiene que tener un objeto para que "no tiene fila"
@@ -103,7 +103,9 @@ async function listarTodo(
     if (!data || data.length === 0) break;
 
     for (const entrada of data) {
-      const ruta = prefijo ? `${prefijo}/${entrada.name}` : entrada.name;
+      // unirRuta (de _compartido/huerfanos.ts) garantiza que prefijo vacío
+      // no produce barra inicial, y que nunca aparece barra doble.
+      const ruta = unirRuta(prefijo, entrada.name);
       // M1: `== null` cubre tanto `null` como `undefined`.
       if (entrada.id == null) {
         salida.push(...await listarTodo(storage, bucket, ruta, profundidad + 1));

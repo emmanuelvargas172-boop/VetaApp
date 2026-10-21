@@ -149,6 +149,14 @@ async function subirDocumento(file, mascotaId) {
 
   const up = await supabase.storage.from('documentos').upload(ruta, file, {
     upsert: false,
+    // El tipo se fija a 'application/pdf' en vez de usar file.type porque en
+    // este camino ya pasó por revisarArchivo (limites.js), que validó que el
+    // tipo sea application/pdf. Cambiar esto por file.type no cerraría nada:
+    // el navegador deriva File.type de la extensión del nombre, así que un
+    // .exe renombrado a .pdf reporta application/pdf de todas formas.
+    // Lo que sí protege contra una subida que no pasa por este código —alguien
+    // que llame supabase.storage.upload directo con F12— es el allowed_mime_types
+    // del bucket, definido en 015_archivos_mascota.sql:222.
     contentType: 'application/pdf',
   });
   if (up.error) throw apiError(up.error.message);

@@ -11,10 +11,16 @@ describe('revisarArchivo · el tamaño', () => {
 
   // El byte de más es el caso que importa: un `<` donde va un `<=` rechaza
   // el archivo que el mensaje promete aceptar.
+  // I-2: se afirma la frase concreta «el máximo son 5,0.» en vez de '5', que
+  // es subcadena de '50' y hacía que cambiar MAX_BYTES no matara la aserción.
+  // El «5,0» se rastrea a MAX_BYTES = 5242880 en limites.js, que usa mb() en
+  // vez del literal para que ambos cambien juntos. Si se cambia MAX_BYTES hay
+  // que actualizar este literal también — eso es intencional: la aserción
+  // fuerza a que el cambio sea consciente.
   it('rechaza un byte más, y el motivo dice cuánto pesa y qué hacer', () => {
     const r = revisarArchivo(pdf(MAX_BYTES + 1), 0);
     expect(r.ok).toBe(false);
-    expect(r.motivo).toContain('5');
+    expect(r.motivo).toContain('el máximo son 5,0.');
     expect(r.motivo).toContain('blanco y negro');
   });
 
@@ -85,9 +91,13 @@ describe('traducirErrorSql', () => {
     expect(f).toContain('borrá');
   });
 
+  // I-2: se afirma la frase concreta «pasa de 5,0 MB, que es el máximo» en
+  // vez de '5', que era subcadena de '50'. El «5,0» se rastrea a
+  // MAX_BYTES = 5242880 en limites.js. Si se cambia MAX_BYTES hay que
+  // actualizar este literal también — la aserción fuerza a que sea consciente.
   it('traduce el check del peso', () => {
     const f = traducirErrorSql('violates check constraint "archivos_mascota_peso_bytes_check"');
-    expect(f).toContain('5');
+    expect(f).toContain('pasa de 5,0 MB, que es el máximo');
   });
 
   it('traduce el check del tipo de documento', () => {

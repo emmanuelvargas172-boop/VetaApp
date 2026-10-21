@@ -17,8 +17,11 @@ verify_jwt = false
 verify_jwt = true
 
 # limpiar-huerfanos borra archivos de todas las clínicas: exige sesión.
-# La autenticación real es doble: primero el JWT de Supabase (este flag),
-# después es_admin() con el uid del token ya validado por GoTrue.
+# verify_jwt = true rechaza antes de entrar al código a quien no traiga un
+# JWT válido, pero la anon key es pública y la tiene cualquiera, así que
+# ese check no filtra a nadie por sí solo. La barrera real es es_admin():
+# valida el uid del token ya validado por GoTrue y solo deja pasar a la
+# cuenta del dueño de VetaApp.
 # verify_jwt = true es el default del CLI, pero se escribe explícito
 # porque es justamente la función donde el lector quiere ver la compuerta.
 [functions.limpiar-huerfanos]

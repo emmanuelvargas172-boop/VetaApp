@@ -163,8 +163,10 @@ create policy "own_rows_archivos_mascota" on public.archivos_mascota
 -- transaccion. Dos inserts simultaneos pueden leer 9 los dos, disparar
 -- el trigger sobre 9 cada uno, y quedar 11. Se acepta — la app sube de
 -- a un archivo por sentencia (POST /archivos, Task 4, inserta una sola
--- fila), asi que el desborde no es alcanzable desde el producto; solo
--- seria alcanzable escribiendo SQL a mano.
+-- fila), así que el desborde no es alcanzable desde el producto; sería
+-- alcanzable con un insert de varias filas en una sola sentencia (lo que
+-- hace el cliente de Supabase con un arreglo: `.insert([fila1, fila2, ...])`),
+-- pero eso no es algo que el producto haga.
 --
 -- Ademas: un `insert ... values (...), (...)` de dos filas en UNA sola
 -- sentencia pasa por el trigger dos veces, pero ambas veces leen el mismo
@@ -262,6 +264,12 @@ create policy "documentos_insert_own"
               and (storage.foldername(name))[1] = auth.uid()::text
               and public.esta_activo());
 
+-- `update` NO lleva `esta_activo()`, igual que `select` y `delete`. Motivo:
+-- la app no tiene ninguna ruta que actualice un objeto existente — todos los
+-- uploads usan `upsert: false` (subirDocumento en api/axios.js:151), así que
+-- no hay un path de la app por donde una clínica vencida pueda llegar acá a
+-- sobreescribir bytes. Si en el futuro se agrega un endpoint de actualización,
+-- habrá que revisar si esta política necesita `esta_activo()`.
 create policy "documentos_update_own"
   on storage.objects for update to authenticated
   using (bucket_id = 'documentos' and (storage.foldername(name))[1] = auth.uid()::text);

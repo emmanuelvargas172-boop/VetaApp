@@ -29,7 +29,7 @@ export type ObjetoStorage = {
  *   · `archivos_mascota.ruta` guarda la ruta pelada —
  *     `{user_id}/{mascota_id}/{ts}-{rand}.pdf`.
  *   · `mascotas.foto` guarda una URL COMPLETA, porque `subirFoto`
- *     (api/axios.js:116) termina en `getPublicUrl`.
+ *     (api/axios.js) termina en `getPublicUrl`.
  *
  * Sin esta conversión, ninguna URL coincidiría con ningún `name` de
  * Storage y el barrido concluiría que TODAS las fotos de TODAS las
@@ -90,6 +90,23 @@ export function rutaDesdeValor(valor: string | null | undefined): string | null 
  * Un objeto SIN `created_at` se respeta, no se borra: no se puede saber si
  * está dentro de la ventana, y ante la duda no se borra.
  */
+/**
+ * Arma la ruta de un objeto tal como la devuelve `storage.list()` después de
+ * paginar: prefijo + "/" + nombre, o solo el nombre si el prefijo está vacío.
+ *
+ * Existe para que `listarTodo` (index.ts) no repita inline la lógica de unión
+ * y para que esa lógica se pueda probar: una barra de más, una de menos o el
+ * prefijo omitido hacen que ningún objeto coincida con ninguna fila y el
+ * barrido declara huérfano a todo el bucket. Es la misma clase de falla que
+ * el Critical de la Task 8, del otro lado de la comparación.
+ *
+ * Regla: si `prefijo` está vacío, devuelve `nombre` sin barra inicial. Si no,
+ * une con una sola barra. Nunca produce barra doble.
+ */
+export function unirRuta(prefijo: string, nombre: string): string {
+  return prefijo ? `${prefijo}/${nombre}` : nombre;
+}
+
 export function rutasHuerfanas(
   objetos: ObjetoStorage[],
   conocidas: (string | null | undefined)[],
