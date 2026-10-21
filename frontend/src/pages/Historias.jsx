@@ -10,6 +10,8 @@ import {
   SpeciesAvatar, especieCfg,
 } from '../components/icons';
 import { useEsMovil } from '../lib/useEsMovil';
+import ArchivosMascota from '../components/ArchivosMascota';
+import { n } from '../importador/textos.js';
 
 const TIPO_REGISTRO = {
   Vacunación:  { Icon: IconSyringe,      color: 'var(--info)',      soft: 'var(--info-soft)',          ring: 'var(--info-ring)' },
@@ -195,6 +197,25 @@ function badgeProxDosis(proxima_dosis) {
   return { tone: 'neutral', label: new Date(proxima_dosis + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) };
 }
 
+/**
+ * La línea de abajo del título de la ficha: el estado del paciente en
+ * tres números.
+ *
+ * Afuera del componente a propósito. Adentro no se puede probar —este
+ * vitest no tiene jsdom, así que no hay forma de renderizar un
+ * componente— y esta línea ya tuvo un bug visible: decía
+ * `${consultas.length} consultas`, con el plural pegado, y una mascota
+ * con una sola consulta se presentaba como "1 consultas".
+ *
+ * Recibe números, no arreglos, para que la prueba no tenga que inventar
+ * seis consultas falsas para contar hasta seis.
+ */
+export const subtituloPaciente = (consultas, vacunas, archivos) => [
+  n(consultas, 'consulta', 'consultas'),
+  n(vacunas,   'vacuna',   'vacunas'),
+  n(archivos,  'archivo',  'archivos'),
+].join(' · ');
+
 function HistorialMascota() {
   const { mascotaId } = useParams();
   const navigate = useNavigate();
@@ -203,6 +224,7 @@ function HistorialMascota() {
   const [mascota, setMascota]     = useState(null);
   const [consultas, setConsultas] = useState([]);
   const [vacunas, setVacunas]     = useState([]);
+  const [archivos, setArchivos]   = useState([]);
   const [tabActiva, setTabActiva] = useState('consultas');
   const [cargando, setCargando]   = useState(true);
   const [error, setError]         = useState(false);
@@ -243,19 +265,31 @@ function HistorialMascota() {
     setVacunas(data);
   };
 
+  // El padre carga los archivos, no el componente de la pestaña. Si los
+  // cargara la pestaña, el badge del tab y la lista contarían por
+  // separado: el badge diría 3 y la lista mostraría 4 hasta que alguien
+  // recargue. Un contador y su lista tienen que salir de la misma
+  // consulta.
+  const cargarArchivos = async () => {
+    const { data } = await api.get(`/archivos/mascota/${mascotaId}`);
+    setArchivos(data);
+  };
+
   useEffect(() => {
     const cargar = async () => {
       setCargando(true);
       setError(false);
       try {
-        const [mRes, cRes, vRes] = await Promise.all([
+        const [mRes, cRes, vRes, aRes] = await Promise.all([
           api.get(`/mascotas/${mascotaId}`),
           api.get(`/historias/mascota/${mascotaId}`),
           api.get(`/historias/vacunas/mascota/${mascotaId}`),
+          api.get(`/archivos/mascota/${mascotaId}`),
         ]);
         setMascota(mRes.data);
         setConsultas(cRes.data);
         setVacunas(vRes.data);
+        setArchivos(aRes.data);
         if (cRes.data.length > 0) setSelReg(cRes.data[0]);
       } catch {
         setError(true);
@@ -407,14 +441,19 @@ function HistorialMascota() {
       <Topbar
         breadcrumb={['Historias', mascota.nombre]}
         title={`Historia · ${mascota.nombre}`}
-        subtitle={`${consultas.length} consultas · ${vacunas.length} vacunas`}
+        subtitle={subtituloPaciente(consultas.length, vacunas.length, archivos.length)}
         actions={
           <>
             <Button variant="secondary" size="md" icon={<IconArrowLeft size={13}/>} onClick={() => navigate('/app/historias')}>Volver</Button>
-            <Button variant="primary" size="md" icon={<IconPlus size={14}/>}
-              onClick={() => tabActiva === 'consultas' ? abrirPanelConsulta() : abrirPanelVacuna()}>
-              {tabActiva === 'consultas' ? 'Nueva consulta' : 'Nueva vacuna'}
-            </Button>
+            {/* En la pestaña de archivos no se muestra: el formulario de
+                subida vive adentro del panel, y un botón "Nuevo" que no
+                abre nada es peor que no tenerlo. */}
+            {tabActiva !== 'archivos' && (
+              <Button variant="primary" size="md" icon={<IconPlus size={14}/>}
+                onClick={() => tabActiva === 'consultas' ? abrirPanelConsulta() : abrirPanelVacuna()}>
+                {tabActiva === 'consultas' ? 'Nueva consulta' : 'Nueva vacuna'}
+              </Button>
+            )}
           </>
         }
       />
@@ -468,6 +507,7 @@ function HistorialMascota() {
               {[
                 { key: 'consultas', label: 'Consultas', count: consultas.length },
                 { key: 'vacunas',   label: 'Vacunas',   count: vacunas.length },
+                { key: 'archivos',  label: 'Archivos',  count: archivos.length },
               ].map(t => (
                 <button key={t.key} onClick={() => setTabActiva(t.key)} style={{
                   flex: 1, padding: '5px 10px', border: 'none', cursor: 'pointer',
@@ -580,6 +620,14 @@ function HistorialMascota() {
                 )}
               </Card>
             )}
+
+            {tabActiva === 'archivos' && (
+              <ArchivosMascota
+                mascotaId={mascotaId}
+                archivos={archivos}
+                onCambio={cargarArchivos}
+              />
+            )}
           </div>
 
           {/* Columna derecha: detalle registro */}
@@ -675,12 +723,22 @@ function HistorialMascota() {
                 subtitle="Registra la primera consulta médica"
                 action={<Button variant="primary" size="md" icon={<IconPlus size={13}/>} onClick={() => abrirPanelConsulta()}>Nueva consulta</Button>}
               />
-            ) : (
+            ) : tabActiva === 'vacunas' ? (
               <EmptyState
                 icon={<IconSyringe size={22}/>}
                 title="Sin vacunas"
                 subtitle="Registra la primera vacuna aplicada"
                 action={<Button variant="primary" size="md" icon={<IconPlus size={13}/>} onClick={abrirPanelVacuna}>Nueva vacuna</Button>}
+              />
+            ) : (
+              /* Pestaña de archivos. El detalle de la derecha es para
+                 consultas y vacunas; un PDF no tiene nada que mostrar acá
+                 —se abre en otra pestaña del navegador— así que lo único
+                 honesto es decir dónde está la acción. */
+              <EmptyState
+                icon={<IconFile size={22}/>}
+                title="Documentos"
+                subtitle="Los archivos de esta mascota están en la lista de la izquierda"
               />
             )}
           </div>
