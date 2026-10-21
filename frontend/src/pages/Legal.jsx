@@ -134,7 +134,7 @@ function Privacidad() {
         cancelar puedes descargar tus datos en archivos CSV desde{' '}
         <span className="font-medium">Configuración → Datos y backups</span>; esa exportación
         incluye dueños, mascotas, historias clínicas, vacunas, tratamientos, citas, inventario y
-        cobros, pero no los archivos adjuntos (PDF). Los documentos adjuntos los podés bajar uno
+        cobros, pero no los archivos adjuntos (PDF). Los documentos adjuntos los puedes bajar uno
         por uno desde la ficha de cada mascota. Después de cancelar puedes pedirnos la exportación
         o la eliminación escribiendo a{' '}
         <a className="text-emerald-700 underline" href={`mailto:${CORREO}`}>{CORREO}</a>.
