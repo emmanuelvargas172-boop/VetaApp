@@ -4,11 +4,12 @@ import { useAuth } from '../lib/AuthContext';
 import { Card, Badge, KPI, Button, Topbar, Page, UIInput, EmptyState } from '../components/ui';
 import {
   IconSearch, IconUser, IconCheckCircle, IconLock, IconShield,
-  IconLogout, IconRefresh, IconAlert, VetaAppLogo,
+  IconLogout, IconRefresh, IconAlert, VetaAppLogo, IconBox,
 } from '../components/icons';
 import {
   PLANES as CATALOGO, MODULOS, MODULOS_BASE, planIncluye,
 } from '../lib/planes';
+import { fmtBytes } from '../archivos/textos.js';
 
 const fmtFecha = (iso) => {
   if (!iso) return '—';
@@ -252,6 +253,10 @@ export default function Admin() {
   ).length;
   // Una prueba vencida cuenta como inactiva: la base ya no la deja entrar.
   const inactivas = veterinarias.length - activas - enPrueba;
+  // Se suman TODAS las filas, no solo las de rol 'veterinaria': la cuenta
+  // del dueño también ocupa espacio en el mismo plan de Supabase, y el
+  // KPI se llama "total".
+  const espacioTotal = filas.reduce((t, f) => t + (Number(f.espacio_bytes) || 0), 0);
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -341,6 +346,7 @@ export default function Admin() {
           <KPI label="Activas"   value={activas}   icon={<IconCheckCircle size={15} />} />
           <KPI label="En prueba" value={enPrueba}  icon={<IconRefresh size={15} />} />
           <KPI label="Inactivas" value={inactivas} icon={<IconLock size={15} />} />
+          <KPI label="Espacio total" value={fmtBytes(espacioTotal)} icon={<IconBox size={15} />} />
         </div>
 
         {error && (
@@ -374,13 +380,14 @@ export default function Admin() {
             />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 940 }}>
                 <thead>
                   <tr>
                     <th style={th}>Veterinaria</th>
                     <th style={th}>Registro</th>
                     <th style={th}>Estado</th>
                     <th style={th}>Plan</th>
+                    <th style={{ ...th, textAlign: 'right' }}>Espacio</th>
                     <th style={th}>Notas</th>
                     <th style={{ ...th, textAlign: 'right' }}>Acción</th>
                   </tr>
@@ -424,6 +431,16 @@ export default function Admin() {
                           ) : (
                             <CeldaPlan fila={f} onCambiar={cambiarPlan} />
                           )}
+                        </td>
+                        {/* A la derecha y tabular, como todo número de la
+                            app: así las magnitudes se comparan de un
+                            vistazo entre filas. Y SÍ se muestra para la
+                            fila de admin, al revés que plan y notas: el
+                            espacio del dueño también lo cobra Supabase. */}
+                        <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <span className="tabular" style={{ color: 'var(--text-muted)' }}>
+                            {fmtBytes(f.espacio_bytes)}
+                          </span>
                         </td>
                         <td style={{ ...td, minWidth: 200 }}>
                           {admin ? (

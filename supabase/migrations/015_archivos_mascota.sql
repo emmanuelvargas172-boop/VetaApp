@@ -53,7 +53,7 @@ create table if not exists public.archivos_mascota (
 
   -- Las seis llaves van sin tildes a propósito: son valores de base de
   -- datos, no texto de pantalla. Lo que la clínica lea saldrá de
-  -- ETIQUETA_TIPO en frontend/src/archivos/textos.js (lo crea la Task 2),
+  -- ETIQUETA_TIPO en frontend/src/archivos/textos.js,
   -- que es donde se podrá cambiar la palabra sin tocar una migración ya corrida.
   tipo        text   not null check (tipo in (
                 'chequeo','examenes','imagenes','cirugia','historia_anterior','otro')),
@@ -273,6 +273,80 @@ create policy "documentos_update_own"
 create policy "documentos_delete_own"
   on storage.objects for delete to authenticated
   using (bucket_id = 'documentos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- ---------- 8. CUÁNTO ESPACIO OCUPA CADA CLÍNICA ----------
+-- Esta columna es para el dueño de VetaApp, no para la clínica. La
+-- pregunta que contesta es "¿cuánto me está costando esta cuenta?", y la
+-- respuesta tiene que estar en la misma tabla donde él decide a quién
+-- activar.
+--
+-- OJO CON LA VERSIÓN: `admin_listar_veterinarias()` existe en cuatro
+-- migraciones distintas y la que está viva es la ÚLTIMA,
+-- 007_pagos.sql:329-363, con ONCE columnas. Las de 002 y las intermedias
+-- tienen ocho. Si se recrea sobre la versión vieja, Admin.jsx pierde el
+-- selector de plan (:425), la insignia de prueba (:411-414) y el botón de
+-- "+8 días" (:440), porque desaparecen `plan`, `prueba_hasta` y
+-- `suscripcion_hasta` — y no falla nada: las celdas quedan en `undefined`.
+--
+-- `drop function` primero porque `create or replace` no puede cambiar el
+-- tipo de retorno de una función que devuelve `table (...)`.
+drop function if exists public.admin_listar_veterinarias();
+
+create or replace function public.admin_listar_veterinarias()
+returns table (
+  id uuid, email text, nombre text, clinica_nombre text, rol text,
+  estado_suscripcion text, plan text,
+  prueba_hasta timestamptz, suscripcion_hasta timestamptz,
+  fecha_registro timestamptz, notas_admin text,
+  espacio_bytes bigint
+)
+language plpgsql stable security definer set search_path = public
+as $$
+begin
+  if not public.es_admin() then raise exception 'No autorizado'; end if;
+  return query
+    select p.id, p.email, p.nombre, c.clinica_nombre,
+           p.rol, p.estado_suscripcion, p.plan, p.prueba_hasta, p.suscripcion_hasta,
+           p.fecha_registro, p.notas_admin,
+           -- `coalesce` y no el null del left join: una clínica que no
+           -- subió nada ocupa 0 bytes, no "no sé". El null obligaría a
+           -- cada pantalla a decidir qué hacer con él.
+           coalesce(e.bytes, 0) as espacio_bytes
+      from public.perfiles p
+      left join public.configuracion c on c.user_id = p.id
+      left join (
+        select o.path_tokens[1]::uuid as uid,
+               sum((o.metadata->>'size')::bigint) as bytes
+          from storage.objects o
+         -- GUARDA 1, y es la que evita que la función entera reviente.
+         -- `path_tokens[1]::uuid` levanta `invalid input syntax for type
+         -- uuid` con CUALQUIER objeto que no esté guardado bajo una
+         -- carpeta con forma de uuid. Un solo archivo suelto en la raíz
+         -- de cualquier bucket —subido a mano desde el Dashboard— y el
+         -- panel de Admin deja de cargar por completo.
+         where o.path_tokens[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+         -- GUARDA 2: este proyecto tiene versionado de objetos
+         -- (`archived_at`, `is_delete_marker`, `is_versioned` existen en
+         -- storage.objects — verificado el 2026-10-20). Sin estos dos
+         -- filtros la suma cuenta versiones viejas y lápidas de borrado,
+         -- o sea que una clínica que borró todo seguiría mostrando el
+         -- espacio de lo que borró.
+           and coalesce(o.is_delete_marker, false) = false
+           and o.archived_at is null
+         group by 1
+      ) e on e.uid = p.id
+     order by p.fecha_registro desc;
+end $$;
+
+-- NO lleva filtro por bucket, y es a propósito: la pregunta es cuánto
+-- cobra Supabase por esa cuenta, y Supabase cobra por todo —los PDFs de
+-- `documentos` y las fotos de `mascotas`—. Un filtro por 'documentos'
+-- daría un número más chico que la factura.
+--
+-- Los permisos no se tocan: la función ya era `security definer` con el
+-- chequeo de `es_admin()` adentro, y ese chequeo es lo único que la
+-- protege. Ver 007_pagos.sql:300-322 para el día que faltó un revoke.
 
 
 -- ============================================================
