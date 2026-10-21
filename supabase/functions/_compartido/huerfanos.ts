@@ -110,9 +110,11 @@ export function rutasHuerfanas(
       if (o.id == null) return false;
       if (!o.name) return false;
       // M5: el Dashboard crea un objeto `.emptyFolderPlaceholder` al
-      // "crear carpeta". Tiene `id` y `created_at` reales pero ninguna
-      // fila lo nombra: el barrido lo lanzaría como huérfano y metería
-      // ruido en el reporte que hay que revisar a ojo. Se filtra acá
+      // "crear carpeta" (comportamiento del Dashboard, no verificado
+      // contra este repo). Ninguna fila lo nombra, así que el barrido lo
+      // lanzaría como huérfano y metería ruido en el reporte que hay que
+      // revisar a ojo. Borrarlo no rompe nada, pero el reporte de una
+      // función que borra archivos tiene que ser legible. Se filtra acá
       // —en `huerfanos.ts` y no en `index.ts`— porque "qué cuenta como
       // huérfano" es la pregunta que este archivo contesta, y ahí se
       // puede probar.

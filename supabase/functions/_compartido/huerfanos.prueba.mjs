@@ -123,5 +123,19 @@ t('el marcador de carpeta vacía no es huérfano (M5)',
     60,
   ).length === 0);
 
+// I2-NaN: una fecha que `new Date()` no puede leer da NaN, y NaN pierde
+// toda comparación —`NaN >= corte` es false—, así que sin la guarda
+// explícita el objeto se colaría hasta el borrado. Van dos entradas y no
+// una: la segunda, que sí es huérfana, es la que hace que la aserción
+// distinga en vez de comparar contra una lista vacía. Si se borra el
+// `if (Number.isNaN(nacio))`, length pasa a 2 y esto muere.
+t('una fecha impareseable no se borra, y la huérfana de al lado sí (I2)',
+  rutasHuerfanas(
+    [{ name: 'u/7/mala-fecha.pdf', id: 'a', created_at: 'no-es-una-fecha' }, obj('u/7/viejo.pdf', 180)],
+    [],
+    AHORA,
+    60,
+  ).length === 1);
+
 console.log(`\n${ok} OK · ${mal} MAL`);
 if (mal > 0) process.exit(1);

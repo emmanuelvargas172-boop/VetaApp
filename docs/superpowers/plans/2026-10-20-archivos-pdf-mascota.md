@@ -2328,6 +2328,19 @@ t('el marcador de carpeta vacía no es huérfano',
     60,
   ).length === 0);
 
+// Una fecha que `new Date()` no puede leer da NaN, y NaN pierde toda
+// comparación —`NaN >= corte` es false—, así que sin la guarda explícita
+// el objeto se colaría hasta el borrado. Van dos entradas y no una: la
+// segunda, que sí es huérfana, es la que hace que la aserción distinga en
+// vez de comparar contra una lista vacía.
+t('una fecha impareseable no se borra, y la huérfana de al lado sí',
+  rutasHuerfanas(
+    [{ name: 'u/7/mala-fecha.pdf', id: 'a', created_at: 'no-es-una-fecha' }, obj('u/7/viejo.pdf', 180)],
+    [],
+    AHORA,
+    60,
+  ).length === 1);
+
 console.log(`\n${ok} OK · ${mal} MAL`);
 if (mal > 0) process.exit(1);
 ```
@@ -2471,7 +2484,22 @@ export function rutasHuerfanas(
 cd supabase/functions/_compartido && node huerfanos.prueba.mjs
 ```
 
-Esperado: `15 OK · 0 MAL`.
+Esperado: `16 OK · 0 MAL`.
+
+Y después, la verificación que de verdad importa en una función que borra
+archivos: **que cada aserción muera si se borra la guarda que nombra.** Una
+prueba verde que sigue verde con la guarda borrada no está probando nada, y
+acá eso significa que nada vigila el borrado. Copiar `huerfanos.ts` y la
+prueba a un directorio temporal, borrar una guarda por vez —el filtro de
+carpetas por `id`, el de `.emptyFolderPlaceholder`, el de `created_at`
+ausente, el de `Number.isNaN`, el de la ventana de gracia y el
+`decodeURIComponent`— y confirmar que en cada caso al menos una aserción
+pasa a `MAL`.
+
+La única excepción conocida es el `.filter` que descarta los nulls de la
+lista de rutas conocidas: `Set.has(unString)` nunca da `true` para `null`,
+así que borrarlo no cambia ningún comportamiento observable. Es una
+restricción de tipo, no una guarda, y no hay que fabricarle una aserción.
 
 - [ ] **Step 5: Escribir la edge function**
 

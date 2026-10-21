@@ -161,12 +161,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return responder({ error: 'Método no permitido' }, 405);
 
-  // Robustez: las tres variables de entorno se leen antes de crear los
-  // clientes. Si falta alguna, `createClient` lanza en el constructor y
-  // la excepción escaparía del handler —el runtime respondería un 500
-  // opaco sin JSON ni headers CORS, que el navegador ve como error de
-  // CORS en vez del problema real. Con la lectura acá, el try/catch de
-  // abajo atrapa la excepción y devuelve JSON con CORS.
+  // En las edge functions hosteadas estas tres las inyecta la plataforma;
+  // el caso en que falta alguna es `supabase functions serve` local. El `!`
+  // es solo para el compilador: `Deno.env.get` no lanza, devuelve
+  // `undefined`. Quien lanza es `createClient`, y por eso se crea adentro
+  // del try de abajo (ver el comentario de ahí).
   const url = Deno.env.get('SUPABASE_URL')!;
   const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -178,9 +177,12 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization') ?? '';
   if (!auth.startsWith('Bearer ')) return responder({ error: 'Falta la sesión' }, 401);
 
-  // Robustez: los dos clientes se crean adentro del try para que si falta
-  // SUPABASE_ANON_KEY o SUPABASE_SERVICE_ROLE_KEY la excepción no escape
-  // del handler y la respuesta salga con JSON y con CORS.
+  // Los dos clientes se crean adentro del try a propósito. Si falta
+  // SUPABASE_ANON_KEY o SUPABASE_SERVICE_ROLE_KEY, `createClient` lanza
+  // `supabaseKey is required` en el constructor; afuera del try esa
+  // excepción escaparía del handler y el runtime respondería un 500 opaco,
+  // sin JSON y sin los headers CORS de arriba, que desde el navegador se
+  // lee como error de CORS en vez del problema real.
   try {
     const comoUsuario = createClient(url, anon, {
       global: { headers: { Authorization: auth } },
