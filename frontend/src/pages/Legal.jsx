@@ -62,8 +62,15 @@ function Privacidad() {
       <Lista items={[
         'De la cuenta: nombre, correo electrónico y, si inicias sesión con Google, tu nombre y foto de perfil de Google. No accedemos a tu correo de Gmail ni a ningún otro dato de tu cuenta de Google.',
         'De la operación de la clínica: mascotas, dueños, historias clínicas, citas, recordatorios, inventario y movimientos de caja que la clínica registre.',
+        'Documentos clínicos en PDF que la clínica suba a la ficha de una mascota: exámenes, imágenes diagnósticas, descripciones quirúrgicas e historias de otras clínicas. Esos archivos pueden contener el nombre del dueño y su número de documento.',
         'Técnicos: registros de acceso y errores necesarios para operar y asegurar el servicio.',
       ]} />
+      <P>
+        Los documentos en PDF se guardan en un almacenamiento privado: no son accesibles por
+        internet sin autenticación. Solo la cuenta de la clínica que los subió puede consultarlos,
+        descargarlos y borrarlos. Cuando alguien de la clínica abre uno, el sistema genera un
+        enlace temporal que vence en cinco minutos.
+      </P>
       <P>
         No solicitamos ni almacenamos datos de tarjetas de crédito. Los pagos se acuerdan por fuera
         de la plataforma.
@@ -84,7 +91,7 @@ function Privacidad() {
         los tratan por cuenta nuestra:
       </P>
       <Lista items={[
-        'Supabase: base de datos y autenticación.',
+        'Supabase: base de datos, autenticación y almacenamiento de los archivos que la clínica suba.',
         'Cloudflare: alojamiento y entrega de la aplicación.',
         'Google: inicio de sesión, únicamente si eliges esa opción.',
       ]} />
