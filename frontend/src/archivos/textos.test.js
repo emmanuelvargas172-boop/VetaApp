@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ETIQUETA_TIPO, TIPOS, textoArchivo, fechaLegible, fmtBytes } from './textos.js';
+import { ETIQUETA_TIPO, TIPOS, textoArchivo, fechaLegible, fmtBytes, preguntaBorrado } from './textos.js';
 
 // Las seis llaves del `check (tipo in (...))` de 015_archivos_mascota.sql,
 // copiadas a mano. Si alguien agrega un tipo a la migración y no acá, esta
@@ -100,5 +100,43 @@ describe('textoArchivo', () => {
 
   it('con argumento null devuelve vacío', () => {
     expect(textoArchivo(null)).toBe('');
+  });
+});
+
+describe('preguntaBorrado', () => {
+  // El nombre del archivo tiene que estar en la pregunta: la lista puede
+  // tener diez PDF con nombres parecidos y el modal es lo único que dice
+  // cuál de ellos va a desaparecer.
+  it('nombra el archivo y avisa que no se deshace', () => {
+    const p = preguntaBorrado({ nombre: 'hemograma.pdf' });
+    expect(p.titulo).toBe('¿Borrar este archivo?');
+    expect(p.mensaje).toContain('hemograma.pdf');
+    expect(p.mensaje).toContain('no se puede deshacer');
+  });
+
+  // El tipo entra cuando se conoce: un "Exámenes de laboratorio" de más en
+  // la pregunta es la diferencia entre borrar el correcto y borrar el de
+  // al lado cuando los dos se llaman `escaneo.pdf`.
+  it('agrega el tipo en palabras cuando lo conoce', () => {
+    expect(preguntaBorrado({ nombre: 'a.pdf', tipo: 'cirugia' }).mensaje)
+      .toContain('Cirugía');
+  });
+
+  it('con un tipo que no conoce no inventa etiqueta', () => {
+    const m = preguntaBorrado({ nombre: 'a.pdf', tipo: 'radiografia' }).mensaje;
+    expect(m).toContain('radiografia');
+    expect(m).toContain('a.pdf');
+  });
+
+  // Una fila sin nombre no puede dejar la pregunta en «¿Borrar ""?»: eso
+  // se lee como un error de la app y nadie sabe qué está aceptando.
+  it('sin nombre dice "este archivo" en vez de comillas vacías', () => {
+    const m = preguntaBorrado({ nombre: null }).mensaje;
+    expect(m).not.toContain('""');
+    expect(m).toContain('este archivo');
+  });
+
+  it('con argumento null no revienta', () => {
+    expect(preguntaBorrado(null).mensaje).toContain('este archivo');
   });
 });

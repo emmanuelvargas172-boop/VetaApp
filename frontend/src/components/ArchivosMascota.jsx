@@ -20,8 +20,9 @@
 import { useState, useRef } from 'react';
 import api from '../api/axios';
 import { Card, Button, SectionHeader, EmptyState, iconBtnStyle } from './ui';
+import ConfirmDialog from './ConfirmDialog';
 import { IconFile, IconPlus, IconTrash, IconArrowRight } from './icons';
-import { TIPOS, textoArchivo, fmtBytes } from '../archivos/textos.js';
+import { TIPOS, textoArchivo, fmtBytes, preguntaBorrado } from '../archivos/textos.js';
 import { revisarArchivo, MAX_POR_MASCOTA, MAX_BYTES, MOTIVO_CUPO } from '../archivos/limites.js';
 
 // Copiado de Historias.jsx:22-28. Mismo look en todos los formularios del
@@ -48,6 +49,11 @@ export default function ArchivosMascota({ mascotaId, archivos, onCambio }) {
   const [error, setError]       = useState('');
   const [abriendo, setAbriendo] = useState(null);    // id del archivo que se está abriendo
   const [borrando, setBorrando] = useState(null);    // id del archivo que se está borrando
+  // La fila que el modal está preguntando si borrar. Se guarda el objeto
+  // entero y no el id porque el texto de la pregunta nombra el archivo y
+  // su tipo, y buscarlo de nuevo en la lista para redactar la pregunta es
+  // una búsqueda que puede no encontrar nada si la lista se recargó.
+  const [porBorrar, setPorBorrar] = useState(null);  // archivo | null
   const inputRef = useRef(null);
 
   // true cuando la mascota ya alcanzó el máximo. En ese estado se desactiva
@@ -127,18 +133,30 @@ export default function ArchivosMascota({ mascotaId, archivos, onCambio }) {
     }
   };
 
-  const borrar = async (a) => {
-    // Borrar un documento clínico no se deshace, y la lista puede tener ocho
-    // archivos con nombres similares. La pregunta nombra el archivo para que
-    // la clínica sepa exactamente cuál va a desaparecer.
-    if (!window.confirm(`¿Borrar "${a.nombre}"? Esto no se puede deshacer.`)) return;
+  // Borrar un documento clínico no se deshace. El botón de la fila no borra:
+  // abre la pregunta. Quien borra es `confirmarBorrado`, y solo lo llama el
+  // botón rojo del modal.
+  const borrar = (a) => {
+    setError('');
+    setPorBorrar(a);
+  };
+
+  const confirmarBorrado = async () => {
+    const a = porBorrar;
+    if (!a || borrando) return;
 
     setBorrando(a.id);
     setError('');
     try {
       await api.delete(`/archivos/${a.id}`);
+      // El modal se cierra recién acá, con el borrado ya hecho. Cerrarlo
+      // antes del await lo dejaría desaparecer mientras la petición todavía
+      // va en camino, y un error de red se mostraría sin nada en pantalla
+      // que explique a qué archivo se refiere.
+      setPorBorrar(null);
       await onCambio();
     } catch (err) {
+      setPorBorrar(null);
       setError(err.response?.data?.error || 'No se pudo borrar el archivo');
     } finally {
       setBorrando(null);
@@ -320,6 +338,19 @@ export default function ArchivosMascota({ mascotaId, archivos, onCambio }) {
           ))}
         </div>
       )}
+
+      {/* El modal va al final del Card pero se pinta por encima de todo:
+          position fixed con z-index 60. Vive acá y no en Historias.jsx
+          porque el estado de qué archivo se está borrando es de esta
+          pantalla, no de la ficha del paciente. */}
+      <ConfirmDialog
+        abierto={!!porBorrar}
+        {...preguntaBorrado(porBorrar)}
+        textoConfirmar="Borrar"
+        onConfirmar={confirmarBorrado}
+        onCancelar={() => setPorBorrar(null)}
+        ocupado={borrando !== null}
+      />
     </Card>
   );
 }

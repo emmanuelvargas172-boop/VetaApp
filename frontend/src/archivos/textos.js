@@ -110,3 +110,32 @@ export function textoArchivo(a) {
     a?.descripcion || '',
   ].filter(Boolean).join(' · ');
 }
+
+/**
+ * El título y el mensaje del modal que pregunta antes de borrar.
+ *
+ * Vive acá y no adentro del componente por lo mismo que todo lo demás de
+ * este archivo: adentro del JSX no se puede probar, y este texto es lo
+ * único que la clínica lee antes de borrar un documento clínico que no se
+ * recupera.
+ *
+ * Tres decisiones, todas por el mismo motivo —que se entienda QUÉ se está
+ * borrando antes de aceptar:
+ *
+ *  · El NOMBRE del archivo va siempre. Una mascota puede tener diez PDF y
+ *    el escáner los nombra a todos `escaneo.pdf`.
+ *  · El TIPO entra cuando hay: entre dos `escaneo.pdf`, "Cirugía" es lo
+ *    que distingue cuál se va. Un tipo que esta versión no conoce se
+ *    muestra crudo, mismo criterio que `textoArchivo`.
+ *  · Sin nombre se dice "este archivo", no `""`. Una pregunta con comillas
+ *    vacías se lee como un error de la app, y nadie sabe qué está
+ *    aceptando.
+ */
+export function preguntaBorrado(a) {
+  const nombre = a?.nombre ? `"${a.nombre}"` : 'este archivo';
+  const tipo = a?.tipo ? ` (${ETIQUETA_TIPO[a.tipo] ?? a.tipo})` : '';
+  return {
+    titulo: '¿Borrar este archivo?',
+    mensaje: `Se va a borrar ${nombre}${tipo}. Esto no se puede deshacer.`,
+  };
+}
