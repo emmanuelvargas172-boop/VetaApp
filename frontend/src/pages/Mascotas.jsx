@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ModalMascota from '../components/ModalMascota';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useEsMovil } from '../lib/useEsMovil';
 import {
   Card, Badge, SectionHeader, Topbar, Page, Button, UIInput, EmptyState, iconBtnStyle, Sparkline,
@@ -390,6 +391,12 @@ export default function Mascotas() {
   const [perfilActivo, setPerfilActivo] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState(null);
+  // La mascota que el modal está preguntando si eliminar. Se guarda el
+  // objeto y no el id porque la pregunta la nombra, y buscarla de nuevo en
+  // la lista para redactar la pregunta puede no encontrarla si la lista se
+  // recargó entre medio.
+  const [porEliminar, setPorEliminar] = useState(null);  // mascota | null
+  const [eliminando, setEliminando] = useState(false);
   const esMovil = useEsMovil();
 
   const cargar = () => {
@@ -407,16 +414,29 @@ export default function Mascotas() {
 
   useEffect(() => { cargar(); }, []);
 
-  async function eliminarMascota(m) {
-    // Las historias, vacunas, citas y tratamientos cuelgan de mascota_id
-    // con on delete cascade: se van con ella.
-    const aviso = `¿Eliminar a ${m.nombre}?\n\nSe borra también su historia clínica, vacunas y citas. Esta acción no se puede deshacer.`;
-    if (!window.confirm(aviso)) return;
+  // El botón de la fila no elimina: abre la pregunta. Quien elimina es
+  // confirmarEliminacion, y solo lo llama el botón rojo del modal.
+  function eliminarMascota(m) {
+    setPorEliminar(m);
+  }
+
+  async function confirmarEliminacion() {
+    const m = porEliminar;
+    if (!m || eliminando) return;
+
+    setEliminando(true);
     try {
       await api.delete(`/mascotas/${m.id}`);
+      // Se cierra con el borrado ya hecho, no antes del await: cerrarlo
+      // primero dejaría el error de abajo apareciendo sin nada en pantalla
+      // que diga a qué mascota se refiere.
+      setPorEliminar(null);
       cargar();
     } catch {
+      setPorEliminar(null);
       alert('No se pudo eliminar la mascota. Intenta de nuevo.');
+    } finally {
+      setEliminando(false);
     }
   }
 
@@ -561,6 +581,21 @@ export default function Mascotas() {
       </Page>
 
       {modal}
+
+      {/* Eliminar una mascota se lleva por delante su historia clínica
+          entera. El aviso enumera qué se va —incluidos los PDF, que cuelgan
+          de mascota_id con on delete cascade en 015_archivos_mascota.sql—
+          porque "eliminar a Luna" no deja ver que se van ocho documentos
+          escaneados con ella. */}
+      <ConfirmDialog
+        abierto={!!porEliminar}
+        titulo={`¿Eliminar a ${porEliminar?.nombre ?? 'esta mascota'}?`}
+        mensaje="Se borran también su historia clínica, vacunas, citas y los archivos PDF que tenga subidos. Esto no se puede deshacer."
+        textoConfirmar="Eliminar"
+        onConfirmar={confirmarEliminacion}
+        onCancelar={() => setPorEliminar(null)}
+        ocupado={eliminando}
+      />
     </>
   );
 }
