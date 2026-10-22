@@ -430,8 +430,9 @@ const routes = [
   // está vencida, cualquiera que la vea entra sin sesión.
   //
   // 300 s porque el único uso es abrir el PDF en otra pestaña, ahora. Más
-  // tiempo es una llave de más duración por nada; menos, y un PDF de 5 MB
-  // en el internet de una clínica en Girón no termina de bajar.
+  // tiempo es una llave de más duración por nada; menos, y un PDF de 12 MB
+  // —el máximo desde la 016— en el internet de una clínica en Girón no
+  // termina de bajar.
   { m: 'GET', re: /^\/archivos\/(\d+)\/url$/, fn: async ({ id }) => {
     const fila = unwrap(await supabase
       .from('archivos_mascota').select('ruta').eq('id', id).single());

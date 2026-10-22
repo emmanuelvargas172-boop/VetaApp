@@ -66,7 +66,7 @@ export default function SubirArchivo({ mascotaId, archivos, onCambio }) {
   //
   // revisarArchivo corre TAMBIÉN en la ruta POST /archivos. Que corra en los
   // dos lugares no es duplicación: acá le evita a la clínica esperar a que
-  // suba un PDF de 5 MB para enterarse de que no pasa; la ruta lo hace para
+  // suba un PDF de 12 MB para enterarse de que no pasa; la ruta lo hace para
   // que ninguna pantalla futura pueda saltarse el chequeo.
   const veredicto = archivo ? revisarArchivo(archivo, archivos.length) : null;
 

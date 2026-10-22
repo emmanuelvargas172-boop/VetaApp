@@ -2,6 +2,12 @@
 -- VetaApp · 015_archivos_mascota.sql
 -- Documentos clínicos en PDF, colgados de la mascota.
 --
+-- LOS LÍMITES DE ESTE ARCHIVO YA NO SON LOS VIGENTES. La 016 los cambió:
+-- el peso por PDF pasó de 5 MB (5242880) a 12 MB (12582912) y el cupo por
+-- mascota de 10 a 7. Todo lo que diga 5242880 o 10 de acá para abajo es
+-- historia: así quedó la base el día que corrió esta migración, no como
+-- está hoy. El motivo del cambio está en 016_subir_limite_archivos.sql.
+--
 -- ---------- POR QUÉ ----------
 -- Lo que la clínica tiene hoy de una mascota que llega con historia de
 -- otra parte es un campo de texto. Los exámenes de laboratorio, la

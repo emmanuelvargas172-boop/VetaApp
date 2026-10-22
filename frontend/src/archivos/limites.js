@@ -11,18 +11,34 @@
 // ============================================================
 
 /**
- * 5 MB exactos, en bytes. El MISMO número vive en otros dos lados, los dos
- * en 015_archivos_mascota.sql:
- *   · el `check (peso_bytes > 0 and peso_bytes <= 5242880)` de la tabla
+ * 12 MB exactos, en bytes (12 × 1048576). El MISMO número vive en otros dos
+ * lados, los dos en 016_subir_limite_archivos.sql:
+ *   · el `check (peso_bytes > 0 and peso_bytes <= 12582912)` de la tabla
  *   · `file_size_limit` del bucket `documentos`
  *
  * Si se separan, el que rechace primero decide, y el mensaje que ve la
  * clínica cambia según cuál sea.
+ *
+ * Era 5242880 (5 MB) hasta la 016. Se subió porque los escaneos reales de
+ * una clínica pesan entre 5 y 7 MB: el tope viejo quedaba justo encima del
+ * tamaño NORMAL y rechazaba trabajo legítimo. Un tope frena el disparate
+ * —la foto del celular en color, el escaneo de 80 páginas sin comprimir—,
+ * no el caso de todos los días.
  */
-export const MAX_BYTES = 5242880;
+export const MAX_BYTES = 12582912;
 
-/** Diez por mascota. El mismo número que el trigger `limite_archivos_mascota()`. */
-export const MAX_POR_MASCOTA = 10;
+/**
+ * Siete por mascota. El mismo número que el trigger
+ * `limite_archivos_mascota()`, hoy en 016_subir_limite_archivos.sql.
+ *
+ * Eran diez hasta la 016. Bajó al subir el peso, y no por ahorrar espacio
+ * real —un PDF ocupa lo que pesa, no lo que permite el tope— sino por el
+ * techo del peor caso: 7 × 12 MB = 84 MB por mascota, contra los 150 MB que
+ * darían 10 × 15. El plan gratis de Supabase es 1 GB para TODO el proyecto,
+ * y cuando se llena no falla la mascota que se pasó: dejan de subir todas
+ * las clínicas, incluidas las que pagan.
+ */
+export const MAX_POR_MASCOTA = 7;
 
 /**
  * "12,0". Coma decimal porque la pantalla está en español, y un solo
