@@ -10,7 +10,8 @@ import {
   SpeciesAvatar, especieCfg,
 } from '../components/icons';
 import { useEsMovil } from '../lib/useEsMovil';
-import ArchivosMascota from '../components/ArchivosMascota';
+import SubirArchivo from '../components/SubirArchivo';
+import ArchivosAgrupados from '../components/ArchivosAgrupados';
 import { n } from '../importador/textos.js';
 
 const TIPO_REGISTRO = {
@@ -622,7 +623,7 @@ function HistorialMascota() {
             )}
 
             {tabActiva === 'archivos' && (
-              <ArchivosMascota
+              <SubirArchivo
                 mascotaId={mascotaId}
                 archivos={archivos}
                 onCambio={cargarArchivos}
@@ -730,15 +731,18 @@ function HistorialMascota() {
                 subtitle="Registra la primera vacuna aplicada"
                 action={<Button variant="primary" size="md" icon={<IconPlus size={13}/>} onClick={abrirPanelVacuna}>Nueva vacuna</Button>}
               />
+            ) : archivos.length > 0 ? (
+              /* Pestaña de archivos. Los documentos van en esta columna,
+                 agrupados por tipo; a la izquierda queda solo el formulario
+                 de subida. Se pinta desde el MISMO arreglo `archivos` que
+                 cuenta el badge de la pestaña y el subtítulo del paciente:
+                 una sola fuente, así los tres nunca pueden discrepar. */
+              <ArchivosAgrupados archivos={archivos} onCambio={cargarArchivos}/>
             ) : (
-              /* Pestaña de archivos. El detalle de la derecha es para
-                 consultas y vacunas; un PDF no tiene nada que mostrar acá
-                 —se abre en otra pestaña del navegador— así que lo único
-                 honesto es decir dónde está la acción. */
               <EmptyState
                 icon={<IconFile size={22}/>}
-                title="Documentos"
-                subtitle="Los archivos de esta mascota están en la lista de la izquierda"
+                title="Sin documentos"
+                subtitle="Subí los exámenes, las imágenes o la historia de la clínica anterior con el formulario de la izquierda"
               />
             )}
           </div>

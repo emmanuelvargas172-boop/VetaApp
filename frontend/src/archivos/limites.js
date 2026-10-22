@@ -36,7 +36,8 @@ const mb = (bytes) => (bytes / 1048576).toFixed(1).replace('.', ',');
  *
  * Exportada porque la pantalla de archivos tiene que mostrar el aviso "está llena"
  * sin que la clínica tenga que elegir un archivo primero, y una segunda copia en
- * ArchivosMascota.jsx ya había divergido en la puntuación.
+ * SubirArchivo.jsx (que entonces se llamaba ArchivosMascota.jsx) ya había
+ * divergido en la puntuación.
  */
 export const MOTIVO_CUPO =
   `Esta mascota ya tiene ${MAX_POR_MASCOTA} documentos, que es el máximo; ` +

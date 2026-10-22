@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { ETIQUETA_TIPO, TIPOS, textoArchivo, fechaLegible, fmtBytes, preguntaBorrado } from './textos.js';
+import {
+  ETIQUETA_TIPO, TIPOS, textoArchivo, fechaLegible, fmtBytes,
+  preguntaBorrado, agruparPorTipo,
+} from './textos.js';
 
 // Las seis llaves del `check (tipo in (...))` de 015_archivos_mascota.sql,
 // copiadas a mano. Si alguien agrega un tipo a la migración y no acá, esta
@@ -138,5 +141,70 @@ describe('preguntaBorrado', () => {
 
   it('con argumento null no revienta', () => {
     expect(preguntaBorrado(null).mensaje).toContain('este archivo');
+  });
+});
+
+describe('agruparPorTipo', () => {
+  const a = (id, tipo) => ({ id, tipo, nombre: `${id}.pdf` });
+
+  it('devuelve los grupos en el orden de TIPOS, no en el de llegada', () => {
+    // Llegan al revés del orden del dropdown a propósito.
+    const g = agruparPorTipo([a(1, 'otro'), a(2, 'chequeo'), a(3, 'cirugia')]);
+    expect(g.map((x) => x.valor)).toEqual(['chequeo', 'cirugia', 'otro']);
+  });
+
+  it('junta en un solo grupo todos los del mismo tipo', () => {
+    const g = agruparPorTipo([a(1, 'chequeo'), a(2, 'examenes'), a(3, 'chequeo')]);
+    expect(g).toHaveLength(2);
+    expect(g[0].archivos.map((x) => x.id)).toEqual([1, 3]);
+  });
+
+  it('no pinta grupos vacíos', () => {
+    const g = agruparPorTipo([a(1, 'cirugia')]);
+    expect(g).toHaveLength(1);
+    expect(g[0].valor).toBe('cirugia');
+  });
+
+  it('pone la etiqueta en palabras de cada grupo', () => {
+    const g = agruparPorTipo([a(1, 'historia_anterior')]);
+    expect(g[0].etiqueta).toBe('Historia de otra clínica');
+  });
+
+  // Dentro del grupo se respeta el orden en que vino la lista: el padre la
+  // trae ordenada por created_at desc desde la ruta GET /archivos/mascota.
+  // Reordenar acá rompería ese orden sin que nadie lo pidiera.
+  it('no reordena los archivos dentro de un grupo', () => {
+    const g = agruparPorTipo([a(9, 'chequeo'), a(4, 'chequeo'), a(7, 'chequeo')]);
+    expect(g[0].archivos.map((x) => x.id)).toEqual([9, 4, 7]);
+  });
+
+  // Mismo criterio que textoArchivo: un tipo que esta versión no conoce se
+  // muestra crudo y va al final. Esconderlo sería esconder justo el caso
+  // nuevo, y el archivo desaparecería de la pantalla sin dejar de existir.
+  it('manda al final, con la llave cruda, un tipo que no conoce', () => {
+    const g = agruparPorTipo([a(1, 'radiografia'), a(2, 'chequeo')]);
+    expect(g.map((x) => x.valor)).toEqual(['chequeo', 'radiografia']);
+    expect(g[1].etiqueta).toBe('radiografia');
+  });
+
+  // Una fila sin tipo no puede desaparecer de la pantalla. El check de 015
+  // lo impide por la app, pero una fila puede haber entrado por el SQL
+  // Editor.
+  it('no pierde un archivo sin tipo', () => {
+    const g = agruparPorTipo([{ id: 1, nombre: 'x.pdf' }]);
+    expect(g.flatMap((x) => x.archivos)).toHaveLength(1);
+  });
+
+  it('con lista vacía devuelve lista vacía', () => {
+    expect(agruparPorTipo([])).toEqual([]);
+    expect(agruparPorTipo(null)).toEqual([]);
+  });
+
+  // Lo que se pinta tiene que ser exactamente lo que llegó: ni uno de menos
+  // (un PDF que el cliente no ve es un PDF que cree perdido) ni uno de más.
+  it('no pierde ni duplica ningún archivo', () => {
+    const lista = [a(1, 'chequeo'), a(2, 'otro'), a(3, 'chequeo'), a(4, 'raro'), a(5, 'cirugia')];
+    const ids = agruparPorTipo(lista).flatMap((g) => g.archivos.map((x) => x.id));
+    expect(ids.sort()).toEqual([1, 2, 3, 4, 5]);
   });
 });

@@ -131,6 +131,59 @@ export function textoArchivo(a) {
  *    vacías se lee como un error de la app, y nadie sabe qué está
  *    aceptando.
  */
+/**
+ * La lista plana de archivos, partida en las secciones que se pintan en el
+ * panel derecho: `[{ valor, etiqueta, archivos }]`.
+ *
+ * Pura y acá y no adentro del componente por lo de siempre: sin jsdom en
+ * este proyecto, lo que vive en el JSX no se puede probar. Y esta función
+ * decide QUÉ ARCHIVOS SE VEN — un error acá no rompe la pantalla, hace
+ * desaparecer documentos clínicos que siguen existiendo en la base, que es
+ * peor porque nadie lo nota.
+ *
+ * Tres reglas, cada una por un motivo concreto:
+ *
+ *  · EL ORDEN ES EL DE `TIPOS`, no el de llegada ni el alfabético. Es el
+ *    mismo orden del dropdown de subida, así que la clínica encuentra la
+ *    sección donde la dejó. Si fuera el orden de llegada, las secciones se
+ *    reacomodarían solas cada vez que se sube algo.
+ *
+ *  · LOS GRUPOS VACÍOS NO SALEN. Seis encabezados fijos con cinco vacíos
+ *    es una pantalla donde hay que buscar el único que tiene algo.
+ *
+ *  · UN TIPO DESCONOCIDO VA AL FINAL, con su llave cruda como etiqueta.
+ *    Mismo criterio que `textoArchivo`. El `check` de 015 impide que entre
+ *    por la app, pero una fila puede haber entrado por el SQL Editor, y
+ *    descartarla la borraría de la pantalla sin borrarla de la base: el
+ *    cliente la daría por perdida teniéndola.
+ *
+ * Una fila sin `tipo` cae en el grupo `''`, que también se pinta. Suena
+ * feo y es a propósito: feo y visible es mejor que prolijo y desaparecido.
+ */
+export function agruparPorTipo(archivos) {
+  const lista = Array.isArray(archivos) ? archivos : [];
+
+  // Un Map y no un objeto: el Map conserva el orden de inserción, que es
+  // lo que hace que los tipos desconocidos queden al final sin ordenarlos
+  // aparte. Se siembra con los seis conocidos en el orden del dropdown y
+  // al final se tiran los que quedaron vacíos.
+  const grupos = new Map(TIPOS.map((t) => [t.valor, []]));
+
+  for (const a of lista) {
+    const k = a?.tipo ?? '';
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(a);
+  }
+
+  return [...grupos]
+    .filter(([, archivos]) => archivos.length > 0)
+    .map(([valor, archivos]) => ({
+      valor,
+      etiqueta: ETIQUETA_TIPO[valor] ?? valor,
+      archivos,
+    }));
+}
+
 export function preguntaBorrado(a) {
   const nombre = a?.nombre ? `"${a.nombre}"` : 'este archivo';
   const tipo = a?.tipo ? ` (${ETIQUETA_TIPO[a.tipo] ?? a.tipo})` : '';
