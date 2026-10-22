@@ -520,6 +520,16 @@ create temp table _cuentas as
   select id, row_number() over (order by created_at) as n
   from auth.users order by created_at limit 2;
 
+-- La tabla temporal la crea `postgres`. Después del `set local role
+-- authenticated` de más abajo la sesión pierde el permiso de leerla, pero el
+-- `set_config` la necesita para sacar el `sub`. Sin este grant el bloque muere
+-- con `42501: permission denied for table _cuentas` antes de medir nada.
+-- Medido en el SQL Editor real el 2026-10-21, no deducido.
+--
+-- Esto NO debilita la prueba: `_cuentas` es el andamio, no el sujeto. Sobre
+-- `public.archivos_mascota` no se toca ningún permiso.
+grant select on _cuentas to authenticated;
+
 -- Una mascota y un archivo de la cuenta 1.
 insert into public.duenos(user_id, nombre, telefono)
   select id, 'Prueba RLS', '3000000002' from _cuentas where n = 1;
@@ -551,6 +561,26 @@ incluida la suplantación.
 filtrando, y la tabla quedó legible entre clínicas. No seguir con ninguna
 otra task hasta arreglarlo: es la falla más grave que puede tener este
 cambio, porque expone historias clínicas de una clínica a otra.
+
+**Y un 0 solo no alcanza: falta el control negativo.** Si la suplantación
+del JWT no agarra —el `sub` queda nulo, por ejemplo— la RLS no deja ver
+nada de nadie y el `count` da 0 igual, sin haber medido el filtrado por
+clínica. Una prueba que no puede fallar no prueba nada; es el mismo
+criterio que la verificación por mutación de la Task 8.
+
+Entonces correr el bloque **dos veces**, cambiando solo el `where n = 2`
+del `set_config` por `where n = 1`, que es la cuenta dueña del archivo:
+
+| Quién suplanta | Esperado |
+|---|---|
+| cuenta 2 (ajena) | `0` |
+| cuenta 1 (la dueña) | `1` |
+
+Las dos tienen que dar lo suyo. Si las dos dan 0, la suplantación no
+funciona y no se midió nada — arreglar la prueba antes de seguir.
+
+**Resultado real (2026-10-21, Postgres de producción): 0 y 1.** La RLS
+filtra por clínica.
 
 **Si el `set local role authenticated` falla** porque solo hay una cuenta
 en `auth.users`, crear la segunda registrándose en la app con otro correo y

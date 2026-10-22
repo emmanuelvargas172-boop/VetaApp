@@ -599,6 +599,16 @@ grant execute on function public.admin_listar_veterinarias() to authenticated;
 --   select id, row_number() over (order by created_at) as n
 --   from auth.users order by created_at limit 2;
 --
+-- -- La tabla temporal la crea `postgres`. Despues del `set local role
+-- -- authenticated` de mas abajo la sesion pierde el permiso de leerla, pero
+-- -- el `set_config` la necesita para sacar el `sub`. Sin este grant el bloque
+-- -- muere con `42501: permission denied for table _ctas` antes de medir nada.
+-- -- Medido en el SQL Editor real el 2026-10-21, no deducido.
+-- --
+-- -- Esto NO debilita la prueba: `_ctas` es el andamio, no el sujeto. Sobre
+-- -- `public.archivos_mascota` no se toca ningun permiso.
+-- grant select on _ctas to authenticated;
+--
 -- -- Cuenta 2: dueno y mascota (como postgres, sin RLS activa).
 -- -- La mascota de cuenta 2 es la que se usa como mascota_id compartida.
 -- insert into public.duenos(user_id, nombre, telefono)
