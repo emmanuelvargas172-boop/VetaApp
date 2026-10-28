@@ -4,6 +4,7 @@
 // no hace falta pasar user_id en inserts ni filtrar por él en selects.
 import { supabase } from '../lib/supabase';
 import { edadDesde } from '../utils/edad';
+import { revisarArchivo, traducirErrorSql } from '../archivos/limites.js';
 
 // ---------- helpers ----------
 
@@ -116,6 +117,54 @@ async function subirFoto(file) {
   return supabase.storage.from('mascotas').getPublicUrl(path).data.publicUrl;
 }
 
+/**
+ * Sube el PDF al bucket y devuelve la ruta del objeto.
+ *
+ * Tres diferencias con `subirFoto`, de arriba, y las tres son a propósito:
+ *
+ *  1. `upsert: false`. Con `true` —lo que usa subirFoto— una ruta repetida
+ *     SOBREESCRIBE el objeto en silencio. Acá la ruta lleva un aleatorio,
+ *     así que una repetición significa que algo está mal, y quiero el
+ *     error, no el archivo de otro reemplazado.
+ *
+ *  2. La ruta lleva timestamp Y un aleatorio. `subirFoto` usa solo
+ *     `Date.now()` y tiene el hueco de que dos subidas en el mismo
+ *     milisegundo chocan. Acá la clínica selecciona ocho escaneos de una,
+ *     así que el caso no es teórico.
+ *
+ *  3. Devuelve la RUTA, no una URL. `subirFoto` termina en
+ *     `getPublicUrl`, que en un bucket privado devuelve una URL que no
+ *     abre nada. Un PDF clínico se abre con URL firmada pedida en el
+ *     clic (ver GET /archivos/:id/url).
+ *
+ * El `mascota_id` va en la ruta aunque la tabla ya lo tenga en una
+ * columna: es lo que permite que el barrido de huérfanos y cualquier
+ * inspección manual del bucket digan de qué paciente es cada objeto sin
+ * cruzar con la base.
+ */
+async function subirDocumento(file, mascotaId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const unico = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const ruta = `${user.id}/${mascotaId}/${unico}.pdf`;
+
+  const up = await supabase.storage.from('documentos').upload(ruta, file, {
+    upsert: false,
+    // El tipo se fija a 'application/pdf' en vez de usar file.type porque en
+    // este camino ya pasó por revisarArchivo (limites.js), que validó que el
+    // tipo sea application/pdf. Cambiar esto por file.type no cerraría nada:
+    // el navegador deriva File.type de la extensión del nombre, así que un
+    // .exe renombrado a .pdf reporta application/pdf de todas formas.
+    // Lo que sí protege contra una subida que no pasa por este código —alguien
+    // que llame supabase.storage.upload directo con F12— es el allowed_mime_types
+    // del bucket, que se fija en el `insert into storage.buckets` del bucket
+    // 'documentos', en 015_archivos_mascota.sql.
+    contentType: 'application/pdf',
+  });
+  if (up.error) throw apiError(up.error.message);
+
+  return ruta;
+}
+
 // Campos que acepta la tabla `duenos`, y nada más. Lo que no esté acá se
 // descarta: antes se desestructuraba a mano en POST y en PUT por separado,
 // y cuando la migración 011 agregó cedula y telefono2 los dos sitios los
@@ -221,8 +270,214 @@ const routes = [
     return flattenMascota(row);
   }},
   { m: 'DELETE', re: /^\/mascotas\/(\d+)$/, fn: async ({ id }) => {
+    // `archivos_mascota.mascota_id` es `on delete cascade`, así que
+    // Postgres se lleva las FILAS solo. Los OBJETOS del bucket no: Storage
+    // no tiene ninguna llave foránea contra `mascotas`, y nunca se borran
+    // por SQL —un `delete from storage.objects` deja el archivo en el
+    // disco, y desde 2026-03-05 un trigger lo rechaza. Hay que pedírselo a
+    // la Storage API, acá, antes.
+    const archivos = unwrap(await supabase
+      .from('archivos_mascota').select('ruta').eq('mascota_id', id));
+
+    if (archivos.length > 0) {
+      // Una sola llamada con todas las rutas, no una por archivo: diez
+      // viajes para borrar una mascota es medio segundo de nada.
+      const borrado = await supabase.storage
+        .from('documentos').remove(archivos.map((a) => a.ruta));
+
+      // ASIMETRÍA A PROPÓSITO, y es lo contrario de DELETE /archivos/:id.
+      //
+      // Allá el `.remove()` que falla aborta todo, porque el objetivo era
+      // borrar ESE archivo y no se logró.
+      //
+      // Acá lo que se mandó borrar es la MASCOTA. Dejarla viva porque
+      // Storage tuvo un hipo le deja a la clínica una mascota que no se
+      // puede borrar y ninguna explicación de por qué. El huérfano, en
+      // cambio, no se ve, no le miente a nadie, y el barrido lo encuentra.
+      // Se falla hacia el huérfano.
+      if (borrado.error) {
+        console.warn(
+          `[api] la mascota ${id} se borró pero quedaron ${archivos.length} objetos huérfanos:`,
+          borrado.error.message
+        );
+      } else {
+        // `.remove()` devuelve éxito aunque no haya borrado todos los objetos
+        // de la lista: los que no estaban en Storage —o los que la política
+        // negó— simplemente no aparecen en `data`. No hay error. Se avisa
+        // cuántos se quedaron para que el barrido los encuentre.
+        const borrados = (borrado.data || []).length;
+        if (borrados < archivos.length) {
+          console.warn(
+            `[api] mascota ${id}: se pidió borrar ${archivos.length} objetos, Storage confirmó ${borrados}`
+          );
+        }
+      }
+    }
+
     unwrap(await supabase.from('mascotas').delete().eq('id', id));
     return { mensaje: 'Mascota eliminada correctamente' };
+  }},
+
+  // ===== ARCHIVOS DE MASCOTA =====
+  // Documentos clínicos en PDF. La tabla y el bucket son de
+  // 015_archivos_mascota.sql.
+  { m: 'GET', re: /^\/archivos\/mascota\/(\d+)$/, fn: async ({ id }) =>
+    unwrap(await supabase
+      .from('archivos_mascota')
+      .select('*')
+      .eq('mascota_id', id)
+      .order('created_at', { ascending: false })) },
+
+  { m: 'POST', re: /^\/archivos$/, fn: async ({ body }) => {
+    // `parseMascotaBody` ya estableció el patrón: un getter `g` que sabe si
+    // el body es FormData o un objeto plano, y lee el campo correcto en cada
+    // caso. Sin él, `body?.cuantos_hay` y los demás campos siempre son
+    // `undefined` cuando el llamador manda FormData — body.get() no es lo
+    // mismo que body.campo.
+    const isFD = typeof FormData !== 'undefined' && body instanceof FormData;
+    const g = (k) => (isFD ? body.get(k) : body?.[k]);
+
+    const file = g('archivo');
+
+    // `cuantos_hay` ausente no es lo mismo que cero: cero archivos existentes
+    // es un estado válido del sistema; campo no enviado indica un llamador
+    // que no conoce la interfaz. Se valida igual que `mascota_id` y `tipo`.
+    const cuantosRaw = g('cuantos_hay');
+    if (cuantosRaw == null || cuantosRaw === '') throw apiError('Falta indicar cuántos archivos tiene la mascota');
+    // Y un valor que no es número tampoco sirve: `Number('abc')` da NaN, y
+    // `NaN >= MAX_POR_MASCOTA` es false, así que el cupo se apagaría igual
+    // que si el campo no hubiera llegado. Un FormData manda strings siempre,
+    // de ahí que se convierta antes de mirarlo.
+    const cuantosHay = Number(cuantosRaw);
+    if (!Number.isFinite(cuantosHay) || cuantosHay < 0) throw apiError('No se pudo leer cuántos archivos tiene la mascota');
+
+    // El chequeo del frontend corre ACÁ y no solo en el componente, para
+    // que ninguna pantalla futura pueda saltárselo. Es la capa que da el
+    // mensaje útil; las otras dos (el check de la tabla y el límite del
+    // bucket) solo rechazan.
+    const veredicto = revisarArchivo(file, cuantosHay);
+    if (!veredicto.ok) throw apiError(veredicto.motivo);
+
+    const mascotaIdRaw = g('mascota_id');
+    if (!mascotaIdRaw) throw apiError('Falta decir de qué mascota es el archivo');
+    // Se coerciona a número aquí y no en el insert: si el valor no es un
+    // entero válido, Postgres lo rechaza con un error de tipo crudo en inglés.
+    // Fallando aquí se da un mensaje claro antes de tocar el bucket.
+    const mascotaId = Number(mascotaIdRaw);
+    if (!Number.isFinite(mascotaId) || mascotaId <= 0) throw apiError('El identificador de mascota no es válido');
+
+    if (!g('tipo')) throw apiError('Falta elegir qué tipo de documento es');
+
+    // PRIMERO el bucket, DESPUÉS la fila. El orden es la decisión central
+    // de todo esto.
+    //
+    // Al revés —fila primero— una subida que falla a mitad deja una fila
+    // que dice "acá hay un examen de sangre" apuntando a un objeto que no
+    // existe: la lista lo muestra, la clínica lo clickea, y no abre nada.
+    // Nadie puede distinguir eso de un bug.
+    //
+    // En este orden lo que queda si algo falla es un objeto sin fila: no se
+    // ve en ninguna pantalla, no le miente a nadie, y el barrido de huérfanos
+    // lo encuentra. Se falla hacia el huérfano. Excepción no contemplada: si
+    // el insert se confirma pero la respuesta se pierde (timeout, corte de
+    // red), `unwrap` lanza, el catch borra el objeto, y la fila queda apuntando
+    // a nada — exactamente el estado que este orden intenta evitar. Es un
+    // caso de borde, no el flujo normal; el trade-off sigue valiendo.
+    const ruta = await subirDocumento(file, mascotaId);
+
+    try {
+      return unwrap(await supabase.from('archivos_mascota').insert({
+        mascota_id:      mascotaId,
+        ruta,
+        nombre:          file.name,
+        tipo:            g('tipo'),
+        descripcion:     g('descripcion') || null,
+        fecha_documento: g('fecha_documento') || null,
+        peso_bytes:      file.size,
+      }).select('*').single());
+    } catch (err) {
+      // El insert falló: el objeto que se acaba de subir no tiene dueño.
+      // Se borra acá mismo en vez de dejárselo al barrido, porque el
+      // barrido lo corre el dueño de VetaApp a mano y esto pasa en el
+      // segundo.
+      //
+      // Si el `.remove()` también falla no se dice nada a la clínica: su
+      // problema es el insert, y es el que se le va a mostrar. El huérfano
+      // queda para el barrido, que es exactamente para lo que existe.
+      //
+      // `.remove()` puede devolver éxito con `data` vacío si el objeto ya
+      // no existía o si la política lo negó sin error. Se avisa en consola
+      // para que el barrido lo encuentre; no se lanza nada extra.
+      const limpieza = await supabase.storage.from('documentos').remove([ruta]);
+      if (limpieza.error) {
+        console.warn('[api] quedó un objeto huérfano en documentos:', ruta, limpieza.error.message);
+      } else if (!limpieza.data || limpieza.data.length === 0) {
+        console.warn('[api] rollback sin confirmación de borrado — posible huérfano en documentos:', ruta);
+      }
+
+      // El trigger y los checks de 015 levantan nombres secos. Acá se
+      // vuelven la misma frase que habría dicho la pantalla.
+      const frase = traducirErrorSql(err?.response?.data?.error || err?.message);
+      throw frase ? apiError(frase) : err;
+    }
+  }},
+
+  // La URL firmada se pide EN EL CLIC y vive 300 segundos.
+  //
+  // No se guarda en una columna, y no es una sutileza: una URL firmada
+  // guardada es una llave con fecha de vencimiento en un campo de texto.
+  // Vencida, la fila sigue ahí y el botón abre un error. Y mientras no
+  // está vencida, cualquiera que la vea entra sin sesión.
+  //
+  // 300 s porque el único uso es abrir el PDF en otra pestaña, ahora. Más
+  // tiempo es una llave de más duración por nada; menos, y un PDF de 12 MB
+  // —el máximo desde la 016— en el internet de una clínica en Girón no
+  // termina de bajar.
+  { m: 'GET', re: /^\/archivos\/(\d+)\/url$/, fn: async ({ id }) => {
+    const fila = unwrap(await supabase
+      .from('archivos_mascota').select('ruta').eq('id', id).single());
+
+    const { data, error } = await supabase.storage
+      .from('documentos').createSignedUrl(fila.ruta, 300);
+    if (error) throw apiError(error.message);
+
+    return { url: data.signedUrl };
+  }},
+
+  { m: 'DELETE', re: /^\/archivos\/(\d+)$/, fn: async ({ id }) => {
+    const fila = unwrap(await supabase
+      .from('archivos_mascota').select('ruta').eq('id', id).single());
+
+    // PRIMERO el objeto, DESPUÉS la fila: el mismo criterio que la subida,
+    // leído al revés. Si se borrara la fila primero y el objeto fallara,
+    // el archivo quedaría pagándose para siempre sin que nada lo nombre.
+    //
+    // Y si el objeto se borra pero la fila no, la clínica ve un archivo
+    // que no abre — malo, pero visible, y se arregla volviendo a darle
+    // "Borrar". Es el modo de falla que se puede reintentar.
+    //
+    // Asimetría de `.remove()`: devuelve `{ error: null }` aunque no haya
+    // borrado nada. Storage contesta con la lista de objetos que sí borró, y
+    // el que no estaba —o el que la política negó— simplemente no aparece en
+    // `data`, sin error. Así que `borrado.error` atrapa fallas de red y de
+    // autenticación, no el "borré cero objetos".
+    //
+    // Cuando pasa eso la fila SE BORRA IGUAL, y es a propósito: desde el
+    // cliente no hay forma de distinguir "el objeto ya no estaba" (el caso
+    // normal si el barrido pasó antes) de "la política lo negó" (no
+    // alcanzable para un archivo propio, porque las cuatro políticas del
+    // bucket gatean por el primer segmento de la ruta, que es el uid del
+    // que llama). Frenar acá dejaría a la clínica con una fila que no puede
+    // sacar nunca de la ficha, que es peor que un huérfano. Se avisa en
+    // consola para que el huérfano quede nombrado en alguna parte.
+    const borrado = await supabase.storage.from('documentos').remove([fila.ruta]);
+    if (borrado.error) throw apiError(borrado.error.message);
+    if (!borrado.data || borrado.data.length === 0) {
+      console.warn('[api] DELETE /archivos: Storage reportó éxito sin borrar el objeto — posible huérfano:', fila.ruta);
+    }
+
+    unwrap(await supabase.from('archivos_mascota').delete().eq('id', id));
+    return { mensaje: 'Archivo eliminado' };
   }},
 
   // ===== DUEÑOS =====
